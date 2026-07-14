@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "Client mail auto-hébergé léger"
+  },
+  "nav": {
+    "inbox": "Boîte de réception",
+    "starred": "Suivis",
+    "sent": "Envoyés",
+    "drafts": "Brouillons",
+    "archive": "Archives",
+    "spam": "Spam",
+    "trash": "Corbeille",
+    "compose": "Nouveau message",
+    "settings": "Paramètres",
+    "logout": "Déconnexion",
+    "folders": "Dossiers",
+    "search": "Rechercher des e-mails",
+    "help": "Aide"
+  },
+  "login": {
+    "title": "Connexion",
+    "subtitle": "Connectez-vous à votre boîte IMAP",
+    "host": "Hôte IMAP",
+    "hostPlaceholder": "mail.example.com",
+    "username": "Nom d'utilisateur",
+    "usernamePlaceholder": "you@example.com",
+    "password": "Mot de passe",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Se connecter",
+    "submitting": "Connexion…",
+    "hint": "Les identifiants sont envoyés à votre API auto-hébergée via une session sécurisée."
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "languageHint": "Choisir la langue de l'interface",
+    "theme": "Thème",
+    "themeLight": "Clair",
+    "themeDark": "Sombre",
+    "themeHint": "Paper Quiet prend en charge clair et sombre",
+    "font": "Police",
+    "fontHint": "Police de l'interface (plus tard)",
+    "fontSystem": "Système",
+    "fontSans": "Sans",
+    "fontSerif": "Serif",
+    "fontMono": "Mono",
+    "accent": "Couleur d'accent",
+    "accentHint": "Famille d'accent avec échelle complète",
+    "accentTeal": "Sarcelle",
+    "accentSlate": "Ardoise",
+    "accentAmber": "Ambre",
+    "backToMail": "Retour au courrier"
+  },
+  "mail": {
+    "emptyInbox": "Votre boîte de réception est vide",
+    "emptyInboxHint": "Les nouveaux messages apparaîtront ici",
+    "emptySelection": "Sélectionnez un message",
+    "emptySelectionHint": "Choisissez une conversation dans la liste pour la lire",
+    "noSubject": "(Sans objet)",
+    "to": "à",
+    "attachments": "{{count}} pièce jointe",
+    "attachments_other": "{{count}} pièces jointes",
+    "reply": "Répondre",
+    "replyAll": "Répondre à tous",
+    "forward": "Transférer",
+    "refresh": "Actualiser",
+    "unread": "{{count}} non lus",
+    "of": "{{from}}–{{to}} sur {{total}}"
+  },
+  "errors": {
+    "generic": "Une erreur s'est produite",
+    "network": "Erreur réseau — vérifiez votre connexion",
+    "unauthorized": "Session expirée — veuillez vous reconnecter",
+    "invalidCredentials": "Hôte, nom d'utilisateur ou mot de passe invalide",
+    "required": "Ce champ est obligatoire",
+    "notImplemented": "Pas encore connecté à l'API"
+  },
+  "common": {
+    "loading": "Chargement…",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "close": "Fermer"
+  }
+}

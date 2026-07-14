@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "Cliente de correo autoalojado ligero"
+  },
+  "nav": {
+    "inbox": "Recibidos",
+    "starred": "Destacados",
+    "sent": "Enviados",
+    "drafts": "Borradores",
+    "archive": "Archivo",
+    "spam": "Spam",
+    "trash": "Papelera",
+    "compose": "Redactar",
+    "settings": "Ajustes",
+    "logout": "Cerrar sesión",
+    "folders": "Carpetas",
+    "search": "Buscar correo",
+    "help": "Ayuda"
+  },
+  "login": {
+    "title": "Iniciar sesión",
+    "subtitle": "Conéctese a su buzón IMAP",
+    "host": "Servidor IMAP",
+    "hostPlaceholder": "mail.example.com",
+    "username": "Usuario",
+    "usernamePlaceholder": "you@example.com",
+    "password": "Contraseña",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Entrar",
+    "submitting": "Entrando…",
+    "hint": "Las credenciales se envían a su API autoalojada en una sesión segura."
+  },
+  "settings": {
+    "title": "Ajustes",
+    "language": "Idioma",
+    "languageHint": "Elija el idioma de la interfaz",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Oscuro",
+    "themeHint": "Paper Quiet admite claro y oscuro",
+    "font": "Fuente",
+    "fontHint": "Tipografía de la interfaz (más opciones después)",
+    "fontSystem": "Sistema",
+    "fontSans": "Sans",
+    "fontSerif": "Serif",
+    "fontMono": "Mono",
+    "accent": "Color de acento",
+    "accentHint": "Familia de acento con escala completa",
+    "accentTeal": "Verde azulado",
+    "accentSlate": "Pizarra",
+    "accentAmber": "Ámbar",
+    "backToMail": "Volver al correo"
+  },
+  "mail": {
+    "emptyInbox": "Su bandeja de entrada está vacía",
+    "emptyInboxHint": "Los mensajes nuevos aparecerán aquí",
+    "emptySelection": "Seleccione un mensaje",
+    "emptySelectionHint": "Elija una conversación de la lista para leerla",
+    "noSubject": "(Sin asunto)",
+    "to": "para",
+    "attachments": "{{count}} adjunto",
+    "attachments_other": "{{count}} adjuntos",
+    "reply": "Responder",
+    "replyAll": "Responder a todos",
+    "forward": "Reenviar",
+    "refresh": "Actualizar",
+    "unread": "{{count}} no leídos",
+    "of": "{{from}}–{{to}} de {{total}}"
+  },
+  "errors": {
+    "generic": "Algo salió mal",
+    "network": "Error de red — compruebe su conexión",
+    "unauthorized": "Sesión caducada — inicie sesión de nuevo",
+    "invalidCredentials": "Servidor, usuario o contraseña no válidos",
+    "required": "Este campo es obligatorio",
+    "notImplemented": "Aún no conectado a la API"
+  },
+  "common": {
+    "loading": "Cargando…",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "close": "Cerrar"
+  }
+}

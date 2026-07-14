@@ -1,0 +1,102 @@
+import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import type { FolderId } from '../../data/mockMail'
+import { FOLDERS } from '../../data/mockMail'
+import styles from './Sidebar.module.css'
+
+type SidebarProps = {
+  activeFolder: FolderId
+  onSelectFolder: (id: FolderId) => void
+}
+
+export function Sidebar({ activeFolder, onSelectFolder }: SidebarProps) {
+  const { t } = useTranslation()
+
+  return (
+    <aside className={styles.sidebar}>
+      <button type="button" className={styles.compose}>
+        <ComposeIcon />
+        {t('nav.compose')}
+      </button>
+
+      <nav className={styles.nav} aria-label={t('nav.folders')}>
+        {FOLDERS.map((folder) => {
+          const active = folder.id === activeFolder
+          return (
+            <button
+              key={folder.id}
+              type="button"
+              className={`${styles.navItem} ${active ? styles.navItemActive : ''}`}
+              onClick={() => onSelectFolder(folder.id)}
+            >
+              <FolderIcon id={folder.id} />
+              <span className={styles.navLabel}>{t(`nav.${folder.id}`)}</span>
+              {folder.count != null ? (
+                <span className={styles.navCount}>{folder.count}</span>
+              ) : null}
+            </button>
+          )
+        })}
+      </nav>
+
+      <p className={styles.sectionLabel}>{t('nav.settings')}</p>
+      <nav className={styles.nav}>
+        <Link to="/settings" className={styles.navItem}>
+          <SettingsIcon />
+          <span className={styles.navLabel}>{t('nav.settings')}</span>
+        </Link>
+      </nav>
+    </aside>
+  )
+}
+
+function ComposeIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function SettingsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6" />
+      <path
+        d="M12 3v2.2M12 18.8V21M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M3 12h2.2M18.8 12H21M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function FolderIcon({ id }: { id: FolderId }) {
+  const paths: Record<FolderId, string> = {
+    inbox: 'M4 6h16v12H4V6zm0 0l8 6 8-6',
+    starred: 'M12 3.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.2 7.2 18.4l.9-5.4L4.2 9.2l5.4-.8L12 3.5z',
+    sent: 'M4 12l16-7-7 16-2.2-6.8L4 12z',
+    drafts: 'M6 4h9l3 3v13H6V4zm9 0v3h3',
+    archive: 'M4 7h16v2H4V7zm2 2v10h12V9',
+    spam: 'M12 3l9 16H3L12 3zm0 6v4m0 3h.01',
+    trash: 'M9 4h6m-8 3h10l-1 13H8L7 7zm3 3v7m4-7v7',
+  }
+
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d={paths[id]}
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}

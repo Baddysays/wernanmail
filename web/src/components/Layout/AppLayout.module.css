@@ -1,0 +1,137 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-page);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  height: var(--header-height);
+  padding: 0 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--text-primary);
+  text-decoration: none;
+  min-width: calc(var(--sidebar-width) - 1rem);
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.brandIcon {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+.brandName {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+}
+
+.search {
+  flex: 1;
+  max-width: 36rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-default);
+  background: var(--bg-elevated);
+  color: var(--text-muted);
+}
+
+.search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  color: var(--text-primary);
+}
+
+.search input::placeholder {
+  color: var(--text-muted);
+}
+
+.searchHint {
+  font-size: var(--font-size-xs);
+  padding: 0.1rem 0.4rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.iconBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.body {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) var(--list-width) 1fr;
+  min-height: 0;
+  flex: 1;
+}
+
+@media (max-width: 960px) {
+  .body {
+    grid-template-columns: var(--sidebar-width) 1fr;
+  }
+
+  .body > :last-child {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .brandName {
+    display: none;
+  }
+
+  .brand {
+    min-width: auto;
+  }
+
+  .body {
+    grid-template-columns: 1fr;
+  }
+
+  .body > :first-child {
+    display: none;
+  }
+}

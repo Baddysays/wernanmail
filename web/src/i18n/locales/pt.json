@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "Cliente de e-mail auto-hospedado leve"
+  },
+  "nav": {
+    "inbox": "Caixa de entrada",
+    "starred": "Com estrela",
+    "sent": "Enviados",
+    "drafts": "Rascunhos",
+    "archive": "Arquivo",
+    "spam": "Spam",
+    "trash": "Lixo",
+    "compose": "Escrever",
+    "settings": "Definições",
+    "logout": "Sair",
+    "folders": "Pastas",
+    "search": "Pesquisar e-mail",
+    "help": "Ajuda"
+  },
+  "login": {
+    "title": "Iniciar sessão",
+    "subtitle": "Ligue-se à sua caixa IMAP",
+    "host": "Servidor IMAP",
+    "hostPlaceholder": "mail.example.com",
+    "username": "Utilizador",
+    "usernamePlaceholder": "you@example.com",
+    "password": "Palavra-passe",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Entrar",
+    "submitting": "A entrar…",
+    "hint": "As credenciais são enviadas para a sua API auto-hospedada numa sessão segura."
+  },
+  "settings": {
+    "title": "Definições",
+    "language": "Idioma",
+    "languageHint": "Escolha o idioma da interface",
+    "theme": "Tema",
+    "themeLight": "Claro",
+    "themeDark": "Escuro",
+    "themeHint": "Paper Quiet suporta claro e escuro",
+    "font": "Tipo de letra",
+    "fontHint": "Fonte da interface (mais opções depois)",
+    "fontSystem": "Sistema",
+    "fontSans": "Sans",
+    "fontSerif": "Serif",
+    "fontMono": "Mono",
+    "accent": "Cor de destaque",
+    "accentHint": "Família de destaque com escala completa",
+    "accentTeal": "Verde-azulado",
+    "accentSlate": "Ardósia",
+    "accentAmber": "Âmbar",
+    "backToMail": "Voltar ao correio"
+  },
+  "mail": {
+    "emptyInbox": "A sua caixa de entrada está vazia",
+    "emptyInboxHint": "Novas mensagens aparecerão aqui",
+    "emptySelection": "Selecione uma mensagem",
+    "emptySelectionHint": "Escolha uma conversa da lista para a ler",
+    "noSubject": "(Sem assunto)",
+    "to": "para",
+    "attachments": "{{count}} anexo",
+    "attachments_other": "{{count}} anexos",
+    "reply": "Responder",
+    "replyAll": "Responder a todos",
+    "forward": "Reencaminhar",
+    "refresh": "Atualizar",
+    "unread": "{{count}} não lidas",
+    "of": "{{from}}–{{to}} de {{total}}"
+  },
+  "errors": {
+    "generic": "Algo correu mal",
+    "network": "Erro de rede — verifique a ligação",
+    "unauthorized": "Sessão expirada — inicie sessão novamente",
+    "invalidCredentials": "Servidor, utilizador ou palavra-passe inválidos",
+    "required": "Este campo é obrigatório",
+    "notImplemented": "Ainda não ligado à API"
+  },
+  "common": {
+    "loading": "A carregar…",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "close": "Fechar"
+  }
+}

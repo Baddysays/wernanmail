@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "Лёгкий self-hosted почтовый клиент"
+  },
+  "nav": {
+    "inbox": "Входящие",
+    "starred": "Помеченные",
+    "sent": "Отправленные",
+    "drafts": "Черновики",
+    "archive": "Архив",
+    "spam": "Спам",
+    "trash": "Корзина",
+    "compose": "Написать",
+    "settings": "Настройки",
+    "logout": "Выйти",
+    "folders": "Папки",
+    "search": "Поиск писем",
+    "help": "Справка"
+  },
+  "login": {
+    "title": "Вход",
+    "subtitle": "Подключитесь к почтовому ящику IMAP",
+    "host": "IMAP-сервер",
+    "hostPlaceholder": "mail.example.com",
+    "username": "Имя пользователя",
+    "usernamePlaceholder": "you@example.com",
+    "password": "Пароль",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Войти",
+    "submitting": "Вход…",
+    "hint": "Учётные данные отправляются на ваш self-hosted API в защищённой сессии."
+  },
+  "settings": {
+    "title": "Настройки",
+    "language": "Язык",
+    "languageHint": "Выберите язык интерфейса",
+    "theme": "Тема",
+    "themeLight": "Светлая",
+    "themeDark": "Тёмная",
+    "themeHint": "Paper Quiet поддерживает светлую и тёмную тему",
+    "font": "Шрифт",
+    "fontHint": "Шрифт интерфейса (больше вариантов позже)",
+    "fontSystem": "Системный",
+    "fontSans": "Без засечек",
+    "fontSerif": "С засечками",
+    "fontMono": "Моноширинный",
+    "accent": "Цвет акцента",
+    "accentHint": "Палитра акцента с полной шкалой оттенков",
+    "accentTeal": "Бирюзовый",
+    "accentSlate": "Сланцевый",
+    "accentAmber": "Янтарный",
+    "backToMail": "К почте"
+  },
+  "mail": {
+    "emptyInbox": "Входящие пусты",
+    "emptyInboxHint": "Новые письма появятся здесь",
+    "emptySelection": "Выберите письмо",
+    "emptySelectionHint": "Выберите сообщение из списка, чтобы прочитать",
+    "noSubject": "(Без темы)",
+    "to": "кому",
+    "attachments": "{{count}} вложение",
+    "attachments_other": "{{count}} вложений",
+    "reply": "Ответить",
+    "replyAll": "Ответить всем",
+    "forward": "Переслать",
+    "refresh": "Обновить",
+    "unread": "{{count}} непрочитанных",
+    "of": "{{from}}–{{to}} из {{total}}"
+  },
+  "errors": {
+    "generic": "Что-то пошло не так",
+    "network": "Ошибка сети — проверьте подключение",
+    "unauthorized": "Сессия истекла — войдите снова",
+    "invalidCredentials": "Неверный сервер, имя пользователя или пароль",
+    "required": "Обязательное поле",
+    "notImplemented": "API ещё не подключён"
+  },
+  "common": {
+    "loading": "Загрузка…",
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "close": "Закрыть"
+  }
+}

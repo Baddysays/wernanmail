@@ -1,0 +1,134 @@
+.list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+}
+
+.toolbarMeta {
+  margin-left: auto;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+}
+
+.iconBtn {
+  display: grid;
+  place-items: center;
+  width: 1.85rem;
+  height: 1.85rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+}
+
+.iconBtn:hover {
+  background: var(--bg-hover);
+}
+
+.items {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 0.55rem 0.65rem;
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-left: 3px solid transparent;
+  background: transparent;
+  text-align: left;
+  color: var(--text-primary);
+}
+
+.item:hover {
+  background: var(--bg-hover);
+}
+
+.itemActive {
+  background: var(--bg-selected);
+  border-left-color: var(--accent);
+}
+
+.itemUnread .sender,
+.itemUnread .subject {
+  font-weight: var(--font-weight-semibold);
+}
+
+.star {
+  grid-row: span 2;
+  align-self: start;
+  margin-top: 0.15rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.starOn {
+  color: var(--accent);
+}
+
+.main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.sender {
+  font-size: var(--font-size-sm);
+}
+
+.subject {
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.preview {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.25rem;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.empty {
+  display: grid;
+  place-content: center;
+  gap: 0.35rem;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.emptyTitle {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-secondary);
+}

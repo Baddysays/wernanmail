@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "軽量セルフホスト型メールクライアント"
+  },
+  "nav": {
+    "inbox": "受信トレイ",
+    "starred": "スター付き",
+    "sent": "送信済み",
+    "drafts": "下書き",
+    "archive": "アーカイブ",
+    "spam": "迷惑メール",
+    "trash": "ゴミ箱",
+    "compose": "作成",
+    "settings": "設定",
+    "logout": "ログアウト",
+    "folders": "フォルダ",
+    "search": "メールを検索",
+    "help": "ヘルプ"
+  },
+  "login": {
+    "title": "サインイン",
+    "subtitle": "IMAP メールボックスに接続",
+    "host": "IMAP ホスト",
+    "hostPlaceholder": "mail.example.com",
+    "username": "ユーザー名",
+    "usernamePlaceholder": "you@example.com",
+    "password": "パスワード",
+    "passwordPlaceholder": "••••••••",
+    "submit": "サインイン",
+    "submitting": "サインイン中…",
+    "hint": "認証情報は安全なセッションでセルフホスト API に送信されます。"
+  },
+  "settings": {
+    "title": "設定",
+    "language": "言語",
+    "languageHint": "インターフェース言語を選択",
+    "theme": "テーマ",
+    "themeLight": "ライト",
+    "themeDark": "ダーク",
+    "themeHint": "Paper Quiet はライトとダークに対応",
+    "font": "フォント",
+    "fontHint": "UI 書体（今後追加予定）",
+    "fontSystem": "システム",
+    "fontSans": "ゴシック",
+    "fontSerif": "明朝",
+    "fontMono": "等幅",
+    "accent": "アクセントカラー",
+    "accentHint": "段階スケール付きアクセント系統",
+    "accentTeal": "ティール",
+    "accentSlate": "スレート",
+    "accentAmber": "アンバー",
+    "backToMail": "メールに戻る"
+  },
+  "mail": {
+    "emptyInbox": "受信トレイは空です",
+    "emptyInboxHint": "新しいメッセージがここに表示されます",
+    "emptySelection": "メッセージを選択",
+    "emptySelectionHint": "リストから会話を選んで読んでください",
+    "noSubject": "（件名なし）",
+    "to": "宛先",
+    "attachments": "添付 {{count}} 件",
+    "attachments_other": "添付 {{count}} 件",
+    "reply": "返信",
+    "replyAll": "全員に返信",
+    "forward": "転送",
+    "refresh": "更新",
+    "unread": "未読 {{count}} 件",
+    "of": "{{from}}–{{to}} / {{total}} 件"
+  },
+  "errors": {
+    "generic": "問題が発生しました",
+    "network": "ネットワークエラー — 接続を確認してください",
+    "unauthorized": "セッションの有効期限切れ — 再度サインインしてください",
+    "invalidCredentials": "ホスト、ユーザー名、またはパスワードが無効です",
+    "required": "この項目は必須です",
+    "notImplemented": "まだ API に接続されていません"
+  },
+  "common": {
+    "loading": "読み込み中…",
+    "save": "保存",
+    "cancel": "キャンセル",
+    "close": "閉じる"
+  }
+}

@@ -1,0 +1,27 @@
+.page {
+  display: grid;
+  grid-template-columns: var(--sidebar-width) var(--list-width) 1fr;
+  min-height: 0;
+  flex: 1;
+  height: calc(100% - var(--header-height));
+}
+
+@media (max-width: 960px) {
+  .page {
+    grid-template-columns: var(--sidebar-width) 1fr;
+  }
+
+  .page > :last-child {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    grid-template-columns: 1fr;
+  }
+
+  .page > :first-child {
+    display: none;
+  }
+}

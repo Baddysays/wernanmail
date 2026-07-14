@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "Hafif self-hosted posta istemcisi"
+  },
+  "nav": {
+    "inbox": "Gelen kutusu",
+    "starred": "Yıldızlı",
+    "sent": "Gönderilenler",
+    "drafts": "Taslaklar",
+    "archive": "Arşiv",
+    "spam": "Spam",
+    "trash": "Çöp kutusu",
+    "compose": "Oluştur",
+    "settings": "Ayarlar",
+    "logout": "Çıkış",
+    "folders": "Klasörler",
+    "search": "Posta ara",
+    "help": "Yardım"
+  },
+  "login": {
+    "title": "Oturum aç",
+    "subtitle": "IMAP posta kutunuza bağlanın",
+    "host": "IMAP sunucusu",
+    "hostPlaceholder": "mail.example.com",
+    "username": "Kullanıcı adı",
+    "usernamePlaceholder": "you@example.com",
+    "password": "Parola",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Oturum aç",
+    "submitting": "Oturum açılıyor…",
+    "hint": "Kimlik bilgileri güvenli bir oturumla self-hosted API'nize gönderilir."
+  },
+  "settings": {
+    "title": "Ayarlar",
+    "language": "Dil",
+    "languageHint": "Arayüz dilini seçin",
+    "theme": "Tema",
+    "themeLight": "Açık",
+    "themeDark": "Koyu",
+    "themeHint": "Paper Quiet açık ve koyu temayı destekler",
+    "font": "Yazı tipi",
+    "fontHint": "Arayüz yazı tipi (daha sonra eklenecek)",
+    "fontSystem": "Sistem",
+    "fontSans": "Sans",
+    "fontSerif": "Serif",
+    "fontMono": "Mono",
+    "accent": "Vurgu rengi",
+    "accentHint": "Tam ton ölçeğine sahip vurgu ailesi",
+    "accentTeal": "Camgöbeği",
+    "accentSlate": "Arduvaz",
+    "accentAmber": "Kehribar",
+    "backToMail": "Postaya dön"
+  },
+  "mail": {
+    "emptyInbox": "Gelen kutunuz boş",
+    "emptyInboxHint": "Yeni iletiler burada görünecek",
+    "emptySelection": "Bir ileti seçin",
+    "emptySelectionHint": "Okumak için listeden bir konuşma seçin",
+    "noSubject": "(Konu yok)",
+    "to": "kime",
+    "attachments": "{{count}} ek",
+    "attachments_other": "{{count}} ek",
+    "reply": "Yanıtla",
+    "replyAll": "Tümünü yanıtla",
+    "forward": "İlet",
+    "refresh": "Yenile",
+    "unread": "{{count}} okunmamış",
+    "of": "{{from}}–{{to}} / {{total}}"
+  },
+  "errors": {
+    "generic": "Bir şeyler ters gitti",
+    "network": "Ağ hatası — bağlantınızı kontrol edin",
+    "unauthorized": "Oturum süresi doldu — lütfen yeniden oturum açın",
+    "invalidCredentials": "Geçersiz sunucu, kullanıcı adı veya parola",
+    "required": "Bu alan zorunludur",
+    "notImplemented": "Henüz API'ye bağlanılmadı"
+  },
+  "common": {
+    "loading": "Yükleniyor…",
+    "save": "Kaydet",
+    "cancel": "İptal",
+    "close": "Kapat"
+  }
+}

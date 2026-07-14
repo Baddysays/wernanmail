@@ -1,0 +1,124 @@
+.page {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 2rem 1rem;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, var(--accent-100), transparent),
+    var(--bg-page);
+}
+
+.card {
+  width: min(100%, 26rem);
+  padding: 2rem 1.75rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-bottom: 1.5rem;
+}
+
+.brandIcon {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+.brandName {
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+}
+
+.title {
+  margin: 0 0 0.25rem;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0 0 1.5rem;
+  color: var(--text-secondary);
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field label {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+}
+
+.field input {
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-100);
+}
+
+.error {
+  margin: 0;
+  padding: 0.55rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: #fdecea;
+  color: #8a1f1b;
+  font-size: var(--font-size-sm);
+}
+
+[data-theme='dark'] .error {
+  background: #3a1d1c;
+  color: #f0b4b0;
+}
+
+.submit {
+  margin-top: 0.35rem;
+  padding: 0.7rem 1rem;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--accent);
+  color: var(--text-inverse);
+  font-weight: var(--font-weight-semibold);
+}
+
+.submit:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.submit:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.hint {
+  margin: 1rem 0 0;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  line-height: 1.45;
+}

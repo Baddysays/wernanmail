@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "Lightweight self-hosted mail"
+  },
+  "nav": {
+    "inbox": "Inbox",
+    "starred": "Starred",
+    "sent": "Sent",
+    "drafts": "Drafts",
+    "archive": "Archive",
+    "spam": "Spam",
+    "trash": "Trash",
+    "compose": "Compose",
+    "settings": "Settings",
+    "logout": "Log out",
+    "folders": "Folders",
+    "search": "Search mail",
+    "help": "Help"
+  },
+  "login": {
+    "title": "Sign in",
+    "subtitle": "Connect to your IMAP mailbox",
+    "host": "IMAP host",
+    "hostPlaceholder": "mail.example.com",
+    "username": "Username",
+    "usernamePlaceholder": "you@example.com",
+    "password": "Password",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Sign in",
+    "submitting": "Signing in…",
+    "hint": "Credentials are sent to your self-hosted API over a secure session."
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageHint": "Choose the interface language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeHint": "Paper Quiet supports light and dark",
+    "font": "Font",
+    "fontHint": "UI typeface (more faces later)",
+    "fontSystem": "System",
+    "fontSans": "Sans",
+    "fontSerif": "Serif",
+    "fontMono": "Mono",
+    "accent": "Accent color",
+    "accentHint": "Accent family with full gradation scale",
+    "accentTeal": "Teal",
+    "accentSlate": "Slate",
+    "accentAmber": "Amber",
+    "backToMail": "Back to mail"
+  },
+  "mail": {
+    "emptyInbox": "Your inbox is empty",
+    "emptyInboxHint": "New messages will appear here",
+    "emptySelection": "Select a message",
+    "emptySelectionHint": "Choose a conversation from the list to read it",
+    "noSubject": "(No subject)",
+    "to": "to",
+    "attachments": "{{count}} attachment",
+    "attachments_other": "{{count}} attachments",
+    "reply": "Reply",
+    "replyAll": "Reply all",
+    "forward": "Forward",
+    "refresh": "Refresh",
+    "unread": "{{count}} unread",
+    "of": "{{from}}–{{to}} of {{total}}"
+  },
+  "errors": {
+    "generic": "Something went wrong",
+    "network": "Network error — check your connection",
+    "unauthorized": "Session expired — please sign in again",
+    "invalidCredentials": "Invalid host, username, or password",
+    "required": "This field is required",
+    "notImplemented": "Not connected to the API yet"
+  },
+  "common": {
+    "loading": "Loading…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close"
+  }
+}

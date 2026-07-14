@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "轻量自托管邮件客户端"
+  },
+  "nav": {
+    "inbox": "收件箱",
+    "starred": "已加星标",
+    "sent": "已发送",
+    "drafts": "草稿",
+    "archive": "归档",
+    "spam": "垃圾邮件",
+    "trash": "已删除",
+    "compose": "写邮件",
+    "settings": "设置",
+    "logout": "退出",
+    "folders": "文件夹",
+    "search": "搜索邮件",
+    "help": "帮助"
+  },
+  "login": {
+    "title": "登录",
+    "subtitle": "连接到您的 IMAP 邮箱",
+    "host": "IMAP 主机",
+    "hostPlaceholder": "mail.example.com",
+    "username": "用户名",
+    "usernamePlaceholder": "you@example.com",
+    "password": "密码",
+    "passwordPlaceholder": "••••••••",
+    "submit": "登录",
+    "submitting": "正在登录…",
+    "hint": "凭据通过安全会话发送到您的自托管 API。"
+  },
+  "settings": {
+    "title": "设置",
+    "language": "语言",
+    "languageHint": "选择界面语言",
+    "theme": "主题",
+    "themeLight": "浅色",
+    "themeDark": "深色",
+    "themeHint": "Paper Quiet 支持浅色与深色",
+    "font": "字体",
+    "fontHint": "界面字体（稍后提供更多选项）",
+    "fontSystem": "系统",
+    "fontSans": "无衬线",
+    "fontSerif": "衬线",
+    "fontMono": "等宽",
+    "accent": "强调色",
+    "accentHint": "带完整色阶的强调色系",
+    "accentTeal": "青绿",
+    "accentSlate": "石板灰",
+    "accentAmber": "琥珀",
+    "backToMail": "返回邮件"
+  },
+  "mail": {
+    "emptyInbox": "收件箱为空",
+    "emptyInboxHint": "新邮件将显示在这里",
+    "emptySelection": "选择一封邮件",
+    "emptySelectionHint": "从列表中选择一封邮件以阅读",
+    "noSubject": "（无主题）",
+    "to": "收件人",
+    "attachments": "{{count}} 个附件",
+    "attachments_other": "{{count}} 个附件",
+    "reply": "回复",
+    "replyAll": "全部回复",
+    "forward": "转发",
+    "refresh": "刷新",
+    "unread": "{{count}} 封未读",
+    "of": "{{from}}–{{to}} / 共 {{total}}"
+  },
+  "errors": {
+    "generic": "出了点问题",
+    "network": "网络错误 — 请检查连接",
+    "unauthorized": "会话已过期 — 请重新登录",
+    "invalidCredentials": "主机、用户名或密码无效",
+    "required": "此字段为必填项",
+    "notImplemented": "尚未连接 API"
+  },
+  "common": {
+    "loading": "加载中…",
+    "save": "保存",
+    "cancel": "取消",
+    "close": "关闭"
+  }
+}

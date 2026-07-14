@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "Client di posta self-hosted leggero"
+  },
+  "nav": {
+    "inbox": "Posta in arrivo",
+    "starred": "Speciali",
+    "sent": "Inviati",
+    "drafts": "Bozze",
+    "archive": "Archivio",
+    "spam": "Spam",
+    "trash": "Cestino",
+    "compose": "Scrivi",
+    "settings": "Impostazioni",
+    "logout": "Esci",
+    "folders": "Cartelle",
+    "search": "Cerca posta",
+    "help": "Aiuto"
+  },
+  "login": {
+    "title": "Accedi",
+    "subtitle": "Collegati alla casella IMAP",
+    "host": "Host IMAP",
+    "hostPlaceholder": "mail.example.com",
+    "username": "Nome utente",
+    "usernamePlaceholder": "you@example.com",
+    "password": "Password",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Accedi",
+    "submitting": "Accesso…",
+    "hint": "Le credenziali vengono inviate alla tua API self-hosted in una sessione sicura."
+  },
+  "settings": {
+    "title": "Impostazioni",
+    "language": "Lingua",
+    "languageHint": "Scegli la lingua dell'interfaccia",
+    "theme": "Tema",
+    "themeLight": "Chiaro",
+    "themeDark": "Scuro",
+    "themeHint": "Paper Quiet supporta chiaro e scuro",
+    "font": "Carattere",
+    "fontHint": "Tipo di carattere UI (altri in seguito)",
+    "fontSystem": "Sistema",
+    "fontSans": "Sans",
+    "fontSerif": "Serif",
+    "fontMono": "Mono",
+    "accent": "Colore accento",
+    "accentHint": "Famiglia di accento con scala completa",
+    "accentTeal": "Verde acqua",
+    "accentSlate": "Ardesia",
+    "accentAmber": "Ambra",
+    "backToMail": "Torna alla posta"
+  },
+  "mail": {
+    "emptyInbox": "La posta in arrivo è vuota",
+    "emptyInboxHint": "I nuovi messaggi appariranno qui",
+    "emptySelection": "Seleziona un messaggio",
+    "emptySelectionHint": "Scegli una conversazione dall'elenco per leggerla",
+    "noSubject": "(Nessun oggetto)",
+    "to": "a",
+    "attachments": "{{count}} allegato",
+    "attachments_other": "{{count}} allegati",
+    "reply": "Rispondi",
+    "replyAll": "Rispondi a tutti",
+    "forward": "Inoltra",
+    "refresh": "Aggiorna",
+    "unread": "{{count}} non letti",
+    "of": "{{from}}–{{to}} di {{total}}"
+  },
+  "errors": {
+    "generic": "Qualcosa è andato storto",
+    "network": "Errore di rete — controlla la connessione",
+    "unauthorized": "Sessione scaduta — accedi di nuovo",
+    "invalidCredentials": "Host, nome utente o password non validi",
+    "required": "Questo campo è obbligatorio",
+    "notImplemented": "Non ancora collegato all'API"
+  },
+  "common": {
+    "loading": "Caricamento…",
+    "save": "Salva",
+    "cancel": "Annulla",
+    "close": "Chiudi"
+  }
+}

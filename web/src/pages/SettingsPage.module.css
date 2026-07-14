@@ -1,0 +1,115 @@
+.page {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
+}
+
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: var(--font-size-sm);
+}
+
+.back:hover {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.title {
+  margin: 0 0 1.5rem;
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+}
+
+.section {
+  padding: 1.15rem 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sectionTitle {
+  margin: 0 0 0.25rem;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+}
+
+.sectionHint {
+  margin: 0 0 0.85rem;
+  font-size: var(--font-size-sm);
+  color: var(--text-muted);
+}
+
+.control {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.select {
+  min-width: 14rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+}
+
+.choice {
+  padding: 0.45rem 0.85rem;
+  border: 1px solid var(--border-default);
+  border-radius: 999px;
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+}
+
+.choice:hover {
+  background: var(--bg-hover);
+}
+
+.choiceActive {
+  border-color: var(--accent);
+  background: var(--accent-muted);
+  color: var(--accent-700);
+  font-weight: var(--font-weight-semibold);
+}
+
+[data-theme='dark'] .choiceActive {
+  color: var(--accent-300);
+}
+
+.swatchRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.swatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.55rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  min-width: 4.5rem;
+}
+
+.swatchActive {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-100);
+}
+
+.swatchDot {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+}
+
+.swatchLabel {
+  font-size: var(--font-size-xs);
+  color: var(--text-secondary);
+}

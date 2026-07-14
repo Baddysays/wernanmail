@@ -1,4 +1,4 @@
-﻿# Wernanmail
+# Wernanmail
 
 Lightweight self-hosted **mail client** (web). Own mail server comes later.
 
@@ -84,7 +84,7 @@ docker compose up --build -d
 ```
 
 App: http://localhost:3080 (override with `WERNANMAIL_HTTP_PORT` in `.env`).
-Copy `.env.example` → `.env` for local port overrides. Keep mailbox credentials in `secrets/` (gitignored).
+Copy `.env.example` to `.env` for local port overrides. Keep mailbox credentials in `secrets/` (gitignored).
 
 ## Status
 

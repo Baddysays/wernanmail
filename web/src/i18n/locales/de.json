@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "Leichter selbst gehosteter Mail-Client"
+  },
+  "nav": {
+    "inbox": "Posteingang",
+    "starred": "Markiert",
+    "sent": "Gesendet",
+    "drafts": "Entwürfe",
+    "archive": "Archiv",
+    "spam": "Spam",
+    "trash": "Papierkorb",
+    "compose": "Verfassen",
+    "settings": "Einstellungen",
+    "logout": "Abmelden",
+    "folders": "Ordner",
+    "search": "E-Mails suchen",
+    "help": "Hilfe"
+  },
+  "login": {
+    "title": "Anmelden",
+    "subtitle": "Mit Ihrem IMAP-Postfach verbinden",
+    "host": "IMAP-Host",
+    "hostPlaceholder": "mail.example.com",
+    "username": "Benutzername",
+    "usernamePlaceholder": "you@example.com",
+    "password": "Passwort",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Anmelden",
+    "submitting": "Anmeldung…",
+    "hint": "Zugangsdaten werden über eine sichere Sitzung an Ihre selbst gehostete API gesendet."
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "language": "Sprache",
+    "languageHint": "Oberflächensprache wählen",
+    "theme": "Design",
+    "themeLight": "Hell",
+    "themeDark": "Dunkel",
+    "themeHint": "Paper Quiet unterstützt hell und dunkel",
+    "font": "Schriftart",
+    "fontHint": "UI-Schrift (weitere später)",
+    "fontSystem": "System",
+    "fontSans": "Sans",
+    "fontSerif": "Serif",
+    "fontMono": "Mono",
+    "accent": "Akzentfarbe",
+    "accentHint": "Akzentfamilie mit voller Abstufung",
+    "accentTeal": "Türkis",
+    "accentSlate": "Schiefer",
+    "accentAmber": "Bernstein",
+    "backToMail": "Zurück zur Mail"
+  },
+  "mail": {
+    "emptyInbox": "Ihr Posteingang ist leer",
+    "emptyInboxHint": "Neue Nachrichten erscheinen hier",
+    "emptySelection": "Nachricht auswählen",
+    "emptySelectionHint": "Wählen Sie eine Unterhaltung aus der Liste",
+    "noSubject": "(Kein Betreff)",
+    "to": "an",
+    "attachments": "{{count}} Anhang",
+    "attachments_other": "{{count}} Anhänge",
+    "reply": "Antworten",
+    "replyAll": "Allen antworten",
+    "forward": "Weiterleiten",
+    "refresh": "Aktualisieren",
+    "unread": "{{count}} ungelesen",
+    "of": "{{from}}–{{to}} von {{total}}"
+  },
+  "errors": {
+    "generic": "Etwas ist schiefgelaufen",
+    "network": "Netzwerkfehler — Verbindung prüfen",
+    "unauthorized": "Sitzung abgelaufen — bitte erneut anmelden",
+    "invalidCredentials": "Ungültiger Host, Benutzername oder Passwort",
+    "required": "Dieses Feld ist erforderlich",
+    "notImplemented": "Noch nicht mit der API verbunden"
+  },
+  "common": {
+    "loading": "Laden…",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "close": "Schließen"
+  }
+}

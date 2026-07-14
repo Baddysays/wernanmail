@@ -1,0 +1,85 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "tagline": "Lekki self-hosted klient poczty"
+  },
+  "nav": {
+    "inbox": "Odebrane",
+    "starred": "Oznaczone",
+    "sent": "Wysłane",
+    "drafts": "Wersje robocze",
+    "archive": "Archiwum",
+    "spam": "Spam",
+    "trash": "Kosz",
+    "compose": "Napisz",
+    "settings": "Ustawienia",
+    "logout": "Wyloguj",
+    "folders": "Foldery",
+    "search": "Szukaj wiadomości",
+    "help": "Pomoc"
+  },
+  "login": {
+    "title": "Zaloguj się",
+    "subtitle": "Połącz się ze skrzynką IMAP",
+    "host": "Host IMAP",
+    "hostPlaceholder": "mail.example.com",
+    "username": "Nazwa użytkownika",
+    "usernamePlaceholder": "you@example.com",
+    "password": "Hasło",
+    "passwordPlaceholder": "••••••••",
+    "submit": "Zaloguj",
+    "submitting": "Logowanie…",
+    "hint": "Dane logowania są wysyłane do Twojego self-hosted API w bezpiecznej sesji."
+  },
+  "settings": {
+    "title": "Ustawienia",
+    "language": "Język",
+    "languageHint": "Wybierz język interfejsu",
+    "theme": "Motyw",
+    "themeLight": "Jasny",
+    "themeDark": "Ciemny",
+    "themeHint": "Paper Quiet obsługuje jasny i ciemny",
+    "font": "Czcionka",
+    "fontHint": "Czcionka UI (więcej później)",
+    "fontSystem": "Systemowa",
+    "fontSans": "Sans",
+    "fontSerif": "Serif",
+    "fontMono": "Mono",
+    "accent": "Kolor akcentu",
+    "accentHint": "Rodzina akcentu z pełną skalą odcieni",
+    "accentTeal": "Morski",
+    "accentSlate": "Łupkowy",
+    "accentAmber": "Bursztynowy",
+    "backToMail": "Wróć do poczty"
+  },
+  "mail": {
+    "emptyInbox": "Skrzynka odbiorcza jest pusta",
+    "emptyInboxHint": "Nowe wiadomości pojawią się tutaj",
+    "emptySelection": "Wybierz wiadomość",
+    "emptySelectionHint": "Wybierz rozmowę z listy, aby ją przeczytać",
+    "noSubject": "(Bez tematu)",
+    "to": "do",
+    "attachments": "{{count}} załącznik",
+    "attachments_other": "{{count}} załączników",
+    "reply": "Odpowiedz",
+    "replyAll": "Odpowiedz wszystkim",
+    "forward": "Prześlij dalej",
+    "refresh": "Odśwież",
+    "unread": "{{count}} nieprzeczytanych",
+    "of": "{{from}}–{{to}} z {{total}}"
+  },
+  "errors": {
+    "generic": "Coś poszło nie tak",
+    "network": "Błąd sieci — sprawdź połączenie",
+    "unauthorized": "Sesja wygasła — zaloguj się ponownie",
+    "invalidCredentials": "Nieprawidłowy host, nazwa użytkownika lub hasło",
+    "required": "To pole jest wymagane",
+    "notImplemented": "Jeszcze nie połączono z API"
+  },
+  "common": {
+    "loading": "Ładowanie…",
+    "save": "Zapisz",
+    "cancel": "Anuluj",
+    "close": "Zamknij"
+  }
+}
