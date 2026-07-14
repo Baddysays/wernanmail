@@ -1,0 +1,45 @@
+﻿# Wernanmail — light client + API (no mail server stack).
+# Target: keep RAM low (~hundreds of MB, not Mailcow-class).
+#
+# Usage:
+#   docker compose up --build -d
+#   open http://localhost:3080
+#   API health: http://localhost:3080/api/health
+#
+# Optional overrides: copy .env.example -> .env
+
+services:
+  api:
+    build:
+      context: ./server
+    restart: unless-stopped
+    environment:
+      PORT: "8080"
+    expose:
+      - "8080"
+    mem_limit: 128m
+    memswap_limit: 128m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 8s
+
+  web:
+    build:
+      context: ./web
+    restart: unless-stopped
+    ports:
+      - "${WERNANMAIL_HTTP_PORT:-3080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 64m
+    memswap_limit: 64m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 8s

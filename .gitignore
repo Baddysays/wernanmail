@@ -1,4 +1,4 @@
-node_modules/
+﻿node_modules/
 dist/
 *.exe
 server/bin/
@@ -7,3 +7,5 @@ server/bin/
 *.log
 .DS_Store
 web/dist/
+secrets/
+*.mailbox.env

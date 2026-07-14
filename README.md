@@ -1,4 +1,4 @@
-# Wernanmail
+﻿# Wernanmail
 
 Lightweight self-hosted **mail client** (web). Own mail server comes later.
 
@@ -56,9 +56,39 @@ server/    # Go API
 docs/      # design, policy, mockups
 ```
 
+## Quick start (web)
+
+```bash
+pnpm --dir web install
+pnpm --dir web dev
+```
+
+`/api` is proxied to the Go backend on `localhost:8080`.
+
+## Quick start (API)
+
+```bash
+cd server
+cp .env.example .env   # optional
+go run .
+```
+
+See [server/README.md](server/README.md) for endpoints. Errors are codes only (e.g. `mail.auth_failed`); the UI translates.
+
+## Run with Docker Compose
+
+Light client + API only (no mail server containers):
+
+```bash
+docker compose up --build -d
+```
+
+App: http://localhost:3080 (override with `WERNANMAIL_HTTP_PORT` in `.env`).
+Copy `.env.example` → `.env` for local port overrides. Keep mailbox credentials in `secrets/` (gitignored).
+
 ## Status
 
-Paper Quiet + fonts/colors settings + 12-locale i18n. Client first, server later.
+Paper Quiet client scaffold in `web/`. Go API MVP in `server/` (IMAP/SMTP + httpOnly sessions).
 
 ---
 
