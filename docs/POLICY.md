@@ -17,10 +17,12 @@ Do not publish private infra details (hosts, IPs, staging URLs) in the public re
 ## Design and localization
 - Default visual: Paper Quiet
 - Settings: font choice, accent color with multiple gradations, light/dark
-- **Full i18n** — all user-facing strings localizable from the start
+- **i18n:** 12 locales from day one — en, ru, de, fr, es, pt, zh, ja, ko, it, pl, tr
+- API returns stable **error codes**; the UI translates messages
 
 ## Non-goals (MVP)
 - Matching Mailcow feature surface
 - Calendar/contacts suite
 - Heavy AI in the hot path
 - Publishing deployment secrets or server inventory in git
+- RTL locales (e.g. Arabic) in v1

@@ -27,38 +27,38 @@ Self-hosted mail that **plugs into your stack**, not only a standalone webmail.
 
 Default look: **Paper Quiet** — light, calm, readable, three-column mail UI.
 
-In **Settings** (first-class, not an afterthought):
+In **Settings** (first-class):
 
 - **Font** — user-selectable typefaces for UI / reading
-- **Color** — accent palette with **several gradations** (not a single hard-coded teal)
-- **Theme** — light / dark (and density later)
+- **Color** — accent palette with **several gradations**
+- **Theme** — light / dark
+- **Language** — **12 locales** from day one (en, ru, de, fr, es, pt, zh, ja, ko, it, pl, tr)
 
-Everything in the product is **multilingual** (i18n from day one: UI strings, settings, errors — no hard-coded single language).
-
-See [docs/DESIGN.md](docs/DESIGN.md) and mockups in docs/mockups/.
+See [docs/DESIGN.md](docs/DESIGN.md) and mockups in `docs/mockups/`.
 
 ## Stack (MVP client)
 
 | Layer | Choice |
 |-------|--------|
 | Frontend | React 19 + Vite + TypeScript |
-| i18n | react-i18next (or equivalent), locale files |
+| i18n | `i18next` + `react-i18next` — 12 locale JSON files |
+| Dates | `Intl` (locale-aware) |
 | Styles | CSS Modules + CSS variables (fonts + color scales) |
-| Backend | Go (chi) + go-imap + SMTP |
+| Backend | Go (chi) + go-imap + SMTP — **error codes**, UI translates |
 | Sessions | httpOnly cookies |
 | Deploy | Docker Compose, light containers |
 
 ## Repo layout
 
-`
+```
 web/       # React client
 server/    # Go API
 docs/      # design, policy, mockups
-`
+```
 
 ## Status
 
-Design locked toward Paper Quiet + customizable fonts/colors + full i18n. Client first, server later.
+Paper Quiet + fonts/colors settings + 12-locale i18n. Client first, server later.
 
 ---
 
