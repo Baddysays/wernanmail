@@ -7,8 +7,14 @@ server/bin/
 *.log
 .DS_Store
 web/dist/
+admin/node_modules/
+admin/dist/
+dist-mail/
 secrets/
 *.mailbox.env
+data/
+data-test/
+.env.mail
 
 .cursor/
 

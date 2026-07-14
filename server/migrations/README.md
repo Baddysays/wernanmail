@@ -1,0 +1,2 @@
+-- Schema is applied by store/sqlite migrate().
+-- This file documents the Phase 2 SQL surface for operators.

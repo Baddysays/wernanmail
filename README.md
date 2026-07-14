@@ -23,7 +23,7 @@ Toasts confirm send / trash / new mail; sidebar shows unread badges (including S
 | **Reliable** | Mailcow-inspired containerization and ops discipline — without Mailcow weight |
 
 Phase 1 = **client** (IMAP/SMTP to existing servers).  
-Phase 2 = **server** (own stack, still light).
+Phase 2 = **server** (own Go MTA/IMAP/queue/antispam/admin — see [docs/SERVER.md](docs/SERVER.md)).
 
 ## Unique feature: **Mailport**
 
@@ -109,9 +109,23 @@ docker compose up --build -d
 App: http://localhost:3080 (override with `WERNANMAIL_HTTP_PORT` in `.env`).
 Copy `.env.example` to `.env` for local port overrides. Keep mailbox credentials in `secrets/` (gitignored).
 
+### Phase 2 mail server stack
+
+```bash
+cp .env.mail.example .env.mail
+docker compose -f docker-compose.mail.yml --env-file .env.mail up --build -d
+```
+
+- SMTP submission: host port `2587` → container `:587`
+- IMAP: `2143` → `:143`
+- Admin UI: http://127.0.0.1:3090
+- Architecture: [docs/SERVER.md](docs/SERVER.md)
+
+Optional ClamAV: add `--profile av` (needs ≥2 GiB RAM).
+
 ## Status
 
-Usable MVP client: live IMAP inbox, compose/send, moods + i18n, Compose deploy. Next: denser keyboard shortcuts, Mailport embed, then the light mail **server** phase.
+Usable MVP client + Phase 2 Go mail server foundation (SMTP/IMAP/queue/antispam/admin). Next: denser keyboard shortcuts, Mailport embed, harden deliverability on a dedicated host.
 
 ---
 

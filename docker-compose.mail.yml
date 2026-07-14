@@ -1,0 +1,98 @@
+# Phase 2 mail stack (own Go MTA/IMAP/queue/admin).
+# Usage: docker compose -f docker-compose.mail.yml up --build -d
+# Data: ./data (gitignored). Do not co-locate with Mailcow on the same profile.
+
+services:
+  mta:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.mail
+      args:
+        BINARY: mta
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /data
+      SMTP_ADDR: ":25"
+      SUBMIT_ADDR: ":587"
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME:-localhost}
+      CLAMAV_ADDR: ${CLAMAV_ADDR:-}
+    volumes:
+      - mail_data:/data
+    ports:
+      - "${MAIL_SMTP_PORT:-2525}:25"
+      - "${MAIL_SUBMIT_PORT:-2587}:587"
+    mem_limit: 96m
+    memswap_limit: 96m
+
+  imapd:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.mail
+      args:
+        BINARY: imapd
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /data
+      IMAP_ADDR: ":143"
+    volumes:
+      - mail_data:/data
+    ports:
+      - "${MAIL_IMAP_PORT:-2143}:143"
+    mem_limit: 64m
+    memswap_limit: 64m
+
+  worker:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.mail
+      args:
+        BINARY: worker
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /data
+      RELAY_HOST: ${RELAY_HOST:-}
+    volumes:
+      - mail_data:/data
+    mem_limit: 64m
+    memswap_limit: 64m
+
+  admin:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.mail
+      args:
+        BINARY: admin
+    restart: unless-stopped
+    environment:
+      DATA_DIR: /data
+      ADMIN_ADDR: ":8090"
+      ADMIN_USER: ${ADMIN_USER:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      MAIL_HOSTNAME: ${MAIL_HOSTNAME:-localhost}
+    volumes:
+      - mail_data:/data
+    expose:
+      - "8090"
+    mem_limit: 48m
+    memswap_limit: 48m
+
+  admin-ui:
+    build:
+      context: ./admin
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${MAIL_ADMIN_HTTP_PORT:-3090}:80"
+    depends_on:
+      - admin
+    mem_limit: 32m
+    memswap_limit: 32m
+
+  clamav:
+    profiles: ["av"]
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
+
+volumes:
+  mail_data:
