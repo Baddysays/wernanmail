@@ -9,8 +9,8 @@
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.55rem 0.75rem;
+  gap: 0.25rem;
+  padding: 0.5rem 0.7rem;
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-secondary);
 }
@@ -19,6 +19,7 @@
   margin-left: auto;
   font-size: var(--font-size-xs);
   color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
 }
 
 .iconBtn {
@@ -32,8 +33,10 @@
   color: inherit;
 }
 
-.iconBtn:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .iconBtn:hover {
+    background: var(--bg-hover);
+  }
 }
 
 .items {
@@ -44,24 +47,36 @@
 .item {
   display: grid;
   grid-template-columns: auto 1fr auto;
-  gap: 0.55rem 0.65rem;
+  gap: 0.45rem 0.65rem;
   width: 100%;
-  padding: 0.75rem 0.9rem;
+  padding: 0.7rem 0.85rem;
   border: none;
   border-bottom: 1px solid var(--border-subtle);
-  border-left: 3px solid transparent;
   background: transparent;
   text-align: left;
   color: var(--text-primary);
+  position: relative;
 }
 
-.item:hover {
-  background: var(--bg-hover);
+@media (hover: hover) and (pointer: fine) {
+  .item:hover {
+    background: var(--bg-hover);
+  }
 }
 
 .itemActive {
   background: var(--bg-selected);
-  border-left-color: var(--accent);
+}
+
+.itemActive::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55rem;
+  bottom: 0.55rem;
+  width: 2px;
+  border-radius: 1px;
+  background: var(--accent);
 }
 
 .itemUnread .sender,
@@ -72,9 +87,9 @@
 .star {
   grid-row: span 2;
   align-self: start;
-  margin-top: 0.15rem;
+  margin-top: 0.12rem;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .starOn {
@@ -84,7 +99,7 @@
 .main {
   display: flex;
   flex-direction: column;
-  gap: 0.15rem;
+  gap: 0.12rem;
   min-width: 0;
 }
 
@@ -111,10 +126,11 @@
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0.25rem;
+  gap: 0.2rem;
   font-size: var(--font-size-xs);
   color: var(--text-muted);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .empty {
@@ -131,4 +147,5 @@
   font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
+  letter-spacing: -0.02em;
 }

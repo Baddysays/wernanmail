@@ -7,6 +7,30 @@
 - Three columns: folders · list · reading pane
 - Airy but usable density; thin icons; readable body text
 
+## Motion & craft (emil-design-eng)
+Apply [emilkowalski/skills · emil-design-eng](https://github.com/emilkowalski/skills):
+
+- Press: `transform: scale(0.97)` on `:active` (~120ms, custom ease-out)
+- Never `transition: all` — list only transform / color / opacity / shadow
+- Hover only under `@media (hover: hover) and (pointer: fine)`
+- Elevation via soft multi-layer shadows, not heavy solid borders
+- Custom easings: `--ease-out: cubic-bezier(0.23, 1, 0.32, 1)`; UI under ~300ms
+- Respect `prefers-reduced-motion`
+
+## Color moods (app-wide)
+Settings → **Color palette** (`mood`) drives CSS on `<html data-mood>`:
+
+| Mood | Feel |
+|------|------|
+| `auto` | Time of day → harbor / reef / grove / ember / mist |
+| `harbor` | Morning sea blue |
+| `reef` | Midday teal (default Paper Quiet) |
+| `grove` | Moss / late day |
+| `ember` | Evening copper on ink |
+| `mist` | Night steel |
+
+Surfaces, accents, login hero, and mail chrome all read the same variables.
+
 ## Settings (required)
 1. **Font** — pick UI font (and optional reading font)
 2. **Color** — accent family with several gradations (e.g. 50–900 scale via CSS variables), not one flat hex

@@ -9,16 +9,17 @@
 
 .errorBanner {
   position: absolute;
-  top: 8px;
+  top: 10px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 5;
-  padding: 0.45rem 0.9rem;
-  border-radius: 8px;
-  background: color-mix(in srgb, #c44 18%, var(--surface, #fff));
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, #c44 12%, var(--bg-elevated));
   color: #8a2020;
-  font-size: 0.85rem;
-  border: 1px solid color-mix(in srgb, #c44 35%, transparent);
+  font-size: var(--font-size-sm);
+  box-shadow: var(--shadow-md);
+  border: none;
 }
 
 @media (max-width: 960px) {

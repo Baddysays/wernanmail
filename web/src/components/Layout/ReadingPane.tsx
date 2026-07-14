@@ -7,9 +7,18 @@ import styles from './ReadingPane.module.css'
 type ReadingPaneProps = {
   message: UiMessage | null
   loading?: boolean
+  onReply?: (message: UiMessage) => void
+  onReplyAll?: (message: UiMessage) => void
+  onForward?: (message: UiMessage) => void
 }
 
-export function ReadingPane({ message, loading }: ReadingPaneProps) {
+export function ReadingPane({
+  message,
+  loading,
+  onReply,
+  onReplyAll,
+  onForward,
+}: ReadingPaneProps) {
   const { t } = useTranslation()
   const { language } = useSettings()
 
@@ -51,10 +60,20 @@ export function ReadingPane({ message, loading }: ReadingPaneProps) {
           <span className={styles.folderTag}>{message.folder}</span>
         </div>
         <div className={styles.actions}>
-          <button type="button" className={styles.iconBtn} aria-label={t('mail.reply')}>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            aria-label={t('mail.reply')}
+            onClick={() => onReply?.(message)}
+          >
             ↩
           </button>
-          <button type="button" className={styles.iconBtn} aria-label={t('mail.forward')}>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            aria-label={t('mail.forward')}
+            onClick={() => onForward?.(message)}
+          >
             ↪
           </button>
         </div>
@@ -97,13 +116,13 @@ export function ReadingPane({ message, loading }: ReadingPaneProps) {
       ) : null}
 
       <footer className={styles.footer}>
-        <button type="button" className={styles.footerBtn}>
+        <button type="button" className={styles.footerBtn} onClick={() => onReply?.(message)}>
           {t('mail.reply')}
         </button>
-        <button type="button" className={styles.footerBtn}>
+        <button type="button" className={styles.footerBtn} onClick={() => onReplyAll?.(message)}>
           {t('mail.replyAll')}
         </button>
-        <button type="button" className={styles.footerBtn}>
+        <button type="button" className={styles.footerBtn} onClick={() => onForward?.(message)}>
           {t('mail.forward')}
         </button>
       </footer>

@@ -83,3 +83,16 @@ export function fetchMessage(id: string, folder: string) {
     `/api/messages/${encodeURIComponent(id)}?${q}`,
   )
 }
+
+export type SendPayload = {
+  to: string[]
+  cc?: string[]
+  bcc?: string[]
+  subject: string
+  text: string
+  html?: string
+}
+
+export function sendMessage(payload: SendPayload) {
+  return apiPost<{ status: string }>('/api/messages/send', payload)
+}

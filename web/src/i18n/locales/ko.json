@@ -29,7 +29,9 @@
     "passwordPlaceholder": "••••••••",
     "submit": "로그인",
     "submitting": "로그인 중…",
-    "hint": "자격 증명은 보안 세션으로 셀프호스팅 API에 전송됩니다."
+    "hint": "자격 증명은 보안 세션으로 셀프호스팅 API에 전송됩니다.",
+    "tagline": "방해하지 않는 가벼운 메일.",
+    "server": "서버"
   },
   "settings": {
     "title": "설정",
@@ -45,12 +47,19 @@
     "fontSans": "산세리프",
     "fontSerif": "세리프",
     "fontMono": "고정폭",
-    "accent": "강조 색상",
-    "accentHint": "전체 그라데이션 스케일의 강조 계열",
-    "accentTeal": "청록",
-    "accentSlate": "슬레이트",
-    "accentAmber": "호박색",
-    "backToMail": "메일로 돌아가기"
+    "backToMail": "메일로 돌아가기",
+    "mood": "색상 팔레트",
+    "moodHint": "로그인과 전체 클라이언트에 적용",
+    "moodAutoActive": "시간대에 맞춤",
+    "moodAutoMeta": "현재: {{mood}}",
+    "moods": {
+      "auto": "자동",
+      "harbor": "항구",
+      "reef": "산호초",
+      "grove": "숲",
+      "ember": "노을",
+      "mist": "안개"
+    }
   },
   "mail": {
     "emptyInbox": "받은편지함이 비어 있습니다",
@@ -74,12 +83,29 @@
     "unauthorized": "세션이 만료되었습니다 — 다시 로그인하세요",
     "invalidCredentials": "호스트, 사용자 이름 또는 비밀번호가 잘못되었습니다",
     "required": "필수 입력 항목입니다",
-    "notImplemented": "아직 API에 연결되지 않았습니다"
+    "notImplemented": "아직 API에 연결되지 않았습니다",
+    "codes": {
+      "mail.send_failed": "메일을 보낼 수 없습니다"
+    }
   },
   "common": {
     "loading": "불러오는 중…",
     "save": "저장",
     "cancel": "취소",
     "close": "닫기"
+  },
+  "compose": {
+    "title": "새 메일",
+    "to": "받는사람",
+    "cc": "참조",
+    "subject": "제목",
+    "send": "보내기",
+    "sending": "보내는 중…",
+    "toRequired": "수신자를 한 명 이상 추가하세요",
+    "sendFailed": "메일을 보낼 수 없습니다",
+    "bodyPlaceholder": "메시지를 작성하세요…",
+    "subjectPlaceholder": "제목",
+    "toPlaceholder": "name@example.com",
+    "ccPlaceholder": "선택"
   }
 }

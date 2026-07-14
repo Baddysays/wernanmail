@@ -9,12 +9,26 @@ import {
   type Folder,
   type UiMessage,
 } from '../api/types'
+import { ComposeDialog, type ComposeDraft } from '../components/Compose/ComposeDialog'
 import { Sidebar } from '../components/Layout/Sidebar'
 import { MessageList } from '../components/Layout/MessageList'
 import { ReadingPane } from '../components/Layout/ReadingPane'
 import styles from './MailPage.module.css'
 
 const ROLE_ORDER = ['inbox', 'sent', 'drafts', 'archive', 'spam', 'trash'] as const
+
+function withRePrefix(subject: string, prefix: 'Re' | 'Fwd') {
+  const trimmed = subject.trim()
+  if (!trimmed) return `${prefix}:`
+  const re = new RegExp(`^${prefix}:\\s*`, 'i')
+  if (re.test(trimmed)) return trimmed
+  return `${prefix}: ${trimmed}`
+}
+
+function quoteBody(message: UiMessage) {
+  const lines = (message.body || '').split('\n').map((line) => `> ${line}`)
+  return `\n\nOn ${message.date}, ${message.from.name || message.from.email} wrote:\n${lines.join('\n')}`
+}
 
 export function MailPage() {
   const { t } = useTranslation()
@@ -27,6 +41,8 @@ export function MailPage() {
   const [loadingList, setLoadingList] = useState(true)
   const [loadingMsg, setLoadingMsg] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [composeOpen, setComposeOpen] = useState(false)
+  const [composeDraft, setComposeDraft] = useState<ComposeDraft | null>(null)
 
   const sidebarFolders = useMemo(() => {
     const ranked = [...folders].sort((a, b) => {
@@ -37,7 +53,6 @@ export function MailPage() {
       if (ia !== ib) return ia - ib
       return a.name.localeCompare(b.name)
     })
-    // Prefer one folder per standard role for the main nav
     const seen = new Set<string>()
     const primary: Folder[] = []
     for (const f of ranked) {
@@ -63,6 +78,16 @@ export function MailPage() {
     },
     [navigate],
   )
+
+  const openCompose = useCallback((draft?: ComposeDraft) => {
+    setComposeDraft(draft ?? null)
+    setComposeOpen(true)
+  }, [])
+
+  const closeCompose = useCallback(() => {
+    setComposeOpen(false)
+    setComposeDraft(null)
+  }, [])
 
   const loadFolders = useCallback(async () => {
     try {
@@ -126,7 +151,6 @@ export function MailPage() {
       .catch((err) => {
         if (cancelled) return
         if (handleAuthError(err)) return
-        // Keep list row visible even if body fetch fails
         const row = messages.find((m) => m.id === selectedId) ?? null
         setSelected(row)
       })
@@ -138,12 +162,40 @@ export function MailPage() {
     }
   }, [selectedId, folderName, handleAuthError, messages])
 
+  function handleReply(message: UiMessage) {
+    openCompose({
+      to: message.from.email,
+      subject: withRePrefix(message.subject || '', 'Re'),
+      body: quoteBody(message),
+    })
+  }
+
+  function handleReplyAll(message: UiMessage) {
+    const others = [message.to.email].filter(
+      (e) => e && e.toLowerCase() !== message.from.email.toLowerCase(),
+    )
+    openCompose({
+      to: message.from.email,
+      cc: others.join(', '),
+      subject: withRePrefix(message.subject || '', 'Re'),
+      body: quoteBody(message),
+    })
+  }
+
+  function handleForward(message: UiMessage) {
+    openCompose({
+      subject: withRePrefix(message.subject || '', 'Fwd'),
+      body: `\n\n---------- Forwarded message ----------\nFrom: ${message.from.name || message.from.email} <${message.from.email}>\nDate: ${message.date}\nSubject: ${message.subject || ''}\nTo: ${message.to.email}\n\n${message.body || ''}`,
+    })
+  }
+
   return (
     <div className={styles.page}>
       <Sidebar
         folders={sidebarFolders}
         activeFolder={folderName}
         onSelectFolder={(name) => setFolderName(name)}
+        onCompose={() => openCompose()}
       />
       {error ? <div className={styles.errorBanner}>{error}</div> : null}
       <MessageList
@@ -153,7 +205,24 @@ export function MailPage() {
         onSelect={setSelectedId}
         onRefresh={() => void loadMessages(folderName)}
       />
-      <ReadingPane message={selected} loading={loadingMsg} />
+      <ReadingPane
+        message={selected}
+        loading={loadingMsg}
+        onReply={handleReply}
+        onReplyAll={handleReplyAll}
+        onForward={handleForward}
+      />
+      <ComposeDialog
+        open={composeOpen}
+        draft={composeDraft}
+        onClose={closeCompose}
+        onSent={() => {
+          const sent = sidebarFolders.find((f) => folderRole(f) === 'sent')
+          if (sent && folderName === sent.name) {
+            void loadMessages(folderName)
+          }
+        }}
+      />
     </div>
   )
 }

@@ -29,7 +29,9 @@
     "passwordPlaceholder": "••••••••",
     "submit": "Войти",
     "submitting": "Вход…",
-    "hint": "Учётные данные отправляются на ваш self-hosted API в защищённой сессии."
+    "hint": "Учётные данные отправляются на ваш self-hosted API в защищённой сессии.",
+    "tagline": "Лёгкая почта, которая не мешает работать.",
+    "server": "Сервер"
   },
   "settings": {
     "title": "Настройки",
@@ -45,12 +47,19 @@
     "fontSans": "Без засечек",
     "fontSerif": "С засечками",
     "fontMono": "Моноширинный",
-    "accent": "Цвет акцента",
-    "accentHint": "Палитра акцента с полной шкалой оттенков",
-    "accentTeal": "Бирюзовый",
-    "accentSlate": "Сланцевый",
-    "accentAmber": "Янтарный",
-    "backToMail": "К почте"
+    "backToMail": "К почте",
+    "mood": "Цветовая гамма",
+    "moodHint": "Действует на логин и весь почтовый клиент",
+    "moodAutoActive": "По времени суток",
+    "moodAutoMeta": "Сейчас: {{mood}}",
+    "moods": {
+      "auto": "Авто",
+      "harbor": "Гавань",
+      "reef": "Риф",
+      "grove": "Роща",
+      "ember": "Закат",
+      "mist": "Туман"
+    }
   },
   "mail": {
     "emptyInbox": "Входящие пусты",
@@ -74,12 +83,29 @@
     "unauthorized": "Сессия истекла — войдите снова",
     "invalidCredentials": "Неверный сервер, имя пользователя или пароль",
     "required": "Обязательное поле",
-    "notImplemented": "API ещё не подключён"
+    "notImplemented": "API ещё не подключён",
+    "codes": {
+      "mail.send_failed": "Не удалось отправить письмо"
+    }
   },
   "common": {
     "loading": "Загрузка…",
     "save": "Сохранить",
     "cancel": "Отмена",
     "close": "Закрыть"
+  },
+  "compose": {
+    "title": "Новое письмо",
+    "to": "Кому",
+    "cc": "Копия",
+    "subject": "Тема",
+    "toPlaceholder": "name@example.com",
+    "ccPlaceholder": "необязательно",
+    "subjectPlaceholder": "Тема",
+    "bodyPlaceholder": "Напишите сообщение…",
+    "send": "Отправить",
+    "sending": "Отправка…",
+    "toRequired": "Укажите хотя бы одного получателя",
+    "sendFailed": "Не удалось отправить письмо"
   }
 }

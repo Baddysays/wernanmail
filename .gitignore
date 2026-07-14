@@ -9,3 +9,6 @@ server/bin/
 web/dist/
 secrets/
 *.mailbox.env
+
+.cursor/
+

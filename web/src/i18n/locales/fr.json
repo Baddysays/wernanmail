@@ -29,7 +29,9 @@
     "passwordPlaceholder": "••••••••",
     "submit": "Se connecter",
     "submitting": "Connexion…",
-    "hint": "Les identifiants sont envoyés à votre API auto-hébergée via une session sécurisée."
+    "hint": "Les identifiants sont envoyés à votre API auto-hébergée via une session sécurisée.",
+    "tagline": "Un mail léger qui reste discret.",
+    "server": "Serveur"
   },
   "settings": {
     "title": "Paramètres",
@@ -45,12 +47,19 @@
     "fontSans": "Sans",
     "fontSerif": "Serif",
     "fontMono": "Mono",
-    "accent": "Couleur d'accent",
-    "accentHint": "Famille d'accent avec échelle complète",
-    "accentTeal": "Sarcelle",
-    "accentSlate": "Ardoise",
-    "accentAmber": "Ambre",
-    "backToMail": "Retour au courrier"
+    "backToMail": "Retour au courrier",
+    "mood": "Palette de couleurs",
+    "moodHint": "S’applique à la connexion et à tout le client",
+    "moodAutoActive": "Selon l’heure",
+    "moodAutoMeta": "Maintenant : {{mood}}",
+    "moods": {
+      "auto": "Auto",
+      "harbor": "Port",
+      "reef": "Récif",
+      "grove": "Bosquet",
+      "ember": "Braises",
+      "mist": "Brume"
+    }
   },
   "mail": {
     "emptyInbox": "Votre boîte de réception est vide",
@@ -74,12 +83,29 @@
     "unauthorized": "Session expirée — veuillez vous reconnecter",
     "invalidCredentials": "Hôte, nom d'utilisateur ou mot de passe invalide",
     "required": "Ce champ est obligatoire",
-    "notImplemented": "Pas encore connecté à l'API"
+    "notImplemented": "Pas encore connecté à l'API",
+    "codes": {
+      "mail.send_failed": "Impossible d’envoyer le message"
+    }
   },
   "common": {
     "loading": "Chargement…",
     "save": "Enregistrer",
     "cancel": "Annuler",
     "close": "Fermer"
+  },
+  "compose": {
+    "title": "Nouveau message",
+    "to": "À",
+    "cc": "Cc",
+    "subject": "Objet",
+    "send": "Envoyer",
+    "sending": "Envoi…",
+    "toRequired": "Ajoutez au moins un destinataire",
+    "sendFailed": "Impossible d’envoyer le message",
+    "bodyPlaceholder": "Écrivez votre message…",
+    "subjectPlaceholder": "Objet",
+    "toPlaceholder": "name@example.com",
+    "ccPlaceholder": "facultatif"
   }
 }

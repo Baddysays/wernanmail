@@ -2,23 +2,29 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { LOCALES, type LocaleCode } from '../i18n'
 import {
+  MOOD_IDS,
+  resolveMood,
   updateSettings,
   useSettings,
-  type AccentChoice,
   type FontChoice,
+  type MoodChoice,
+  type MoodId,
   type Theme,
 } from '../store/settings'
 import styles from './SettingsPage.module.css'
 
-const ACCENT_PREVIEW: Record<AccentChoice, string> = {
-  teal: '#2a8f80',
-  slate: '#516b80',
-  amber: '#c47d22',
+const MOOD_PREVIEW: Record<MoodId, string> = {
+  harbor: 'linear-gradient(135deg, #0f2438, #3d7ea6)',
+  reef: 'linear-gradient(135deg, #143c48, #4aa89a)',
+  grove: 'linear-gradient(135deg, #1a2e1c, #6a9a4e)',
+  ember: 'linear-gradient(135deg, #1c1410, #c47a3a)',
+  mist: 'linear-gradient(135deg, #12151a, #6b7c8f)',
 }
 
 export function SettingsPage() {
   const { t } = useTranslation()
   const settings = useSettings()
+  const effective = resolveMood(settings.mood)
 
   return (
     <div className={styles.page}>
@@ -27,6 +33,40 @@ export function SettingsPage() {
       </Link>
 
       <h1 className={styles.title}>{t('settings.title')}</h1>
+
+      <section className={styles.section}>
+        <h2 className={styles.sectionTitle}>{t('settings.mood')}</h2>
+        <p className={styles.sectionHint}>{t('settings.moodHint')}</p>
+        <div className={styles.moodGrid}>
+          <button
+            type="button"
+            className={`${styles.moodCard} ${settings.mood === 'auto' ? styles.moodCardActive : ''}`}
+            onClick={() => updateSettings({ mood: 'auto' })}
+          >
+            <span className={`${styles.moodPreview} ${styles.moodPreviewAuto}`} aria-hidden />
+            <span className={styles.moodName}>{t('settings.moods.auto')}</span>
+            <span className={styles.moodMeta}>
+              {t('settings.moodAutoMeta', { mood: t(`settings.moods.${effective}`) })}
+            </span>
+          </button>
+
+          {MOOD_IDS.map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={`${styles.moodCard} ${settings.mood === id ? styles.moodCardActive : ''}`}
+              onClick={() => updateSettings({ mood: id as MoodChoice })}
+            >
+              <span
+                className={styles.moodPreview}
+                style={{ background: MOOD_PREVIEW[id] }}
+                aria-hidden
+              />
+              <span className={styles.moodName}>{t(`settings.moods.${id}`)}</span>
+            </button>
+          ))}
+        </div>
+      </section>
 
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>{t('settings.language')}</h2>
@@ -83,33 +123,6 @@ export function SettingsPage() {
               onClick={() => updateSettings({ font: value as FontChoice })}
             >
               {t(`settings.${labelKey}`)}
-            </button>
-          ))}
-        </div>
-      </section>
-
-      <section className={styles.section}>
-        <h2 className={styles.sectionTitle}>{t('settings.accent')}</h2>
-        <p className={styles.sectionHint}>{t('settings.accentHint')}</p>
-        <div className={styles.swatchRow}>
-          {(
-            [
-              ['teal', 'accentTeal'],
-              ['slate', 'accentSlate'],
-              ['amber', 'accentAmber'],
-            ] as const
-          ).map(([value, labelKey]) => (
-            <button
-              key={value}
-              type="button"
-              className={`${styles.swatch} ${settings.accent === value ? styles.swatchActive : ''}`}
-              onClick={() => updateSettings({ accent: value as AccentChoice })}
-            >
-              <span
-                className={styles.swatchDot}
-                style={{ background: ACCENT_PREVIEW[value] }}
-              />
-              <span className={styles.swatchLabel}>{t(`settings.${labelKey}`)}</span>
             </button>
           ))}
         </div>

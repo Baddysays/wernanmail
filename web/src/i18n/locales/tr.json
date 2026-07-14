@@ -29,7 +29,9 @@
     "passwordPlaceholder": "••••••••",
     "submit": "Oturum aç",
     "submitting": "Oturum açılıyor…",
-    "hint": "Kimlik bilgileri güvenli bir oturumla self-hosted API'nize gönderilir."
+    "hint": "Kimlik bilgileri güvenli bir oturumla self-hosted API'nize gönderilir.",
+    "tagline": "Yoluna çıkmayan hafif posta.",
+    "server": "Sunucu"
   },
   "settings": {
     "title": "Ayarlar",
@@ -45,12 +47,19 @@
     "fontSans": "Sans",
     "fontSerif": "Serif",
     "fontMono": "Mono",
-    "accent": "Vurgu rengi",
-    "accentHint": "Tam ton ölçeğine sahip vurgu ailesi",
-    "accentTeal": "Camgöbeği",
-    "accentSlate": "Arduvaz",
-    "accentAmber": "Kehribar",
-    "backToMail": "Postaya dön"
+    "backToMail": "Postaya dön",
+    "mood": "Renk paleti",
+    "moodHint": "Giriş ve tüm istemciye uygulanır",
+    "moodAutoActive": "Günün saatine göre",
+    "moodAutoMeta": "Şu an: {{mood}}",
+    "moods": {
+      "auto": "Otomatik",
+      "harbor": "Liman",
+      "reef": "Resif",
+      "grove": "Koruluk",
+      "ember": "Köz",
+      "mist": "Sis"
+    }
   },
   "mail": {
     "emptyInbox": "Gelen kutunuz boş",
@@ -74,12 +83,29 @@
     "unauthorized": "Oturum süresi doldu — lütfen yeniden oturum açın",
     "invalidCredentials": "Geçersiz sunucu, kullanıcı adı veya parola",
     "required": "Bu alan zorunludur",
-    "notImplemented": "Henüz API'ye bağlanılmadı"
+    "notImplemented": "Henüz API'ye bağlanılmadı",
+    "codes": {
+      "mail.send_failed": "İleti gönderilemedi"
+    }
   },
   "common": {
     "loading": "Yükleniyor…",
     "save": "Kaydet",
     "cancel": "İptal",
     "close": "Kapat"
+  },
+  "compose": {
+    "title": "Yeni ileti",
+    "to": "Kime",
+    "cc": "Cc",
+    "subject": "Konu",
+    "send": "Gönder",
+    "sending": "Gönderiliyor…",
+    "toRequired": "En az bir alıcı ekleyin",
+    "sendFailed": "İleti gönderilemedi",
+    "bodyPlaceholder": "Mesajınızı yazın…",
+    "subjectPlaceholder": "Konu",
+    "toPlaceholder": "name@example.com",
+    "ccPlaceholder": "isteğe bağlı"
   }
 }

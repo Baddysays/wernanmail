@@ -29,7 +29,9 @@
     "passwordPlaceholder": "••••••••",
     "submit": "Zaloguj",
     "submitting": "Logowanie…",
-    "hint": "Dane logowania są wysyłane do Twojego self-hosted API w bezpiecznej sesji."
+    "hint": "Dane logowania są wysyłane do Twojego self-hosted API w bezpiecznej sesji.",
+    "tagline": "Lekka poczta, która nie przeszkadza.",
+    "server": "Serwer"
   },
   "settings": {
     "title": "Ustawienia",
@@ -45,12 +47,19 @@
     "fontSans": "Sans",
     "fontSerif": "Serif",
     "fontMono": "Mono",
-    "accent": "Kolor akcentu",
-    "accentHint": "Rodzina akcentu z pełną skalą odcieni",
-    "accentTeal": "Morski",
-    "accentSlate": "Łupkowy",
-    "accentAmber": "Bursztynowy",
-    "backToMail": "Wróć do poczty"
+    "backToMail": "Wróć do poczty",
+    "mood": "Paleta kolorów",
+    "moodHint": "Działa na logowanie i cały klient",
+    "moodAutoActive": "Według pory dnia",
+    "moodAutoMeta": "Teraz: {{mood}}",
+    "moods": {
+      "auto": "Auto",
+      "harbor": "Port",
+      "reef": "Rafa",
+      "grove": "Gaj",
+      "ember": "Żar",
+      "mist": "Mgła"
+    }
   },
   "mail": {
     "emptyInbox": "Skrzynka odbiorcza jest pusta",
@@ -74,12 +83,29 @@
     "unauthorized": "Sesja wygasła — zaloguj się ponownie",
     "invalidCredentials": "Nieprawidłowy host, nazwa użytkownika lub hasło",
     "required": "To pole jest wymagane",
-    "notImplemented": "Jeszcze nie połączono z API"
+    "notImplemented": "Jeszcze nie połączono z API",
+    "codes": {
+      "mail.send_failed": "Nie udało się wysłać wiadomości"
+    }
   },
   "common": {
     "loading": "Ładowanie…",
     "save": "Zapisz",
     "cancel": "Anuluj",
     "close": "Zamknij"
+  },
+  "compose": {
+    "title": "Nowa wiadomość",
+    "to": "Do",
+    "cc": "Dw",
+    "subject": "Temat",
+    "send": "Wyślij",
+    "sending": "Wysyłanie…",
+    "toRequired": "Dodaj co najmniej jednego odbiorcę",
+    "sendFailed": "Nie udało się wysłać wiadomości",
+    "bodyPlaceholder": "Napisz wiadomość…",
+    "subjectPlaceholder": "Temat",
+    "toPlaceholder": "name@example.com",
+    "ccPlaceholder": "opcjonalnie"
   }
 }

@@ -29,7 +29,9 @@
     "passwordPlaceholder": "••••••••",
     "submit": "登录",
     "submitting": "正在登录…",
-    "hint": "凭据通过安全会话发送到您的自托管 API。"
+    "hint": "凭据通过安全会话发送到您的自托管 API。",
+    "tagline": "轻量邮件，不打扰工作。",
+    "server": "服务器"
   },
   "settings": {
     "title": "设置",
@@ -45,12 +47,19 @@
     "fontSans": "无衬线",
     "fontSerif": "衬线",
     "fontMono": "等宽",
-    "accent": "强调色",
-    "accentHint": "带完整色阶的强调色系",
-    "accentTeal": "青绿",
-    "accentSlate": "石板灰",
-    "accentAmber": "琥珀",
-    "backToMail": "返回邮件"
+    "backToMail": "返回邮件",
+    "mood": "色彩方案",
+    "moodHint": "作用于登录页和整个邮件客户端",
+    "moodAutoActive": "随时间变化",
+    "moodAutoMeta": "当前：{{mood}}",
+    "moods": {
+      "auto": "自动",
+      "harbor": "港湾",
+      "reef": "礁石",
+      "grove": "林间",
+      "ember": "余烬",
+      "mist": "薄雾"
+    }
   },
   "mail": {
     "emptyInbox": "收件箱为空",
@@ -74,12 +83,29 @@
     "unauthorized": "会话已过期 — 请重新登录",
     "invalidCredentials": "主机、用户名或密码无效",
     "required": "此字段为必填项",
-    "notImplemented": "尚未连接 API"
+    "notImplemented": "尚未连接 API",
+    "codes": {
+      "mail.send_failed": "无法发送邮件"
+    }
   },
   "common": {
     "loading": "加载中…",
     "save": "保存",
     "cancel": "取消",
     "close": "关闭"
+  },
+  "compose": {
+    "title": "新邮件",
+    "to": "收件人",
+    "cc": "抄送",
+    "subject": "主题",
+    "send": "发送",
+    "sending": "发送中…",
+    "toRequired": "请至少添加一位收件人",
+    "sendFailed": "无法发送邮件",
+    "bodyPlaceholder": "撰写邮件…",
+    "subjectPlaceholder": "主题",
+    "toPlaceholder": "name@example.com",
+    "ccPlaceholder": "可选"
   }
 }

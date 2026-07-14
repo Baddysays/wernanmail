@@ -29,7 +29,9 @@
     "passwordPlaceholder": "••••••••",
     "submit": "Sign in",
     "submitting": "Signing in…",
-    "hint": "Credentials are sent to your self-hosted API over a secure session."
+    "hint": "Credentials are sent to your self-hosted API over a secure session.",
+    "tagline": "Light mail that stays out of the way.",
+    "server": "Server"
   },
   "settings": {
     "title": "Settings",
@@ -45,12 +47,19 @@
     "fontSans": "Sans",
     "fontSerif": "Serif",
     "fontMono": "Mono",
-    "accent": "Accent color",
-    "accentHint": "Accent family with full gradation scale",
-    "accentTeal": "Teal",
-    "accentSlate": "Slate",
-    "accentAmber": "Amber",
-    "backToMail": "Back to mail"
+    "backToMail": "Back to mail",
+    "mood": "Color palette",
+    "moodHint": "Applies to login and the whole mail client",
+    "moodAutoActive": "Following time of day",
+    "moodAutoMeta": "Now: {{mood}}",
+    "moods": {
+      "auto": "Auto",
+      "harbor": "Harbor",
+      "reef": "Reef",
+      "grove": "Grove",
+      "ember": "Ember",
+      "mist": "Mist"
+    }
   },
   "mail": {
     "emptyInbox": "Your inbox is empty",
@@ -80,7 +89,8 @@
       "mail.fetch_failed": "Could not load messages",
       "mail.folder_list_failed": "Could not load folders",
       "mail.session_required": "Please sign in",
-      "mail.session_invalid": "Session expired — please sign in again"
+      "mail.session_invalid": "Session expired — please sign in again",
+      "mail.send_failed": "Could not send the message"
     }
   },
   "common": {
@@ -88,5 +98,19 @@
     "save": "Save",
     "cancel": "Cancel",
     "close": "Close"
+  },
+  "compose": {
+    "title": "New message",
+    "to": "To",
+    "cc": "Cc",
+    "subject": "Subject",
+    "toPlaceholder": "name@example.com",
+    "ccPlaceholder": "optional",
+    "subjectPlaceholder": "Subject",
+    "bodyPlaceholder": "Write your message…",
+    "send": "Send",
+    "sending": "Sending…",
+    "toRequired": "Add at least one recipient",
+    "sendFailed": "Could not send the message"
   }
 }

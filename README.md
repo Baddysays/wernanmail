@@ -2,6 +2,12 @@
 
 Lightweight self-hosted **mail client** (web). Own mail server comes later.
 
+<p align="center">
+  <img src="docs/mockups/login-moods.png" alt="Wernanmail sign-in — Paper Quiet with color moods" width="720" />
+</p>
+
+Sign in connects to your IMAP/SMTP server. Color **moods** (Harbor, Reef, Grove, Ember, Mist, or Auto by time of day) tint the whole client — login, inbox, and settings.
+
 ## Product policy
 
 | Principle | Meaning |
@@ -23,18 +29,28 @@ Embeddable mail for other products — iframe / web component / JS SDK.
 
 Self-hosted mail that **plugs into your stack**, not only a standalone webmail.
 
+## What’s working now
+
+- Login against real IMAP (session cookie → Go API)
+- Three-column inbox: folders · list · reading pane
+- **Compose / Reply / Forward** via SMTP
+- Settings: language (12 locales), light/dark, fonts, **color moods**
+- Docker Compose for `api` + `web` (localhost bind for reverse-proxy deploys)
+
 ## Design direction
 
 Default look: **Paper Quiet** — light, calm, readable, three-column mail UI.
 
+Craft details lean on [emil-design-eng](https://github.com/emilkowalski/skills) (press feedback, gated hover, shadows over heavy borders, intentional motion).
+
 In **Settings** (first-class):
 
 - **Font** — user-selectable typefaces for UI / reading
-- **Color** — accent palette with **several gradations**
+- **Color mood** — full palette (not a single flat accent hex), including Auto
 - **Theme** — light / dark
 - **Language** — **12 locales** from day one (en, ru, de, fr, es, pt, zh, ja, ko, it, pl, tr)
 
-See [docs/DESIGN.md](docs/DESIGN.md) and mockups in `docs/mockups/`.
+See [docs/DESIGN.md](docs/DESIGN.md), [docs/POLICY.md](docs/POLICY.md), and more mockups in `docs/mockups/`.
 
 ## Stack (MVP client)
 
@@ -43,7 +59,7 @@ See [docs/DESIGN.md](docs/DESIGN.md) and mockups in `docs/mockups/`.
 | Frontend | React 19 + Vite + TypeScript |
 | i18n | `i18next` + `react-i18next` — 12 locale JSON files |
 | Dates | `Intl` (locale-aware) |
-| Styles | CSS Modules + CSS variables (fonts + color scales) |
+| Styles | CSS Modules + CSS variables (fonts + mood scales) |
 | Backend | Go (chi) + go-imap + SMTP — **error codes**, UI translates |
 | Sessions | httpOnly cookies |
 | Deploy | Docker Compose, light containers |
@@ -88,7 +104,7 @@ Copy `.env.example` to `.env` for local port overrides. Keep mailbox credentials
 
 ## Status
 
-Paper Quiet client scaffold in `web/`. Go API MVP in `server/` (IMAP/SMTP + httpOnly sessions).
+Usable MVP client: live IMAP inbox, compose/send, moods + i18n, Compose deploy. Next: denser keyboard shortcuts, Mailport embed, then the light mail **server** phase.
 
 ---
 

@@ -29,7 +29,9 @@
     "passwordPlaceholder": "••••••••",
     "submit": "Anmelden",
     "submitting": "Anmeldung…",
-    "hint": "Zugangsdaten werden über eine sichere Sitzung an Ihre selbst gehostete API gesendet."
+    "hint": "Zugangsdaten werden über eine sichere Sitzung an Ihre selbst gehostete API gesendet.",
+    "tagline": "Leichte Mail, die nicht im Weg steht.",
+    "server": "Server"
   },
   "settings": {
     "title": "Einstellungen",
@@ -45,12 +47,19 @@
     "fontSans": "Sans",
     "fontSerif": "Serif",
     "fontMono": "Mono",
-    "accent": "Akzentfarbe",
-    "accentHint": "Akzentfamilie mit voller Abstufung",
-    "accentTeal": "Türkis",
-    "accentSlate": "Schiefer",
-    "accentAmber": "Bernstein",
-    "backToMail": "Zurück zur Mail"
+    "backToMail": "Zurück zur Mail",
+    "mood": "Farbpalette",
+    "moodHint": "Gilt für Login und den gesamten Client",
+    "moodAutoActive": "Nach Tageszeit",
+    "moodAutoMeta": "Jetzt: {{mood}}",
+    "moods": {
+      "auto": "Auto",
+      "harbor": "Hafen",
+      "reef": "Riff",
+      "grove": "Hain",
+      "ember": "Abendglut",
+      "mist": "Nebel"
+    }
   },
   "mail": {
     "emptyInbox": "Ihr Posteingang ist leer",
@@ -74,12 +83,29 @@
     "unauthorized": "Sitzung abgelaufen — bitte erneut anmelden",
     "invalidCredentials": "Ungültiger Host, Benutzername oder Passwort",
     "required": "Dieses Feld ist erforderlich",
-    "notImplemented": "Noch nicht mit der API verbunden"
+    "notImplemented": "Noch nicht mit der API verbunden",
+    "codes": {
+      "mail.send_failed": "Nachricht konnte nicht gesendet werden"
+    }
   },
   "common": {
     "loading": "Laden…",
     "save": "Speichern",
     "cancel": "Abbrechen",
     "close": "Schließen"
+  },
+  "compose": {
+    "title": "Neue Nachricht",
+    "to": "An",
+    "cc": "Cc",
+    "subject": "Betreff",
+    "send": "Senden",
+    "sending": "Wird gesendet…",
+    "toRequired": "Mindestens einen Empfänger angeben",
+    "sendFailed": "Nachricht konnte nicht gesendet werden",
+    "bodyPlaceholder": "Nachricht schreiben…",
+    "subjectPlaceholder": "Betreff",
+    "toPlaceholder": "name@example.com",
+    "ccPlaceholder": "optional"
   }
 }

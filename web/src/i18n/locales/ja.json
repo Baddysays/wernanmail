@@ -29,7 +29,9 @@
     "passwordPlaceholder": "••••••••",
     "submit": "サインイン",
     "submitting": "サインイン中…",
-    "hint": "認証情報は安全なセッションでセルフホスト API に送信されます。"
+    "hint": "認証情報は安全なセッションでセルフホスト API に送信されます。",
+    "tagline": "邪魔にならない、軽やかなメール。",
+    "server": "サーバー"
   },
   "settings": {
     "title": "設定",
@@ -45,12 +47,19 @@
     "fontSans": "ゴシック",
     "fontSerif": "明朝",
     "fontMono": "等幅",
-    "accent": "アクセントカラー",
-    "accentHint": "段階スケール付きアクセント系統",
-    "accentTeal": "ティール",
-    "accentSlate": "スレート",
-    "accentAmber": "アンバー",
-    "backToMail": "メールに戻る"
+    "backToMail": "メールに戻る",
+    "mood": "カラーパレット",
+    "moodHint": "ログインとクライアント全体に適用",
+    "moodAutoActive": "時間帯に合わせる",
+    "moodAutoMeta": "現在：{{mood}}",
+    "moods": {
+      "auto": "自動",
+      "harbor": "ハーバー",
+      "reef": "リーフ",
+      "grove": "グローブ",
+      "ember": "エンバー",
+      "mist": "ミスト"
+    }
   },
   "mail": {
     "emptyInbox": "受信トレイは空です",
@@ -74,12 +83,29 @@
     "unauthorized": "セッションの有効期限切れ — 再度サインインしてください",
     "invalidCredentials": "ホスト、ユーザー名、またはパスワードが無効です",
     "required": "この項目は必須です",
-    "notImplemented": "まだ API に接続されていません"
+    "notImplemented": "まだ API に接続されていません",
+    "codes": {
+      "mail.send_failed": "送信できませんでした"
+    }
   },
   "common": {
     "loading": "読み込み中…",
     "save": "保存",
     "cancel": "キャンセル",
     "close": "閉じる"
+  },
+  "compose": {
+    "title": "新規メッセージ",
+    "to": "宛先",
+    "cc": "Cc",
+    "subject": "件名",
+    "send": "送信",
+    "sending": "送信中…",
+    "toRequired": "宛先を1人以上追加してください",
+    "sendFailed": "送信できませんでした",
+    "bodyPlaceholder": "メッセージを入力…",
+    "subjectPlaceholder": "件名",
+    "toPlaceholder": "name@example.com",
+    "ccPlaceholder": "任意"
   }
 }
