@@ -1,5 +1,6 @@
-﻿.git
+.git
 *.exe
 bin/
 .env
 .env.local
+README.md

@@ -1,6 +1,7 @@
-﻿# Build stage
+# Build stage
 FROM golang:1.24-alpine AS build
 WORKDIR /src
+RUN apk add --no-cache git ca-certificates
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
@@ -14,6 +15,7 @@ USER app
 WORKDIR /app
 COPY --from=build /out/api /app/api
 EXPOSE 8080
-HEALTHCHECK --interval=15s --timeout=3s --start-period=5s --retries=3 \
+ENV ADDR=:8080
+HEALTHCHECK --interval=15s --timeout=3s --start-period=8s --retries=3 \
   CMD wget -qO- http://127.0.0.1:8080/healthz >/dev/null || exit 1
 CMD ["/app/api"]

@@ -1,4 +1,4 @@
-﻿# Wernanmail — light client + API (no mail server stack).
+# Wernanmail — light client + API (no mail server stack).
 # Target: keep RAM low (~hundreds of MB, not Mailcow-class).
 #
 # Usage:
@@ -14,7 +14,9 @@ services:
       context: ./server
     restart: unless-stopped
     environment:
-      PORT: "8080"
+      ADDR: ":8080"
+      CORS_ORIGINS: "http://localhost:3080,http://127.0.0.1:3080"
+      COOKIE_SECURE: "false"
     expose:
       - "8080"
     mem_limit: 128m
