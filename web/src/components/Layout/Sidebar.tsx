@@ -28,15 +28,21 @@ export function Sidebar({ folders, activeFolder, onSelectFolder, onCompose }: Si
             role === 'other'
               ? folder.name
               : t(`nav.${role}`, { defaultValue: folder.name })
+          const unseen = folder.unseen ?? 0
           return (
             <button
               key={folder.name}
               type="button"
-              className={`${styles.navItem} ${active ? styles.navItemActive : ''}`}
+              className={`${styles.navItem} ${active ? styles.navItemActive : ''} ${role === 'spam' ? styles.navSpam : ''}`}
               onClick={() => onSelectFolder(folder.name)}
             >
               <FolderIcon role={role} />
               <span className={styles.navLabel}>{label}</span>
+              {unseen > 0 ? (
+                <span className={`${styles.navCount} ${styles.navBadge}`} aria-label={t('mail.unread', { count: unseen })}>
+                  {unseen > 99 ? '99+' : unseen}
+                </span>
+              ) : null}
             </button>
           )
         })}

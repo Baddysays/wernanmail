@@ -7,6 +7,8 @@ export type Folder = {
   name: string
   delimiter?: string
   attributes?: string[]
+  unseen?: number
+  messages?: number
 }
 
 export type MessageSummary = {

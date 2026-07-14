@@ -79,7 +79,13 @@
     "star": "Yıldız",
     "trash": "Sil",
     "sent": "İleti gönderildi",
-    "trashed": "Çöp kutusuna taşındı"
+    "trashed": "Çöp kutusuna taşındı",
+    "sentSaved": "Saved to Sent.",
+    "sentSpamHint": "If the recipient does not see it, ask them to check Spam — deliverability depends on SPF/DKIM/DMARC on your mail server.",
+    "newMail": "New message",
+    "newMailCount": "{{count}} new messages",
+    "emptySpam": "Spam is empty",
+    "emptySpamHint": "Messages filtered as junk appear here. Check this folder if a reply seems missing."
   },
   "errors": {
     "generic": "Bir şeyler ters gitti",

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
@@ -20,9 +20,11 @@ import { ComposeDialog, type ComposeDraft } from '../components/Compose/ComposeD
 import { Sidebar } from '../components/Layout/Sidebar'
 import { MessageList } from '../components/Layout/MessageList'
 import { ReadingPane } from '../components/Layout/ReadingPane'
+import { useToast } from '../components/Toast/ToastContext'
 import styles from './MailPage.module.css'
 
 const ROLE_ORDER = ['inbox', 'sent', 'drafts', 'archive', 'spam', 'trash'] as const
+const POLL_MS = 35_000
 
 function withRePrefix(subject: string, prefix: 'Re' | 'Fwd') {
   const trimmed = subject.trim()
@@ -40,6 +42,7 @@ function quoteBody(message: UiMessage) {
 export function MailPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const { pushToast } = useToast()
   const [folders, setFolders] = useState<Folder[]>([])
   const [folderName, setFolderName] = useState('INBOX')
   const [messages, setMessages] = useState<UiMessage[]>([])
@@ -47,10 +50,23 @@ export function MailPage() {
   const [selected, setSelected] = useState<UiMessage | null>(null)
   const [loadingList, setLoadingList] = useState(true)
   const [loadingMsg, setLoadingMsg] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [notice, setNotice] = useState<string | null>(null)
   const [composeOpen, setComposeOpen] = useState(false)
   const [composeDraft, setComposeDraft] = useState<ComposeDraft | null>(null)
+
+  const messagesRef = useRef(messages)
+  const folderNameRef = useRef(folderName)
+  const knownIdsRef = useRef<Set<string>>(new Set())
+  const pollReadyRef = useRef(false)
+
+  useEffect(() => {
+    messagesRef.current = messages
+  }, [messages])
+
+  useEffect(() => {
+    folderNameRef.current = folderName
+    pollReadyRef.current = false
+    knownIdsRef.current = new Set()
+  }, [folderName])
 
   const sidebarFolders = useMemo(() => {
     const ranked = [...folders].sort((a, b) => {
@@ -80,6 +96,11 @@ export function MailPage() {
     () => sidebarFolders.find((f) => folderRole(f) === 'sent') ?? null,
     [sidebarFolders],
   )
+
+  const activeRole = useMemo(() => {
+    const f = folders.find((x) => x.name === folderName)
+    return f ? folderRole(f) : 'other'
+  }, [folders, folderName])
 
   const handleAuthError = useCallback(
     (err: unknown) => {
@@ -116,34 +137,63 @@ export function MailPage() {
       })
     } catch (err) {
       if (handleAuthError(err)) return
-      setError(t('errors.generic'))
+      pushToast({ tone: 'error', title: t('errors.generic') })
     }
-  }, [handleAuthError, t])
+  }, [handleAuthError, pushToast, t])
+
+  const applyMessageList = useCallback(
+    (folder: string, list: UiMessage[], announceNew: boolean) => {
+      const ids = new Set(list.map((m) => m.id))
+      if (announceNew && pollReadyRef.current) {
+        const fresh = list.filter((m) => !knownIdsRef.current.has(m.id) && m.unread)
+        if (fresh.length === 1) {
+          const msg = fresh[0]
+          pushToast({
+            tone: 'info',
+            title: t('mail.newMail'),
+            detail: msg.subject || msg.from.name || msg.from.email,
+            durationMs: 5500,
+          })
+        } else if (fresh.length > 1) {
+          pushToast({
+            tone: 'info',
+            title: t('mail.newMailCount', { count: fresh.length }),
+            durationMs: 5500,
+          })
+        }
+      }
+      knownIdsRef.current = ids
+      pollReadyRef.current = true
+      setMessages(list)
+      setSelectedId((prev) => {
+        if (prev && list.some((m) => m.id === prev)) return prev
+        return list[0]?.id ?? null
+      })
+    },
+    [pushToast, t],
+  )
 
   const loadMessages = useCallback(
-    async (folder: string) => {
-      setLoadingList(true)
-      setError(null)
+    async (folder: string, opts?: { silent?: boolean; announceNew?: boolean }) => {
+      if (!opts?.silent) setLoadingList(true)
       try {
         const list = await fetchMessages(folder, 50)
         const ui = list.map((m) => summaryToUi(m, folder))
-        setMessages(ui)
-        setSelectedId((prev) => {
-          if (prev && ui.some((m) => m.id === prev)) return prev
-          return ui[0]?.id ?? null
-        })
-        setSelected(null)
+        applyMessageList(folder, ui, Boolean(opts?.announceNew))
+        if (!opts?.silent) setSelected(null)
       } catch (err) {
         if (handleAuthError(err)) return
-        setError(t('errors.generic'))
-        setMessages([])
-        setSelectedId(null)
-        setSelected(null)
+        if (!opts?.silent) {
+          pushToast({ tone: 'error', title: t('errors.generic') })
+          setMessages([])
+          setSelectedId(null)
+          setSelected(null)
+        }
       } finally {
-        setLoadingList(false)
+        if (!opts?.silent) setLoadingList(false)
       }
     },
-    [handleAuthError, t],
+    [applyMessageList, handleAuthError, pushToast, t],
   )
 
   useEffect(() => {
@@ -172,6 +222,12 @@ export function MailPage() {
             m.id === selectedId ? { ...m, unread: false, preview: ui.preview || m.preview } : m,
           ),
         )
+        setFolders((prev) =>
+          prev.map((f) => {
+            if (f.name !== folderName || !f.unseen) return f
+            return { ...f, unseen: Math.max(0, (f.unseen ?? 0) - 1) }
+          }),
+        )
       })
       .catch((err) => {
         if (cancelled) return
@@ -185,6 +241,25 @@ export function MailPage() {
       cancelled = true
     }
   }, [selectedId, folderName, handleAuthError])
+
+  // Background refresh: folders + current mailbox.
+  useEffect(() => {
+    const tick = () => {
+      if (document.visibilityState === 'hidden') return
+      void loadFolders()
+      const folder = folderNameRef.current
+      if (folder) void loadMessages(folder, { silent: true, announceNew: true })
+    }
+    const id = window.setInterval(tick, POLL_MS)
+    const onVis = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      window.clearInterval(id)
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [loadFolders, loadMessages])
 
   function handleReply(message: UiMessage) {
     openCompose({
@@ -216,11 +291,12 @@ export function MailPage() {
   async function handleTrash(message: UiMessage) {
     try {
       await trashMessage(message.id, message.folder || folderName)
-      setNotice(t('mail.trashed'))
+      pushToast({ tone: 'success', title: t('mail.trashed') })
       await loadMessages(folderName)
+      void loadFolders()
     } catch (err) {
       if (handleAuthError(err)) return
-      setError(t('errors.generic'))
+      pushToast({ tone: 'error', title: t('errors.generic') })
     }
   }
 
@@ -237,15 +313,9 @@ export function MailPage() {
       setSelected((cur) => (cur?.id === message.id ? { ...cur, starred: next } : cur))
     } catch (err) {
       if (handleAuthError(err)) return
-      setError(t('errors.generic'))
+      pushToast({ tone: 'error', title: t('errors.generic') })
     }
   }
-
-  useEffect(() => {
-    if (!notice) return
-    const tmr = window.setTimeout(() => setNotice(null), 3200)
-    return () => window.clearTimeout(tmr)
-  }, [notice])
 
   return (
     <div className={styles.page}>
@@ -255,14 +325,16 @@ export function MailPage() {
         onSelectFolder={(name) => setFolderName(name)}
         onCompose={() => openCompose()}
       />
-      {error ? <div className={styles.errorBanner}>{error}</div> : null}
-      {notice ? <div className={styles.noticeBanner}>{notice}</div> : null}
       <MessageList
         messages={messages}
         selectedId={selectedId}
         loading={loadingList}
+        folderRole={activeRole}
         onSelect={setSelectedId}
-        onRefresh={() => void loadMessages(folderName)}
+        onRefresh={() => {
+          void loadMessages(folderName)
+          void loadFolders()
+        }}
         onToggleStar={(id) => {
           const msg = messages.find((m) => m.id === id)
           if (msg) void handleToggleStar(msg)
@@ -286,7 +358,12 @@ export function MailPage() {
         draft={composeDraft}
         onClose={closeCompose}
         onSent={() => {
-          setNotice(t('mail.sent'))
+          pushToast({
+            tone: 'success',
+            title: t('mail.sent'),
+            detail: `${t('mail.sentSaved')} ${t('mail.sentSpamHint')}`,
+            durationMs: 7500,
+          })
           if (sentFolder) {
             if (folderName === sentFolder.name) {
               void loadMessages(folderName)
@@ -294,6 +371,7 @@ export function MailPage() {
               setFolderName(sentFolder.name)
             }
           }
+          void loadFolders()
         }}
       />
     </div>

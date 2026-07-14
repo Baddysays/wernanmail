@@ -79,7 +79,13 @@
     "star": "Star",
     "trash": "Delete",
     "sent": "Message sent",
-    "trashed": "Moved to Trash"
+    "sentSaved": "Saved to Sent.",
+    "sentSpamHint": "If the recipient does not see it, ask them to check Spam — deliverability depends on SPF/DKIM/DMARC on your mail server.",
+    "trashed": "Moved to Trash",
+    "newMail": "New message",
+    "newMailCount": "{{count}} new messages",
+    "emptySpam": "Spam is empty",
+    "emptySpamHint": "Messages filtered as junk appear here. Check this folder if a reply seems missing."
   },
   "errors": {
     "generic": "Something went wrong",

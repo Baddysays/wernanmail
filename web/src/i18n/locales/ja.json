@@ -79,7 +79,13 @@
     "star": "スター",
     "trash": "削除",
     "sent": "送信しました",
-    "trashed": "ゴミ箱へ移動しました"
+    "trashed": "ゴミ箱へ移動しました",
+    "sentSaved": "Saved to Sent.",
+    "sentSpamHint": "If the recipient does not see it, ask them to check Spam — deliverability depends on SPF/DKIM/DMARC on your mail server.",
+    "newMail": "New message",
+    "newMailCount": "{{count}} new messages",
+    "emptySpam": "Spam is empty",
+    "emptySpamHint": "Messages filtered as junk appear here. Check this folder if a reply seems missing."
   },
   "errors": {
     "generic": "問題が発生しました",

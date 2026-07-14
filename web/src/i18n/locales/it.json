@@ -79,7 +79,13 @@
     "star": "Speciale",
     "trash": "Elimina",
     "sent": "Messaggio inviato",
-    "trashed": "Spostato nel cestino"
+    "trashed": "Spostato nel cestino",
+    "sentSaved": "Saved to Sent.",
+    "sentSpamHint": "If the recipient does not see it, ask them to check Spam — deliverability depends on SPF/DKIM/DMARC on your mail server.",
+    "newMail": "New message",
+    "newMailCount": "{{count}} new messages",
+    "emptySpam": "Spam is empty",
+    "emptySpamHint": "Messages filtered as junk appear here. Check this folder if a reply seems missing."
   },
   "errors": {
     "generic": "Qualcosa è andato storto",

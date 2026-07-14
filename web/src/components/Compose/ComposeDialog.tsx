@@ -14,7 +14,7 @@ type ComposeDialogProps = {
   open: boolean
   draft?: ComposeDraft | null
   onClose: () => void
-  onSent?: () => void
+  onSent?: (info: { to: string[] }) => void
 }
 
 function splitAddresses(raw: string): string[] {
@@ -76,7 +76,7 @@ export function ComposeDialog({ open, draft, onClose, onSent }: ComposeDialogPro
         subject: subject.trim(),
         text: body,
       })
-      onSent?.()
+      onSent?.({ to: recipients })
       onClose()
     } catch (err) {
       if (err instanceof ApiError) {

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import type { UiMessage } from '../../api/types'
+import type { FolderRole, UiMessage } from '../../api/types'
 import { formatMessageDate } from '../../utils/format'
 import { useSettings } from '../../store/settings'
 import styles from './MessageList.module.css'
@@ -8,6 +8,7 @@ type MessageListProps = {
   messages: UiMessage[]
   selectedId: string | null
   loading?: boolean
+  folderRole?: FolderRole
   onSelect: (id: string) => void
   onRefresh?: () => void
   onToggleStar?: (id: string) => void
@@ -18,6 +19,7 @@ export function MessageList({
   messages,
   selectedId,
   loading,
+  folderRole = 'other',
   onSelect,
   onRefresh,
   onToggleStar,
@@ -25,6 +27,7 @@ export function MessageList({
 }: MessageListProps) {
   const { t } = useTranslation()
   const { language } = useSettings()
+  const unreadCount = messages.filter((m) => m.unread).length
 
   if (loading) {
     return (
@@ -35,6 +38,11 @@ export function MessageList({
       </section>
     )
   }
+
+  const emptyTitle =
+    folderRole === 'spam' ? t('mail.emptySpam') : t('mail.emptyInbox')
+  const emptyHint =
+    folderRole === 'spam' ? t('mail.emptySpamHint') : t('mail.emptyInboxHint')
 
   return (
     <section className={styles.list}>
@@ -60,15 +68,17 @@ export function MessageList({
         </button>
         {messages.length > 0 ? (
           <span className={styles.toolbarMeta}>
-            {t('mail.of', { from: 1, to: messages.length, total: messages.length })}
+            {unreadCount > 0
+              ? t('mail.unread', { count: unreadCount })
+              : t('mail.of', { from: 1, to: messages.length, total: messages.length })}
           </span>
         ) : null}
       </div>
 
       {messages.length === 0 ? (
         <div className={styles.empty}>
-          <div className={styles.emptyTitle}>{t('mail.emptyInbox')}</div>
-          <div>{t('mail.emptyInboxHint')}</div>
+          <div className={styles.emptyTitle}>{emptyTitle}</div>
+          <div>{emptyHint}</div>
         </div>
       ) : (
         <div className={styles.items} role="listbox" aria-label={t('nav.inbox')}>
@@ -100,7 +110,10 @@ export function MessageList({
                   {message.starred ? '★' : '☆'}
                 </span>
                 <div className={styles.main}>
-                  <span className={styles.sender}>{message.from.name}</span>
+                  <span className={styles.sender}>
+                    {message.unread ? <span className={styles.unreadDot} aria-hidden /> : null}
+                    {message.from.name}
+                  </span>
                   <span className={styles.subject}>
                     {message.subject || t('mail.noSubject')}
                   </span>

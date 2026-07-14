@@ -79,7 +79,13 @@
     "star": "별표",
     "trash": "삭제",
     "sent": "메일을 보냈습니다",
-    "trashed": "휴지통으로 이동했습니다"
+    "trashed": "휴지통으로 이동했습니다",
+    "sentSaved": "Saved to Sent.",
+    "sentSpamHint": "If the recipient does not see it, ask them to check Spam — deliverability depends on SPF/DKIM/DMARC on your mail server.",
+    "newMail": "New message",
+    "newMailCount": "{{count}} new messages",
+    "emptySpam": "Spam is empty",
+    "emptySpamHint": "Messages filtered as junk appear here. Check this folder if a reply seems missing."
   },
   "errors": {
     "generic": "문제가 발생했습니다",

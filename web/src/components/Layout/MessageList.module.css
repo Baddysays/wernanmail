@@ -104,7 +104,18 @@
 }
 
 .sender {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: var(--font-size-sm);
+}
+
+.unreadDot {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
 }
 
 .subject {

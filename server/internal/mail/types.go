@@ -4,9 +4,11 @@ import "time"
 
 // Folder is an IMAP mailbox/folder.
 type Folder struct {
-	Name       string `json:"name"`
-	Delimiter  string `json:"delimiter,omitempty"`
+	Name       string   `json:"name"`
+	Delimiter  string   `json:"delimiter,omitempty"`
 	Attributes []string `json:"attributes,omitempty"`
+	Unseen     uint32   `json:"unseen,omitempty"`
+	Messages   uint32   `json:"messages,omitempty"`
 }
 
 // Address is a mail address.

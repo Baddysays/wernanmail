@@ -79,7 +79,13 @@
     "star": "Destacar",
     "trash": "Eliminar",
     "sent": "Mensaje enviado",
-    "trashed": "Movido a la papelera"
+    "trashed": "Movido a la papelera",
+    "sentSaved": "Saved to Sent.",
+    "sentSpamHint": "If the recipient does not see it, ask them to check Spam — deliverability depends on SPF/DKIM/DMARC on your mail server.",
+    "newMail": "New message",
+    "newMailCount": "{{count}} new messages",
+    "emptySpam": "Spam is empty",
+    "emptySpamHint": "Messages filtered as junk appear here. Check this folder if a reply seems missing."
   },
   "errors": {
     "generic": "Algo salió mal",

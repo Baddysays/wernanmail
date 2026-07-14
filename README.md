@@ -3,10 +3,16 @@
 Lightweight self-hosted **mail client** (web). Own mail server comes later.
 
 <p align="center">
+  <img src="docs/mockups/login-ru.png" alt="Wernanmail — вход (русский интерфейс)" width="720" />
+</p>
+
+<p align="center">
   <img src="docs/mockups/login-moods.png" alt="Wernanmail sign-in — Paper Quiet with color moods" width="720" />
 </p>
 
 Sign in connects to your IMAP/SMTP server. Color **moods** (Harbor, Reef, Grove, Ember, Mist, or Auto by time of day) tint the whole client — login, inbox, and settings.
+
+Toasts confirm send / trash / new mail; sidebar shows unread badges (including Spam).
 
 ## Product policy
 
@@ -33,7 +39,8 @@ Self-hosted mail that **plugs into your stack**, not only a standalone webmail.
 
 - Login against real IMAP (session cookie → Go API)
 - Three-column inbox: folders · list · reading pane
-- **Compose / Reply / Forward** via SMTP
+- **Compose / Reply / Forward** via SMTP (toast feedback + Sent folder)
+- Unread badges, Spam folder clarity, auto-refresh for new mail
 - Settings: language (12 locales), light/dark, fonts, **color moods**
 - Docker Compose for `api` + `web` (localhost bind for reverse-proxy deploys)
 

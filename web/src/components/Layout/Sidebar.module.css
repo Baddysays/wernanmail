@@ -76,8 +76,33 @@
   font-variant-numeric: tabular-nums;
 }
 
+.navBadge {
+  min-width: 1.35rem;
+  padding: 0.08rem 0.38rem;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--text-inverse);
+  text-align: center;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.25;
+}
+
 .navItemActive .navCount {
   color: inherit;
+}
+
+.navItemActive .navBadge {
+  background: var(--accent-700);
+  color: var(--text-inverse);
+}
+
+[data-theme='dark'] .navItemActive .navBadge {
+  background: var(--accent-300);
+  color: var(--accent-900);
+}
+
+.navSpam .navLabel {
+  letter-spacing: 0.01em;
 }
 
 .sectionLabel {

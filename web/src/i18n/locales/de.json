@@ -79,7 +79,13 @@
     "star": "Markieren",
     "trash": "Löschen",
     "sent": "Nachricht gesendet",
-    "trashed": "In Papierkorb verschoben"
+    "trashed": "In Papierkorb verschoben",
+    "sentSaved": "Saved to Sent.",
+    "sentSpamHint": "If the recipient does not see it, ask them to check Spam — deliverability depends on SPF/DKIM/DMARC on your mail server.",
+    "newMail": "New message",
+    "newMailCount": "{{count}} new messages",
+    "emptySpam": "Spam is empty",
+    "emptySpamHint": "Messages filtered as junk appear here. Check this folder if a reply seems missing."
   },
   "errors": {
     "generic": "Etwas ist schiefgelaufen",

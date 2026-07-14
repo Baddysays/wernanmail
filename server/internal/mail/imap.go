@@ -74,7 +74,34 @@ func ListFolders(creds session.Credentials) ([]Folder, error) {
 	if err := <-done; err != nil {
 		return nil, err
 	}
+
+	// STATUS UNSEEN for selectable mailboxes (badges in the client sidebar).
+	for i := range folders {
+		if folderHasAttr(folders[i].Attributes, "\\Noselect") {
+			continue
+		}
+		status, err := c.Status(folders[i].Name, []imap.StatusItem{
+			imap.StatusUnseen,
+			imap.StatusMessages,
+		})
+		if err != nil {
+			continue
+		}
+		folders[i].Unseen = status.Unseen
+		folders[i].Messages = status.Messages
+	}
+
 	return folders, nil
+}
+
+func folderHasAttr(attrs []string, want string) bool {
+	want = strings.ToLower(want)
+	for _, a := range attrs {
+		if strings.EqualFold(a, want) || strings.ToLower(a) == want {
+			return true
+		}
+	}
+	return false
 }
 
 // ListMessages fetches recent message summaries from a folder.

@@ -7,40 +7,6 @@
   position: relative;
 }
 
-.errorBanner {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5;
-  padding: 0.5rem 0.95rem;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, #c44 12%, var(--bg-elevated));
-  color: #8a2020;
-  font-size: var(--font-size-sm);
-  box-shadow: var(--shadow-md);
-  border: none;
-}
-
-.noticeBanner {
-  position: absolute;
-  top: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5;
-  padding: 0.5rem 0.95rem;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--accent-500) 14%, var(--bg-elevated));
-  color: var(--accent-800);
-  font-size: var(--font-size-sm);
-  box-shadow: var(--shadow-md);
-  border: none;
-}
-
-[data-theme='dark'] .noticeBanner {
-  color: var(--accent-200);
-}
-
 @media (max-width: 960px) {
   .page {
     grid-template-columns: var(--sidebar-width) 1fr;
