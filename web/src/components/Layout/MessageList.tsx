@@ -1,22 +1,50 @@
 import { useTranslation } from 'react-i18next'
-import type { Message } from '../../data/mockMail'
-import { formatMessageDate } from '../../data/mockMail'
+import type { UiMessage } from '../../api/types'
+import { formatMessageDate } from '../../utils/format'
 import { useSettings } from '../../store/settings'
 import styles from './MessageList.module.css'
 
 type MessageListProps = {
-  messages: Message[]
+  messages: UiMessage[]
   selectedId: string | null
+  loading?: boolean
   onSelect: (id: string) => void
+  onRefresh?: () => void
 }
 
-export function MessageList({ messages, selectedId, onSelect }: MessageListProps) {
+export function MessageList({
+  messages,
+  selectedId,
+  loading,
+  onSelect,
+  onRefresh,
+}: MessageListProps) {
   const { t } = useTranslation()
   const { language } = useSettings()
+
+  if (loading) {
+    return (
+      <section className={styles.list}>
+        <div className={styles.empty}>
+          <div className={styles.emptyTitle}>{t('common.loading')}</div>
+        </div>
+      </section>
+    )
+  }
 
   if (messages.length === 0) {
     return (
       <section className={styles.list}>
+        <div className={styles.toolbar}>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            aria-label={t('mail.refresh')}
+            onClick={onRefresh}
+          >
+            ↻
+          </button>
+        </div>
         <div className={styles.empty}>
           <div className={styles.emptyTitle}>{t('mail.emptyInbox')}</div>
           <div>{t('mail.emptyInboxHint')}</div>
@@ -28,7 +56,12 @@ export function MessageList({ messages, selectedId, onSelect }: MessageListProps
   return (
     <section className={styles.list}>
       <div className={styles.toolbar}>
-        <button type="button" className={styles.iconBtn} aria-label={t('mail.refresh')}>
+        <button
+          type="button"
+          className={styles.iconBtn}
+          aria-label={t('mail.refresh')}
+          onClick={onRefresh}
+        >
           ↻
         </button>
         <span className={styles.toolbarMeta}>

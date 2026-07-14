@@ -1,16 +1,27 @@
 import { useTranslation } from 'react-i18next'
-import type { Message } from '../../data/mockMail'
-import { formatBytes, formatMessageDate } from '../../data/mockMail'
+import type { UiMessage } from '../../api/types'
+import { formatBytes, formatMessageDate } from '../../utils/format'
 import { useSettings } from '../../store/settings'
 import styles from './ReadingPane.module.css'
 
 type ReadingPaneProps = {
-  message: Message | null
+  message: UiMessage | null
+  loading?: boolean
 }
 
-export function ReadingPane({ message }: ReadingPaneProps) {
+export function ReadingPane({ message, loading }: ReadingPaneProps) {
   const { t } = useTranslation()
   const { language } = useSettings()
+
+  if (loading && !message?.body) {
+    return (
+      <section className={styles.pane}>
+        <div className={styles.empty}>
+          <div className={styles.emptyTitle}>{t('common.loading')}</div>
+        </div>
+      </section>
+    )
+  }
 
   if (!message) {
     return (
@@ -23,7 +34,7 @@ export function ReadingPane({ message }: ReadingPaneProps) {
     )
   }
 
-  const initials = message.from.name
+  const initials = (message.from.name || message.from.email || '?')
     .split(/\s+/)
     .map((part) => part[0])
     .join('')
@@ -37,7 +48,7 @@ export function ReadingPane({ message }: ReadingPaneProps) {
           <h1 className={styles.subject}>
             {message.subject || t('mail.noSubject')}
           </h1>
-          <span className={styles.folderTag}>{t(`nav.${message.folder}`)}</span>
+          <span className={styles.folderTag}>{message.folder}</span>
         </div>
         <div className={styles.actions}>
           <button type="button" className={styles.iconBtn} aria-label={t('mail.reply')}>
@@ -57,7 +68,7 @@ export function ReadingPane({ message }: ReadingPaneProps) {
           <span className={styles.senderName}>{message.from.name}</span>
           <span className={styles.senderEmail}>{`<${message.from.email}>`}</span>
           <span className={styles.recipient}>
-            {t('mail.to')} {message.to.name}
+            {t('mail.to')} {message.to.name || message.to.email}
           </span>
         </div>
         <time className={styles.date} dateTime={message.date}>
@@ -65,7 +76,7 @@ export function ReadingPane({ message }: ReadingPaneProps) {
         </time>
       </div>
 
-      <div className={styles.body}>{message.body}</div>
+      <div className={styles.body}>{message.body || (loading ? t('common.loading') : '')}</div>
 
       {message.attachments.length > 0 ? (
         <div className={styles.attachments}>

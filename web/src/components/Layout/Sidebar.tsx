@@ -1,15 +1,15 @@
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import type { FolderId } from '../../data/mockMail'
-import { FOLDERS } from '../../data/mockMail'
+import { folderRole, type Folder, type FolderRole } from '../../api/types'
 import styles from './Sidebar.module.css'
 
 type SidebarProps = {
-  activeFolder: FolderId
-  onSelectFolder: (id: FolderId) => void
+  folders: Folder[]
+  activeFolder: string
+  onSelectFolder: (name: string) => void
 }
 
-export function Sidebar({ activeFolder, onSelectFolder }: SidebarProps) {
+export function Sidebar({ folders, activeFolder, onSelectFolder }: SidebarProps) {
   const { t } = useTranslation()
 
   return (
@@ -20,20 +20,22 @@ export function Sidebar({ activeFolder, onSelectFolder }: SidebarProps) {
       </button>
 
       <nav className={styles.nav} aria-label={t('nav.folders')}>
-        {FOLDERS.map((folder) => {
-          const active = folder.id === activeFolder
+        {folders.map((folder) => {
+          const role = folderRole(folder)
+          const active = folder.name === activeFolder
+          const label =
+            role === 'other'
+              ? folder.name
+              : t(`nav.${role}`, { defaultValue: folder.name })
           return (
             <button
-              key={folder.id}
+              key={folder.name}
               type="button"
               className={`${styles.navItem} ${active ? styles.navItemActive : ''}`}
-              onClick={() => onSelectFolder(folder.id)}
+              onClick={() => onSelectFolder(folder.name)}
             >
-              <FolderIcon id={folder.id} />
-              <span className={styles.navLabel}>{t(`nav.${folder.id}`)}</span>
-              {folder.count != null ? (
-                <span className={styles.navCount}>{folder.count}</span>
-              ) : null}
+              <FolderIcon role={role} />
+              <span className={styles.navLabel}>{label}</span>
             </button>
           )
         })}
@@ -77,8 +79,8 @@ function SettingsIcon() {
   )
 }
 
-function FolderIcon({ id }: { id: FolderId }) {
-  const paths: Record<FolderId, string> = {
+function FolderIcon({ role }: { role: FolderRole }) {
+  const paths: Record<FolderRole, string> = {
     inbox: 'M4 6h16v12H4V6zm0 0l8 6 8-6',
     starred: 'M12 3.5l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 16.2 7.2 18.4l.9-5.4L4.2 9.2l5.4-.8L12 3.5z',
     sent: 'M4 12l16-7-7 16-2.2-6.8L4 12z',
@@ -86,12 +88,13 @@ function FolderIcon({ id }: { id: FolderId }) {
     archive: 'M4 7h16v2H4V7zm2 2v10h12V9',
     spam: 'M12 3l9 16H3L12 3zm0 6v4m0 3h.01',
     trash: 'M9 4h6m-8 3h10l-1 13H8L7 7zm3 3v7m4-7v7',
+    other: 'M3 7h6l2 2h10v10H3V7z',
   }
 
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
-        d={paths[id]}
+        d={paths[role]}
         stroke="currentColor"
         strokeWidth="1.6"
         strokeLinecap="round"

@@ -105,7 +105,13 @@ func ListMessages(creds session.Credentials, folder string, limit uint32) ([]Mes
 	seqset := new(imap.SeqSet)
 	seqset.AddRange(from, mbox.Messages)
 
-	items := []imap.FetchItem{imap.FetchEnvelope, imap.FetchFlags, imap.FetchUid, imap.FetchRFC822Size}
+	items := []imap.FetchItem{
+		imap.FetchEnvelope,
+		imap.FetchFlags,
+		imap.FetchUid,
+		imap.FetchRFC822Size,
+		imap.FetchInternalDate,
+	}
 
 	messages := make(chan *imap.Message, int(limit))
 	done := make(chan error, 1)
@@ -118,18 +124,19 @@ func ListMessages(creds session.Credentials, folder string, limit uint32) ([]Mes
 		if msg == nil || msg.Envelope == nil {
 			continue
 		}
+		date := msg.Envelope.Date
+		if date.IsZero() && !msg.InternalDate.IsZero() {
+			date = msg.InternalDate
+		}
 		sum := MessageSummary{
 			ID:      fmt.Sprintf("%d", msg.Uid),
 			UID:     msg.Uid,
 			Subject: msg.Envelope.Subject,
 			From:    mapAddresses(msg.Envelope.From),
 			To:      mapAddresses(msg.Envelope.To),
-			Date:    msg.Envelope.Date,
+			Date:    date,
 			Flags:   msg.Flags,
 			Size:    msg.Size,
-		}
-		if sum.Date.IsZero() {
-			sum.Date = time.Time{}
 		}
 		out = append(out, sum)
 	}
@@ -168,7 +175,14 @@ func GetMessage(creds session.Credentials, folder, id string) (*Message, error) 
 	seqset.AddNum(uid)
 
 	section := &imap.BodySectionName{}
-	items := []imap.FetchItem{imap.FetchEnvelope, imap.FetchFlags, imap.FetchUid, imap.FetchRFC822Size, section.FetchItem()}
+	items := []imap.FetchItem{
+		imap.FetchEnvelope,
+		imap.FetchFlags,
+		imap.FetchUid,
+		imap.FetchRFC822Size,
+		imap.FetchInternalDate,
+		section.FetchItem(),
+	}
 
 	messages := make(chan *imap.Message, 1)
 	done := make(chan error, 1)
@@ -187,6 +201,11 @@ func GetMessage(creds session.Credentials, folder, id string) (*Message, error) 
 		return nil, errNotFound
 	}
 
+	date := msg.Envelope.Date
+	if date.IsZero() && !msg.InternalDate.IsZero() {
+		date = msg.InternalDate
+	}
+
 	result := &Message{
 		MessageSummary: MessageSummary{
 			ID:      fmt.Sprintf("%d", msg.Uid),
@@ -194,7 +213,7 @@ func GetMessage(creds session.Credentials, folder, id string) (*Message, error) 
 			Subject: msg.Envelope.Subject,
 			From:    mapAddresses(msg.Envelope.From),
 			To:      mapAddresses(msg.Envelope.To),
-			Date:    msg.Envelope.Date,
+			Date:    date,
 			Flags:   msg.Flags,
 			Size:    msg.Size,
 		},

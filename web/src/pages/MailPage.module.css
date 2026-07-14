@@ -4,6 +4,21 @@
   min-height: 0;
   flex: 1;
   height: calc(100% - var(--header-height));
+  position: relative;
+}
+
+.errorBanner {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 0.45rem 0.9rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, #c44 18%, var(--surface, #fff));
+  color: #8a2020;
+  font-size: 0.85rem;
+  border: 1px solid color-mix(in srgb, #c44 35%, transparent);
 }
 
 @media (max-width: 960px) {

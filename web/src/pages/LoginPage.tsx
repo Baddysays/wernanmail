@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { ApiError, login } from '../api/client'
 import styles from './LoginPage.module.css'
 
 type LoginForm = {
@@ -13,7 +14,7 @@ export function LoginPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const [form, setForm] = useState<LoginForm>({
-    imapHost: '',
+    imapHost: 'mail.baddysays.ru',
     username: '',
     password: '',
   })
@@ -31,34 +32,30 @@ export function LoginPage() {
 
     setSubmitting(true)
     try {
-      // Proxy targets Go backend on :8080 — smtpHost defaults to imap host
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({
-          imapHost: form.imapHost.trim(),
-          smtpHost: form.imapHost.trim(),
-          username: form.username.trim(),
-          password: form.password,
-        }),
+      const host = form.imapHost.trim()
+      await login({
+        imapHost: host,
+        imapPort: 993,
+        smtpHost: host,
+        smtpPort: 587,
+        username: form.username.trim(),
+        password: form.password,
+        tls: true,
       })
-
-      if (response.ok) {
-        navigate('/mail')
-        return
-      }
-
-      if (response.status === 401) {
-        setError(t('errors.invalidCredentials'))
-        return
-      }
-
-      setError(t('errors.generic'))
-    } catch {
-      // Dev-friendly: allow entering the shell when API is not running yet
-      sessionStorage.setItem('wernanmail.demo', '1')
+      sessionStorage.removeItem('wernanmail.demo')
       navigate('/mail')
+    } catch (err) {
+      if (err instanceof ApiError) {
+        if (err.code === 'mail.auth_failed') {
+          setError(t('errors.invalidCredentials'))
+        } else if (err.code === 'mail.invalid_request') {
+          setError(t('errors.required'))
+        } else {
+          setError(t(`errors.codes.${err.code}`, { defaultValue: t('errors.generic') }))
+        }
+      } else {
+        setError(t('errors.network'))
+      }
     } finally {
       setSubmitting(false)
     }

@@ -74,7 +74,14 @@
     "unauthorized": "Session expired — please sign in again",
     "invalidCredentials": "Invalid host, username, or password",
     "required": "This field is required",
-    "notImplemented": "Not connected to the API yet"
+    "notImplemented": "Not connected to the API yet",
+    "codes": {
+      "mail.auth_failed": "Invalid host, username, or password",
+      "mail.fetch_failed": "Could not load messages",
+      "mail.folder_list_failed": "Could not load folders",
+      "mail.session_required": "Please sign in",
+      "mail.session_invalid": "Session expired — please sign in again"
+    }
   },
   "common": {
     "loading": "Loading…",
