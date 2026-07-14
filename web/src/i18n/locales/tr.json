@@ -75,7 +75,11 @@
     "forward": "İlet",
     "refresh": "Yenile",
     "unread": "{{count}} okunmamış",
-    "of": "{{from}}–{{to}} / {{total}}"
+    "of": "{{from}}–{{to}} / {{total}}",
+    "star": "Yıldız",
+    "trash": "Sil",
+    "sent": "İleti gönderildi",
+    "trashed": "Çöp kutusuna taşındı"
   },
   "errors": {
     "generic": "Bir şeyler ters gitti",
@@ -85,7 +89,9 @@
     "required": "Bu alan zorunludur",
     "notImplemented": "Henüz API'ye bağlanılmadı",
     "codes": {
-      "mail.send_failed": "İleti gönderilemedi"
+      "mail.send_failed": "İleti gönderilemedi",
+      "mail.flag_failed": "Could not update flags",
+      "mail.trash_failed": "Could not delete message"
     }
   },
   "common": {

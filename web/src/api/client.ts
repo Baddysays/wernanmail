@@ -96,3 +96,31 @@ export type SendPayload = {
 export function sendMessage(payload: SendPayload) {
   return apiPost<{ status: string }>('/api/messages/send', payload)
 }
+
+export function updateMessageFlags(
+  id: string,
+  folder: string,
+  flags: { add?: string[]; remove?: string[] },
+) {
+  return apiPatch<{ status: string }>(`/api/messages/${encodeURIComponent(id)}/flags`, {
+    folder,
+    add: flags.add ?? [],
+    remove: flags.remove ?? [],
+  })
+}
+
+export function trashMessage(id: string, folder: string) {
+  return apiPost<{ status: string }>(
+    `/api/messages/${encodeURIComponent(id)}/trash?folder=${encodeURIComponent(folder)}`,
+  )
+}
+
+async function apiPatch<T>(path: string, body?: unknown): Promise<T> {
+  const res = await fetch(path, {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: body != null ? { 'Content-Type': 'application/json' } : undefined,
+    body: body != null ? JSON.stringify(body) : undefined,
+  })
+  return parse<T>(res)
+}

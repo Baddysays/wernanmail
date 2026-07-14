@@ -75,7 +75,11 @@
     "forward": "Forward",
     "refresh": "Refresh",
     "unread": "{{count}} unread",
-    "of": "{{from}}–{{to}} of {{total}}"
+    "of": "{{from}}–{{to}} of {{total}}",
+    "star": "Star",
+    "trash": "Delete",
+    "sent": "Message sent",
+    "trashed": "Moved to Trash"
   },
   "errors": {
     "generic": "Something went wrong",
@@ -90,7 +94,9 @@
       "mail.folder_list_failed": "Could not load folders",
       "mail.session_required": "Please sign in",
       "mail.session_invalid": "Session expired — please sign in again",
-      "mail.send_failed": "Could not send the message"
+      "mail.send_failed": "Could not send the message",
+      "mail.flag_failed": "Could not update flags",
+      "mail.trash_failed": "Could not delete message"
     }
   },
   "common": {

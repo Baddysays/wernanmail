@@ -1,9 +1,12 @@
 package mail
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+	"mime/quotedprintable"
 	"strings"
+	"time"
 
 	"github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
@@ -228,6 +231,10 @@ func GetMessage(creds session.Credentials, folder, id string) (*Message, error) 
 			result.RawSize = rawSize
 		}
 	}
+
+	// Opening a message marks it read (best-effort).
+	_ = UpdateFlags(creds, folder, id, FlagUpdate{Add: []string{imap.SeenFlag}})
+
 	return result, nil
 }
 
@@ -276,17 +283,201 @@ func parseBody(r io.Reader) (text, html string, rawSize int, err error) {
 		switch h := p.Header.(type) {
 		case *gomessage.InlineHeader:
 			ct, _, _ := h.ContentType()
+			decoded := repairBodyText(string(b))
 			switch {
 			case strings.HasPrefix(ct, "text/plain"):
 				if text == "" {
-					text = string(b)
+					text = decoded
 				}
 			case strings.HasPrefix(ct, "text/html"):
 				if html == "" {
-					html = string(b)
+					html = decoded
 				}
 			}
 		}
 	}
 	return text, html, total, nil
+}
+
+// repairBodyText fixes bodies that were stored as literal quoted-printable
+// without a proper Content-Transfer-Encoding header (legacy send bug).
+func repairBodyText(s string) string {
+	if !looksLikeRawQP(s) {
+		return s
+	}
+	decoded, err := io.ReadAll(quotedprintable.NewReader(strings.NewReader(s)))
+	if err != nil || len(decoded) == 0 {
+		return s
+	}
+	return string(decoded)
+}
+
+func looksLikeRawQP(s string) bool {
+	// Typical UTF-8 Cyrillic/Latin as QP: =D0=BF or =C3=A9
+	n := 0
+	for i := 0; i+2 < len(s); i++ {
+		if s[i] == '=' && isHex(s[i+1]) && isHex(s[i+2]) {
+			n++
+			if n >= 3 {
+				return true
+			}
+			i += 2
+		}
+	}
+	return false
+}
+
+func isHex(c byte) bool {
+	return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')
+}
+
+// FindSentFolder returns the mailbox with \Sent, or a name heuristic.
+func FindSentFolder(creds session.Credentials) (string, error) {
+	folders, err := ListFolders(creds)
+	if err != nil {
+		return "", err
+	}
+	for _, f := range folders {
+		for _, a := range f.Attributes {
+			if strings.EqualFold(a, `\Sent`) || strings.Contains(strings.ToLower(a), "sent") {
+				return f.Name, nil
+			}
+		}
+	}
+	for _, f := range folders {
+		n := strings.ToLower(f.Name)
+		if strings.Contains(n, "sent") || strings.Contains(n, "отправлен") {
+			return f.Name, nil
+		}
+	}
+	return "", fmt.Errorf("sent folder not found")
+}
+
+func FindTrashFolder(creds session.Credentials) (string, error) {
+	folders, err := ListFolders(creds)
+	if err != nil {
+		return "", err
+	}
+	for _, f := range folders {
+		for _, a := range f.Attributes {
+			al := strings.ToLower(a)
+			if strings.Contains(al, "trash") || strings.Contains(al, "bin") {
+				return f.Name, nil
+			}
+		}
+	}
+	for _, f := range folders {
+		n := strings.ToLower(f.Name)
+		if strings.Contains(n, "trash") || strings.Contains(n, "deleted") || strings.Contains(n, "корзин") {
+			return f.Name, nil
+		}
+	}
+	return "", fmt.Errorf("trash folder not found")
+}
+
+// AppendToSent stores a raw RFC822 message in the Sent mailbox.
+func AppendToSent(creds session.Credentials, raw []byte) error {
+	name, err := FindSentFolder(creds)
+	if err != nil {
+		return err
+	}
+	c, err := ConnectIMAP(creds)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = c.Logout() }()
+
+	literal := bytes.NewReader(raw)
+	return c.Append(name, []string{imap.SeenFlag}, time.Now(), literal)
+}
+
+// FlagUpdate describes IMAP flag changes.
+type FlagUpdate struct {
+	Add    []string `json:"add,omitempty"`
+	Remove []string `json:"remove,omitempty"`
+}
+
+// UpdateFlags adds/removes IMAP flags on a UID.
+func UpdateFlags(creds session.Credentials, folder, id string, upd FlagUpdate) error {
+	if folder == "" {
+		folder = "INBOX"
+	}
+	var uid uint32
+	if _, err := fmt.Sscanf(id, "%d", &uid); err != nil || uid == 0 {
+		return fmt.Errorf("invalid message id")
+	}
+	c, err := ConnectIMAP(creds)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = c.Logout() }()
+
+	if _, err := c.Select(folder, false); err != nil {
+		return err
+	}
+	seqset := new(imap.SeqSet)
+	seqset.AddNum(uid)
+
+	if len(upd.Add) > 0 {
+		item := imap.FormatFlagsOp(imap.AddFlags, true)
+		vals := make([]interface{}, len(upd.Add))
+		for i, f := range upd.Add {
+			vals[i] = f
+		}
+		if err := c.UidStore(seqset, item, vals, nil); err != nil {
+			return err
+		}
+	}
+	if len(upd.Remove) > 0 {
+		item := imap.FormatFlagsOp(imap.RemoveFlags, true)
+		vals := make([]interface{}, len(upd.Remove))
+		for i, f := range upd.Remove {
+			vals[i] = f
+		}
+		if err := c.UidStore(seqset, item, vals, nil); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// MarkSeen sets \Seen on a message.
+func MarkSeen(creds session.Credentials, folder, id string) error {
+	return UpdateFlags(creds, folder, id, FlagUpdate{Add: []string{imap.SeenFlag}})
+}
+
+// TrashMessage moves a message to Trash (COPY+DELETE) or flags \Deleted.
+func TrashMessage(creds session.Credentials, folder, id string) error {
+	if folder == "" {
+		folder = "INBOX"
+	}
+	var uid uint32
+	if _, err := fmt.Sscanf(id, "%d", &uid); err != nil || uid == 0 {
+		return fmt.Errorf("invalid message id")
+	}
+
+	c, err := ConnectIMAP(creds)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = c.Logout() }()
+
+	if _, err := c.Select(folder, false); err != nil {
+		return err
+	}
+	seqset := new(imap.SeqSet)
+	seqset.AddNum(uid)
+
+	trash, trashErr := FindTrashFolder(creds)
+	if trashErr == nil && !strings.EqualFold(trash, folder) {
+		if err := c.UidCopy(seqset, trash); err != nil {
+			return err
+		}
+	}
+
+	item := imap.FormatFlagsOp(imap.AddFlags, true)
+	if err := c.UidStore(seqset, item, []interface{}{imap.DeletedFlag}, nil); err != nil {
+		return err
+	}
+	return c.Expunge(nil)
 }

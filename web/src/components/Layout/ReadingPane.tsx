@@ -10,6 +10,8 @@ type ReadingPaneProps = {
   onReply?: (message: UiMessage) => void
   onReplyAll?: (message: UiMessage) => void
   onForward?: (message: UiMessage) => void
+  onTrash?: (message: UiMessage) => void
+  onToggleStar?: (message: UiMessage) => void
 }
 
 export function ReadingPane({
@@ -18,6 +20,8 @@ export function ReadingPane({
   onReply,
   onReplyAll,
   onForward,
+  onTrash,
+  onToggleStar,
 }: ReadingPaneProps) {
   const { t } = useTranslation()
   const { language } = useSettings()
@@ -63,6 +67,15 @@ export function ReadingPane({
           <button
             type="button"
             className={styles.iconBtn}
+            aria-label={t('mail.star')}
+            title={t('mail.star')}
+            onClick={() => onToggleStar?.(message)}
+          >
+            {message.starred ? '★' : '☆'}
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
             aria-label={t('mail.reply')}
             onClick={() => onReply?.(message)}
           >
@@ -75,6 +88,15 @@ export function ReadingPane({
             onClick={() => onForward?.(message)}
           >
             ↪
+          </button>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            aria-label={t('mail.trash')}
+            title={t('mail.trash')}
+            onClick={() => onTrash?.(message)}
+          >
+            ⌫
           </button>
         </div>
       </header>
@@ -124,6 +146,9 @@ export function ReadingPane({
         </button>
         <button type="button" className={styles.footerBtn} onClick={() => onForward?.(message)}>
           {t('mail.forward')}
+        </button>
+        <button type="button" className={styles.footerBtn} onClick={() => onTrash?.(message)}>
+          {t('mail.trash')}
         </button>
       </footer>
     </section>

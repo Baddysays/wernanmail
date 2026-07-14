@@ -1,9 +1,20 @@
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { logout } from '../../api/client'
 import styles from './AppLayout.module.css'
 
 export function AppLayout() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    try {
+      await logout()
+    } catch {
+      /* session may already be gone */
+    }
+    navigate('/login')
+  }
 
   return (
     <div className={styles.shell}>
@@ -30,6 +41,15 @@ export function AppLayout() {
           >
             <GearIcon />
           </Link>
+          <button
+            type="button"
+            className={styles.iconBtn}
+            aria-label={t('nav.logout')}
+            title={t('nav.logout')}
+            onClick={() => void handleLogout()}
+          >
+            <LogoutIcon />
+          </button>
         </div>
       </header>
 
@@ -75,6 +95,26 @@ function GearIcon() {
         stroke="currentColor"
         strokeWidth="1.6"
         strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function LogoutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M10 4H6.5A2.5 2.5 0 0 0 4 6.5v11A2.5 2.5 0 0 0 6.5 20H10"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <path
+        d="M14 8l4 4-4 4M10 12h8"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   )

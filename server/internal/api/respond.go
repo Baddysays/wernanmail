@@ -16,6 +16,8 @@ const (
 	CodeFetchFailed      = "mail.fetch_failed"
 	CodeMessageNotFound  = "mail.message_not_found"
 	CodeSendFailed       = "mail.send_failed"
+	CodeFlagFailed       = "mail.flag_failed"
+	CodeTrashFailed      = "mail.trash_failed"
 	CodeInternal         = "mail.internal_error"
 )
 

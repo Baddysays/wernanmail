@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ApiError, fetchFolders, fetchMessage, fetchMessages } from '../api/client'
+import {
+  ApiError,
+  fetchFolders,
+  fetchMessage,
+  fetchMessages,
+  trashMessage,
+  updateMessageFlags,
+} from '../api/client'
 import {
   detailToUi,
   folderRole,
@@ -41,6 +48,7 @@ export function MailPage() {
   const [loadingList, setLoadingList] = useState(true)
   const [loadingMsg, setLoadingMsg] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
   const [composeOpen, setComposeOpen] = useState(false)
   const [composeDraft, setComposeDraft] = useState<ComposeDraft | null>(null)
 
@@ -68,6 +76,11 @@ export function MailPage() {
     return primary
   }, [folders])
 
+  const sentFolder = useMemo(
+    () => sidebarFolders.find((f) => folderRole(f) === 'sent') ?? null,
+    [sidebarFolders],
+  )
+
   const handleAuthError = useCallback(
     (err: unknown) => {
       if (err instanceof ApiError && (err.status === 401 || err.code.startsWith('mail.session'))) {
@@ -93,11 +106,14 @@ export function MailPage() {
     try {
       const list = await fetchFolders()
       setFolders(list)
-      const inbox =
-        list.find((f) => folderRole(f) === 'inbox') ??
-        list.find((f) => f.name.toUpperCase() === 'INBOX') ??
-        list[0]
-      if (inbox) setFolderName(inbox.name)
+      setFolderName((prev) => {
+        if (prev) return prev
+        const inbox =
+          list.find((f) => folderRole(f) === 'inbox') ??
+          list.find((f) => f.name.toUpperCase() === 'INBOX') ??
+          list[0]
+        return inbox?.name ?? 'INBOX'
+      })
     } catch (err) {
       if (handleAuthError(err)) return
       setError(t('errors.generic'))
@@ -112,7 +128,10 @@ export function MailPage() {
         const list = await fetchMessages(folder, 50)
         const ui = list.map((m) => summaryToUi(m, folder))
         setMessages(ui)
-        setSelectedId(ui[0]?.id ?? null)
+        setSelectedId((prev) => {
+          if (prev && ui.some((m) => m.id === prev)) return prev
+          return ui[0]?.id ?? null
+        })
         setSelected(null)
       } catch (err) {
         if (handleAuthError(err)) return
@@ -146,13 +165,18 @@ export function MailPage() {
     void fetchMessage(selectedId, folderName)
       .then((detail) => {
         if (cancelled) return
-        setSelected(detailToUi(detail, folderName))
+        const ui = detailToUi(detail, folderName)
+        setSelected(ui)
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === selectedId ? { ...m, unread: false, preview: ui.preview || m.preview } : m,
+          ),
+        )
       })
       .catch((err) => {
         if (cancelled) return
         if (handleAuthError(err)) return
-        const row = messages.find((m) => m.id === selectedId) ?? null
-        setSelected(row)
+        setSelected(null)
       })
       .finally(() => {
         if (!cancelled) setLoadingMsg(false)
@@ -160,7 +184,7 @@ export function MailPage() {
     return () => {
       cancelled = true
     }
-  }, [selectedId, folderName, handleAuthError, messages])
+  }, [selectedId, folderName, handleAuthError])
 
   function handleReply(message: UiMessage) {
     openCompose({
@@ -189,6 +213,40 @@ export function MailPage() {
     })
   }
 
+  async function handleTrash(message: UiMessage) {
+    try {
+      await trashMessage(message.id, message.folder || folderName)
+      setNotice(t('mail.trashed'))
+      await loadMessages(folderName)
+    } catch (err) {
+      if (handleAuthError(err)) return
+      setError(t('errors.generic'))
+    }
+  }
+
+  async function handleToggleStar(message: UiMessage) {
+    const next = !message.starred
+    try {
+      await updateMessageFlags(message.id, message.folder || folderName, {
+        add: next ? ['\\Flagged'] : [],
+        remove: next ? [] : ['\\Flagged'],
+      })
+      setMessages((prev) =>
+        prev.map((m) => (m.id === message.id ? { ...m, starred: next } : m)),
+      )
+      setSelected((cur) => (cur?.id === message.id ? { ...cur, starred: next } : cur))
+    } catch (err) {
+      if (handleAuthError(err)) return
+      setError(t('errors.generic'))
+    }
+  }
+
+  useEffect(() => {
+    if (!notice) return
+    const tmr = window.setTimeout(() => setNotice(null), 3200)
+    return () => window.clearTimeout(tmr)
+  }, [notice])
+
   return (
     <div className={styles.page}>
       <Sidebar
@@ -198,12 +256,21 @@ export function MailPage() {
         onCompose={() => openCompose()}
       />
       {error ? <div className={styles.errorBanner}>{error}</div> : null}
+      {notice ? <div className={styles.noticeBanner}>{notice}</div> : null}
       <MessageList
         messages={messages}
         selectedId={selectedId}
         loading={loadingList}
         onSelect={setSelectedId}
         onRefresh={() => void loadMessages(folderName)}
+        onToggleStar={(id) => {
+          const msg = messages.find((m) => m.id === id)
+          if (msg) void handleToggleStar(msg)
+        }}
+        onTrashSelected={() => {
+          const msg = messages.find((m) => m.id === selectedId) ?? selected
+          if (msg) void handleTrash(msg)
+        }}
       />
       <ReadingPane
         message={selected}
@@ -211,15 +278,21 @@ export function MailPage() {
         onReply={handleReply}
         onReplyAll={handleReplyAll}
         onForward={handleForward}
+        onTrash={handleTrash}
+        onToggleStar={handleToggleStar}
       />
       <ComposeDialog
         open={composeOpen}
         draft={composeDraft}
         onClose={closeCompose}
         onSent={() => {
-          const sent = sidebarFolders.find((f) => folderRole(f) === 'sent')
-          if (sent && folderName === sent.name) {
-            void loadMessages(folderName)
+          setNotice(t('mail.sent'))
+          if (sentFolder) {
+            if (folderName === sentFolder.name) {
+              void loadMessages(folderName)
+            } else {
+              setFolderName(sentFolder.name)
+            }
           }
         }}
       />

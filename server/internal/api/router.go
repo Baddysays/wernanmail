@@ -40,6 +40,9 @@ func NewRouter(h *Handler) http.Handler {
 			r.Get("/messages", h.ListMessages)
 			r.Get("/messages/{id}", h.GetMessage)
 			r.Post("/messages/send", h.SendMessage)
+			r.Patch("/messages/{id}/flags", h.UpdateMessageFlags)
+			r.Post("/messages/{id}/trash", h.TrashMessage)
+			r.Delete("/messages/{id}", h.TrashMessage)
 		})
 	})
 

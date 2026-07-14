@@ -10,6 +10,8 @@ type MessageListProps = {
   loading?: boolean
   onSelect: (id: string) => void
   onRefresh?: () => void
+  onToggleStar?: (id: string) => void
+  onTrashSelected?: () => void
 }
 
 export function MessageList({
@@ -18,6 +20,8 @@ export function MessageList({
   loading,
   onSelect,
   onRefresh,
+  onToggleStar,
+  onTrashSelected,
 }: MessageListProps) {
   const { t } = useTranslation()
   const { language } = useSettings()
@@ -32,27 +36,6 @@ export function MessageList({
     )
   }
 
-  if (messages.length === 0) {
-    return (
-      <section className={styles.list}>
-        <div className={styles.toolbar}>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            aria-label={t('mail.refresh')}
-            onClick={onRefresh}
-          >
-            ↻
-          </button>
-        </div>
-        <div className={styles.empty}>
-          <div className={styles.emptyTitle}>{t('mail.emptyInbox')}</div>
-          <div>{t('mail.emptyInboxHint')}</div>
-        </div>
-      </section>
-    )
-  }
-
   return (
     <section className={styles.list}>
       <div className={styles.toolbar}>
@@ -60,54 +43,78 @@ export function MessageList({
           type="button"
           className={styles.iconBtn}
           aria-label={t('mail.refresh')}
+          title={t('mail.refresh')}
           onClick={onRefresh}
         >
           ↻
         </button>
-        <span className={styles.toolbarMeta}>
-          {t('mail.of', { from: 1, to: messages.length, total: messages.length })}
-        </span>
+        <button
+          type="button"
+          className={styles.iconBtn}
+          aria-label={t('mail.trash')}
+          title={t('mail.trash')}
+          onClick={onTrashSelected}
+          disabled={!selectedId}
+        >
+          ⌫
+        </button>
+        {messages.length > 0 ? (
+          <span className={styles.toolbarMeta}>
+            {t('mail.of', { from: 1, to: messages.length, total: messages.length })}
+          </span>
+        ) : null}
       </div>
 
-      <div className={styles.items} role="listbox" aria-label={t('nav.inbox')}>
-        {messages.map((message) => {
-          const active = message.id === selectedId
-          return (
-            <button
-              key={message.id}
-              type="button"
-              role="option"
-              aria-selected={active}
-              className={[
-                styles.item,
-                active ? styles.itemActive : '',
-                message.unread ? styles.itemUnread : '',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              onClick={() => onSelect(message.id)}
-            >
-              <span
-                className={`${styles.star} ${message.starred ? styles.starOn : ''}`}
-                aria-hidden
+      {messages.length === 0 ? (
+        <div className={styles.empty}>
+          <div className={styles.emptyTitle}>{t('mail.emptyInbox')}</div>
+          <div>{t('mail.emptyInboxHint')}</div>
+        </div>
+      ) : (
+        <div className={styles.items} role="listbox" aria-label={t('nav.inbox')}>
+          {messages.map((message) => {
+            const active = message.id === selectedId
+            return (
+              <button
+                key={message.id}
+                type="button"
+                role="option"
+                aria-selected={active}
+                className={[
+                  styles.item,
+                  active ? styles.itemActive : '',
+                  message.unread ? styles.itemUnread : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+                onClick={() => onSelect(message.id)}
               >
-                ★
-              </span>
-              <div className={styles.main}>
-                <span className={styles.sender}>{message.from.name}</span>
-                <span className={styles.subject}>
-                  {message.subject || t('mail.noSubject')}
+                <span
+                  className={`${styles.star} ${message.starred ? styles.starOn : ''}`}
+                  role="presentation"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleStar?.(message.id)
+                  }}
+                >
+                  {message.starred ? '★' : '☆'}
                 </span>
-                <span className={styles.preview}>{message.preview}</span>
-              </div>
-              <div className={styles.meta}>
-                <span>{formatMessageDate(message.date, language)}</span>
-                {message.attachments.length > 0 ? <span>📎</span> : null}
-              </div>
-            </button>
-          )
-        })}
-      </div>
+                <div className={styles.main}>
+                  <span className={styles.sender}>{message.from.name}</span>
+                  <span className={styles.subject}>
+                    {message.subject || t('mail.noSubject')}
+                  </span>
+                  <span className={styles.preview}>{message.preview}</span>
+                </div>
+                <div className={styles.meta}>
+                  <span>{formatMessageDate(message.date, language)}</span>
+                  {message.attachments.length > 0 ? <span>📎</span> : null}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      )}
     </section>
   )
 }

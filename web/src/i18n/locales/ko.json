@@ -75,7 +75,11 @@
     "forward": "전달",
     "refresh": "새로고침",
     "unread": "읽지 않음 {{count}}",
-    "of": "{{from}}–{{to}} / 총 {{total}}"
+    "of": "{{from}}–{{to}} / 총 {{total}}",
+    "star": "별표",
+    "trash": "삭제",
+    "sent": "메일을 보냈습니다",
+    "trashed": "휴지통으로 이동했습니다"
   },
   "errors": {
     "generic": "문제가 발생했습니다",
@@ -85,7 +89,9 @@
     "required": "필수 입력 항목입니다",
     "notImplemented": "아직 API에 연결되지 않았습니다",
     "codes": {
-      "mail.send_failed": "메일을 보낼 수 없습니다"
+      "mail.send_failed": "메일을 보낼 수 없습니다",
+      "mail.flag_failed": "Could not update flags",
+      "mail.trash_failed": "Could not delete message"
     }
   },
   "common": {

@@ -75,7 +75,11 @@
     "forward": "Переслать",
     "refresh": "Обновить",
     "unread": "{{count}} непрочитанных",
-    "of": "{{from}}–{{to}} из {{total}}"
+    "of": "{{from}}–{{to}} из {{total}}",
+    "star": "Избранное",
+    "trash": "Удалить",
+    "sent": "Письмо отправлено",
+    "trashed": "Перенесено в корзину"
   },
   "errors": {
     "generic": "Что-то пошло не так",
@@ -85,7 +89,9 @@
     "required": "Обязательное поле",
     "notImplemented": "API ещё не подключён",
     "codes": {
-      "mail.send_failed": "Не удалось отправить письмо"
+      "mail.send_failed": "Не удалось отправить письмо",
+      "mail.flag_failed": "Не удалось обновить флаги",
+      "mail.trash_failed": "Не удалось удалить письмо"
     }
   },
   "common": {

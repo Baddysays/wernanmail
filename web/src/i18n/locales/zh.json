@@ -75,7 +75,11 @@
     "forward": "转发",
     "refresh": "刷新",
     "unread": "{{count}} 封未读",
-    "of": "{{from}}–{{to}} / 共 {{total}}"
+    "of": "{{from}}–{{to}} / 共 {{total}}",
+    "star": "标星",
+    "trash": "删除",
+    "sent": "已发送",
+    "trashed": "已移至废纸篓"
   },
   "errors": {
     "generic": "出了点问题",
@@ -85,7 +89,9 @@
     "required": "此字段为必填项",
     "notImplemented": "尚未连接 API",
     "codes": {
-      "mail.send_failed": "无法发送邮件"
+      "mail.send_failed": "无法发送邮件",
+      "mail.flag_failed": "Could not update flags",
+      "mail.trash_failed": "Could not delete message"
     }
   },
   "common": {

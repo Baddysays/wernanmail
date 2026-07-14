@@ -1,16 +1,23 @@
 package mail
 
 import (
+	"bytes"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"mime"
+	"mime/quotedprintable"
 	"net"
 	"net/smtp"
 	"strings"
+	"time"
 
 	"github.com/Baddysays/wernanmail/server/internal/session"
 )
 
-// SendMessage sends mail via SMTP using session credentials.
+// SendMessage sends mail via SMTP and best-effort saves a copy to Sent.
 func SendMessage(creds session.Credentials, req SendRequest) error {
 	if len(req.To) == 0 {
 		return fmt.Errorf("missing recipients")
@@ -20,16 +27,24 @@ func SendMessage(creds session.Credentials, req SendRequest) error {
 	recipients = append(recipients, req.CC...)
 	recipients = append(recipients, req.BCC...)
 
-	msg := buildMIME(from, req)
+	msg := buildMIME(from, req, creds.SMTPHost)
 
 	addr := fmt.Sprintf("%s:%d", creds.SMTPHost, creds.SMTPPort)
 	auth := smtp.PlainAuth("", creds.Username, creds.Password, creds.SMTPHost)
 
-	// Port 465 = implicit TLS; 587/25 = plain then STARTTLS when available.
+	var err error
 	if creds.TLS && creds.SMTPPort == 465 {
-		return sendSMTPS(addr, auth, from, recipients, msg, creds.SMTPHost)
+		err = sendSMTPS(addr, auth, from, recipients, msg, creds.SMTPHost)
+	} else {
+		err = sendSMTPStartTLS(addr, auth, from, recipients, msg, creds.SMTPHost, creds.TLS)
 	}
-	return sendSMTPStartTLS(addr, auth, from, recipients, msg, creds.SMTPHost, creds.TLS)
+	if err != nil {
+		return err
+	}
+
+	// Filing to Sent must not undo a successful SMTP delivery.
+	_ = AppendToSent(creds, msg)
+	return nil
 }
 
 func sendSMTPS(addr string, auth smtp.Auth, from string, to []string, msg []byte, host string) error {
@@ -105,35 +120,78 @@ func writeMail(c *smtp.Client, from string, to []string, msg []byte) error {
 	return c.Quit()
 }
 
-func buildMIME(from string, req SendRequest) []byte {
+func buildMIME(from string, req SendRequest, smtpHost string) []byte {
 	var b strings.Builder
 	b.WriteString("From: " + from + "\r\n")
 	b.WriteString("To: " + strings.Join(req.To, ", ") + "\r\n")
 	if len(req.CC) > 0 {
 		b.WriteString("Cc: " + strings.Join(req.CC, ", ") + "\r\n")
 	}
-	b.WriteString("Subject: " + sanitizeHeader(req.Subject) + "\r\n")
+	b.WriteString("Subject: " + encodeHeader(req.Subject) + "\r\n")
+	b.WriteString("Date: " + time.Now().Format(time.RFC1123Z) + "\r\n")
+	b.WriteString("Message-ID: <" + newMessageID(smtpHost) + ">\r\n")
 	b.WriteString("MIME-Version: 1.0\r\n")
 
 	if req.HTML != "" {
 		b.WriteString("Content-Type: multipart/alternative; boundary=\"wernan-boundary\"\r\n\r\n")
 		b.WriteString("--wernan-boundary\r\n")
-		b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
-		b.WriteString(req.Text)
-		b.WriteString("\r\n--wernan-boundary\r\n")
-		b.WriteString("Content-Type: text/html; charset=UTF-8\r\n\r\n")
-		b.WriteString(req.HTML)
-		b.WriteString("\r\n--wernan-boundary--\r\n")
+		writeTextPart(&b, "text/plain", req.Text)
+		b.WriteString("--wernan-boundary\r\n")
+		writeTextPart(&b, "text/html", req.HTML)
+		b.WriteString("--wernan-boundary--\r\n")
 	} else {
-		b.WriteString("Content-Type: text/plain; charset=UTF-8\r\n\r\n")
-		b.WriteString(req.Text)
-		b.WriteString("\r\n")
+		writeTextPart(&b, "text/plain", req.Text)
 	}
 	return []byte(b.String())
 }
 
-func sanitizeHeader(s string) string {
+func writeTextPart(b *strings.Builder, contentType, body string) {
+	b.WriteString("Content-Type: " + contentType + "; charset=UTF-8\r\n")
+	b.WriteString("Content-Transfer-Encoding: quoted-printable\r\n\r\n")
+	b.WriteString(encodeQP(body))
+	if !strings.HasSuffix(body, "\n") {
+		b.WriteString("\r\n")
+	}
+}
+
+func encodeHeader(s string) string {
 	s = strings.ReplaceAll(s, "\r", "")
 	s = strings.ReplaceAll(s, "\n", "")
-	return s
+	if s == "" {
+		return s
+	}
+	needs := false
+	for _, r := range s {
+		if r > 127 || r < 32 {
+			needs = true
+			break
+		}
+	}
+	if !needs {
+		return s
+	}
+	return mime.QEncoding.Encode("utf-8", s)
+}
+
+func encodeQP(s string) string {
+	var buf bytes.Buffer
+	w := quotedprintable.NewWriter(&buf)
+	_, _ = io.WriteString(w, s)
+	_ = w.Close()
+	// quotedprintable uses \r\n; ensure trailing newline for MIME part body
+	out := buf.String()
+	if out != "" && !strings.HasSuffix(out, "\n") {
+		out += "\r\n"
+	}
+	return out
+}
+
+func newMessageID(host string) string {
+	host = strings.TrimSpace(host)
+	if host == "" {
+		host = "localhost"
+	}
+	var b [12]byte
+	_, _ = rand.Read(b[:])
+	return fmt.Sprintf("%s.%d@%s", hex.EncodeToString(b[:]), time.Now().UnixNano(), host)
 }

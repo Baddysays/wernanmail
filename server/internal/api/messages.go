@@ -70,3 +70,49 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 	}
 	writeData(w, http.StatusOK, map[string]string{"status": "sent"})
 }
+
+func (h *Handler) UpdateMessageFlags(w http.ResponseWriter, r *http.Request) {
+	sess := sessionFrom(r)
+	id := chi.URLParam(r, "id")
+	var body struct {
+		Folder string   `json:"folder"`
+		Add    []string `json:"add"`
+		Remove []string `json:"remove"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
+		writeError(w, http.StatusBadRequest, CodeInvalidRequest)
+		return
+	}
+	if body.Folder == "" {
+		body.Folder = "INBOX"
+	}
+	if err := mail.UpdateFlags(sess.Creds, body.Folder, id, mail.FlagUpdate{
+		Add:    body.Add,
+		Remove: body.Remove,
+	}); err != nil {
+		writeError(w, http.StatusBadGateway, CodeFlagFailed)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (h *Handler) TrashMessage(w http.ResponseWriter, r *http.Request) {
+	sess := sessionFrom(r)
+	id := chi.URLParam(r, "id")
+	folder := r.URL.Query().Get("folder")
+	if folder == "" {
+		var body struct {
+			Folder string `json:"folder"`
+		}
+		_ = decodeJSON(r, &body)
+		folder = body.Folder
+	}
+	if folder == "" {
+		folder = "INBOX"
+	}
+	if err := mail.TrashMessage(sess.Creds, folder, id); err != nil {
+		writeError(w, http.StatusBadGateway, CodeTrashFailed)
+		return
+	}
+	writeData(w, http.StatusOK, map[string]string{"status": "trashed"})
+}

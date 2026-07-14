@@ -75,7 +75,11 @@
     "forward": "Prześlij dalej",
     "refresh": "Odśwież",
     "unread": "{{count}} nieprzeczytanych",
-    "of": "{{from}}–{{to}} z {{total}}"
+    "of": "{{from}}–{{to}} z {{total}}",
+    "star": "Oznacz",
+    "trash": "Usuń",
+    "sent": "Wiadomość wysłana",
+    "trashed": "Przeniesiono do kosza"
   },
   "errors": {
     "generic": "Coś poszło nie tak",
@@ -85,7 +89,9 @@
     "required": "To pole jest wymagane",
     "notImplemented": "Jeszcze nie połączono z API",
     "codes": {
-      "mail.send_failed": "Nie udało się wysłać wiadomości"
+      "mail.send_failed": "Nie udało się wysłać wiadomości",
+      "mail.flag_failed": "Could not update flags",
+      "mail.trash_failed": "Could not delete message"
     }
   },
   "common": {

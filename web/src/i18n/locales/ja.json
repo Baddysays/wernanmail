@@ -75,7 +75,11 @@
     "forward": "転送",
     "refresh": "更新",
     "unread": "未読 {{count}} 件",
-    "of": "{{from}}–{{to}} / {{total}} 件"
+    "of": "{{from}}–{{to}} / {{total}} 件",
+    "star": "スター",
+    "trash": "削除",
+    "sent": "送信しました",
+    "trashed": "ゴミ箱へ移動しました"
   },
   "errors": {
     "generic": "問題が発生しました",
@@ -85,7 +89,9 @@
     "required": "この項目は必須です",
     "notImplemented": "まだ API に接続されていません",
     "codes": {
-      "mail.send_failed": "送信できませんでした"
+      "mail.send_failed": "送信できませんでした",
+      "mail.flag_failed": "Could not update flags",
+      "mail.trash_failed": "Could not delete message"
     }
   },
   "common": {
