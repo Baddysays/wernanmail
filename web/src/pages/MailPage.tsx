@@ -142,7 +142,7 @@ export function MailPage() {
   }, [handleAuthError, pushToast, t])
 
   const applyMessageList = useCallback(
-    (folder: string, list: UiMessage[], announceNew: boolean) => {
+    (list: UiMessage[], announceNew: boolean) => {
       const ids = new Set(list.map((m) => m.id))
       if (announceNew && pollReadyRef.current) {
         const fresh = list.filter((m) => !knownIdsRef.current.has(m.id) && m.unread)
@@ -179,7 +179,7 @@ export function MailPage() {
       try {
         const list = await fetchMessages(folder, 50)
         const ui = list.map((m) => summaryToUi(m, folder))
-        applyMessageList(folder, ui, Boolean(opts?.announceNew))
+        applyMessageList(ui, Boolean(opts?.announceNew))
         if (!opts?.silent) setSelected(null)
       } catch (err) {
         if (handleAuthError(err)) return
