@@ -20,6 +20,9 @@ type Config struct {
 	DefaultSMTPHost string
 	DefaultSMTPPort int
 	DefaultTLS      bool
+	MTAStsMode      string
+	MTAStsMX        string
+	MTAStsMaxAge    int
 }
 
 func Load() Config {
@@ -40,22 +43,39 @@ func Load() Config {
 	return Config{
 		Addr:            addr,
 		CORSOrigins:     splitCSV(getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")),
-		CookieSecure:    getenvBool("COOKIE_SECURE", false),
+		CookieSecure:    getenvBool("COOKIE_SECURE", true),
 		SessionCookie:   getenv("SESSION_COOKIE", "wernan_sid"),
 		SessionTTLHours: getenvInt("SESSION_TTL_HOURS", 24),
-		SessionSecret:   getenv("SESSION_SECRET", ""),
-		MasterPassword:  getenv("MAIL_MASTER_PASSWORD", ""),
+		SessionSecret:   getenvSecret("SESSION_SECRET", ""),
+		MasterPassword:  getenvSecret("MAIL_MASTER_PASSWORD", ""),
 		DefaultIMAPHost: imapHost,
 		DefaultIMAPPort: getenvInt("IMAP_PORT", 993),
 		DefaultSMTPHost: smtpHost,
 		DefaultSMTPPort: getenvInt("SMTP_PORT", 465),
 		DefaultTLS:      getenvBool("MAIL_TLS", true),
+		MTAStsMode:      getenv("MTA_STS_MODE", "testing"),
+		MTAStsMX:        getenv("MTA_STS_MX", imapHost),
+		MTAStsMaxAge:    getenvInt("MTA_STS_MAX_AGE", 86400),
 	}
 }
 
 func getenv(key, fallback string) string {
 	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
 		return v
+	}
+	return fallback
+}
+
+func getenvSecret(key, fallback string) string {
+	if v := strings.TrimSpace(os.Getenv(key)); v != "" {
+		return v
+	}
+	if path := strings.TrimSpace(os.Getenv(key + "_FILE")); path != "" {
+		if value, err := os.ReadFile(path); err == nil {
+			if v := strings.TrimSpace(string(value)); v != "" {
+				return v
+			}
+		}
 	}
 	return fallback
 }

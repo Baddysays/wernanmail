@@ -140,6 +140,7 @@ func ListMessages(creds session.Credentials, folder string, limit uint32) ([]Mes
 		imap.FetchUid,
 		imap.FetchRFC822Size,
 		imap.FetchInternalDate,
+		imap.FetchBodyStructure,
 	}
 
 	messages := make(chan *imap.Message, int(limit))
@@ -158,14 +159,16 @@ func ListMessages(creds session.Credentials, folder string, limit uint32) ([]Mes
 			date = msg.InternalDate
 		}
 		sum := MessageSummary{
-			ID:      fmt.Sprintf("%d", msg.Uid),
-			UID:     msg.Uid,
-			Subject: msg.Envelope.Subject,
-			From:    mapAddresses(msg.Envelope.From),
-			To:      mapAddresses(msg.Envelope.To),
-			Date:    date,
-			Flags:   msg.Flags,
-			Size:    msg.Size,
+			ID:            fmt.Sprintf("%d", msg.Uid),
+			UID:           msg.Uid,
+			Subject:       msg.Envelope.Subject,
+			From:          mapAddresses(msg.Envelope.From),
+			To:            mapAddresses(msg.Envelope.To),
+			Date:          date,
+			Flags:         msg.Flags,
+			Size:          msg.Size,
+			HasAttachment: bodyStructureHasAttachment(msg.BodyStructure),
+			MessageID:     msg.Envelope.MessageId,
 		}
 		out = append(out, sum)
 	}
@@ -245,17 +248,20 @@ func GetMessage(creds session.Credentials, folder, id string) (*Message, error) 
 			Date:    date,
 			Flags:   msg.Flags,
 			Size:    msg.Size,
+			MessageID: msg.Envelope.MessageId,
 		},
 		CC: mapAddresses(msg.Envelope.Cc),
 	}
 
 	r := msg.GetBody(section)
 	if r != nil {
-		text, html, rawSize, parseErr := parseBody(r)
+		text, html, atts, rawSize, parseErr := parseBody(r)
 		if parseErr == nil {
 			result.Text = text
 			result.HTML = html
+			result.Attachments = atts
 			result.RawSize = rawSize
+			result.HasAttachment = len(atts) > 0
 		}
 	}
 
@@ -263,6 +269,113 @@ func GetMessage(creds session.Credentials, folder, id string) (*Message, error) 
 	_ = UpdateFlags(creds, folder, id, FlagUpdate{Add: []string{imap.SeenFlag}})
 
 	return result, nil
+}
+
+// GetAttachment returns one attachment payload by part id (from Message.Attachments).
+func GetAttachment(creds session.Credentials, folder, id, partID string) (filename, contentType string, data []byte, err error) {
+	if folder == "" {
+		folder = "INBOX"
+	}
+	var uid uint32
+	if _, err := fmt.Sscanf(id, "%d", &uid); err != nil || uid == 0 {
+		return "", "", nil, fmt.Errorf("invalid message id")
+	}
+
+	c, err := ConnectIMAP(creds)
+	if err != nil {
+		return "", "", nil, err
+	}
+	defer func() { _ = c.Logout() }()
+
+	if _, err := c.Select(folder, true); err != nil {
+		return "", "", nil, err
+	}
+
+	seqset := new(imap.SeqSet)
+	seqset.AddNum(uid)
+	section := &imap.BodySectionName{}
+	items := []imap.FetchItem{section.FetchItem()}
+
+	messages := make(chan *imap.Message, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- c.UidFetch(seqset, items, messages)
+	}()
+
+	var msg *imap.Message
+	for m := range messages {
+		msg = m
+	}
+	if err := <-done; err != nil {
+		return "", "", nil, err
+	}
+	if msg == nil {
+		return "", "", nil, errNotFound
+	}
+	r := msg.GetBody(section)
+	if r == nil {
+		return "", "", nil, errNotFound
+	}
+
+	att, err := findAttachment(r, partID)
+	if err != nil {
+		return "", "", nil, err
+	}
+	return att.Filename, att.ContentType, att.Data, nil
+}
+
+type attachmentPayload struct {
+	Filename    string
+	ContentType string
+	Data        []byte
+}
+
+func findAttachment(r io.Reader, partID string) (*attachmentPayload, error) {
+	_, _, atts, _, err := parseBodyCollect(r, true)
+	if err != nil {
+		return nil, err
+	}
+	for _, a := range atts {
+		if a.meta.ID == partID {
+			return &attachmentPayload{
+				Filename:    a.meta.Filename,
+				ContentType: a.meta.ContentType,
+				Data:        a.data,
+			}, nil
+		}
+	}
+	return nil, errNotFound
+}
+
+func bodyStructureHasAttachment(bs *imap.BodyStructure) bool {
+	if bs == nil {
+		return false
+	}
+	if strings.EqualFold(bs.Disposition, "attachment") {
+		return true
+	}
+	mimeType := strings.ToLower(bs.MIMEType)
+	mimeSub := strings.ToLower(bs.MIMESubType)
+	if len(bs.Parts) == 0 {
+		if mimeType == "text" {
+			return false
+		}
+		if mimeType == "multipart" {
+			return false
+		}
+		// Non-text leaf (image, application, audio, …) counts as attachment.
+		if mimeType != "" {
+			return true
+		}
+		return false
+	}
+	for _, part := range bs.Parts {
+		if bodyStructureHasAttachment(part) {
+			return true
+		}
+	}
+	_ = mimeSub
+	return false
 }
 
 var errNotFound = fmt.Errorf("message not found")
@@ -288,11 +401,29 @@ func mapAddresses(in []*imap.Address) []Address {
 	return out
 }
 
-func parseBody(r io.Reader) (text, html string, rawSize int, err error) {
+func parseBody(r io.Reader) (text, html string, atts []AttachmentMeta, rawSize int, err error) {
+	text, html, collected, rawSize, err := parseBodyCollect(r, false)
+	if err != nil {
+		return text, html, nil, rawSize, err
+	}
+	atts = make([]AttachmentMeta, 0, len(collected))
+	for _, a := range collected {
+		atts = append(atts, a.meta)
+	}
+	return text, html, atts, rawSize, nil
+}
+
+type collectedAttachment struct {
+	meta AttachmentMeta
+	data []byte
+}
+
+func parseBodyCollect(r io.Reader, keepData bool) (text, html string, atts []collectedAttachment, rawSize int, err error) {
 	mr, err := gomessage.CreateReader(r)
 	if err != nil {
-		return "", "", 0, err
+		return "", "", nil, 0, err
 	}
+	attIndex := 0
 	var total int
 	for {
 		p, err := mr.NextPart()
@@ -300,7 +431,7 @@ func parseBody(r io.Reader) (text, html string, rawSize int, err error) {
 			break
 		}
 		if err != nil {
-			return text, html, total, err
+			return text, html, atts, total, err
 		}
 		b, readErr := io.ReadAll(p.Body)
 		if readErr != nil {
@@ -310,20 +441,76 @@ func parseBody(r io.Reader) (text, html string, rawSize int, err error) {
 		switch h := p.Header.(type) {
 		case *gomessage.InlineHeader:
 			ct, _, _ := h.ContentType()
+			ctLower := strings.ToLower(ct)
 			decoded := repairBodyText(string(b))
 			switch {
-			case strings.HasPrefix(ct, "text/plain"):
+			case strings.HasPrefix(ctLower, "text/plain"):
 				if text == "" {
 					text = decoded
 				}
-			case strings.HasPrefix(ct, "text/html"):
+			case strings.HasPrefix(ctLower, "text/html"):
 				if html == "" {
 					html = decoded
 				}
+			default:
+				// Inline non-text (e.g. inline image without AttachmentHeader).
+				if !strings.HasPrefix(ctLower, "text/") && len(b) > 0 {
+					name := inlineFilename(h, attIndex)
+					meta := AttachmentMeta{
+						ID:          fmt.Sprintf("%d", attIndex),
+						Filename:    name,
+						ContentType: ct,
+						Size:        len(b),
+					}
+					attIndex++
+					item := collectedAttachment{meta: meta}
+					if keepData {
+						item.data = b
+					}
+					atts = append(atts, item)
+				}
 			}
+		case *gomessage.AttachmentHeader:
+			ct, _, _ := h.ContentType()
+			if ct == "" {
+				ct = "application/octet-stream"
+			}
+			name, _ := h.Filename()
+			if name == "" {
+				name = fmt.Sprintf("attachment-%d", attIndex+1)
+			}
+			meta := AttachmentMeta{
+				ID:          fmt.Sprintf("%d", attIndex),
+				Filename:    name,
+				ContentType: ct,
+				Size:        len(b),
+			}
+			attIndex++
+			item := collectedAttachment{meta: meta}
+			if keepData {
+				item.data = b
+			}
+			atts = append(atts, item)
 		}
 	}
-	return text, html, total, nil
+	return text, html, atts, total, nil
+}
+
+func inlineFilename(h *gomessage.InlineHeader, index int) string {
+	if h == nil {
+		return fmt.Sprintf("part-%d", index+1)
+	}
+	_, params, _ := h.ContentType()
+	if name := params["name"]; name != "" {
+		return name
+	}
+	disp, dparams, _ := h.ContentDisposition()
+	if strings.EqualFold(disp, "inline") || strings.EqualFold(disp, "attachment") {
+		if name := dparams["filename"]; name != "" {
+			return name
+		}
+	}
+	return fmt.Sprintf("part-%d", index+1)
 }
 
 // repairBodyText fixes bodies that were stored as literal quoted-printable
@@ -402,6 +589,132 @@ func FindTrashFolder(creds session.Credentials) (string, error) {
 	return "", fmt.Errorf("trash folder not found")
 }
 
+func FindDraftsFolder(creds session.Credentials) (string, error) {
+	folders, err := ListFolders(creds)
+	if err != nil {
+		return "", err
+	}
+	for _, f := range folders {
+		for _, a := range f.Attributes {
+			if strings.EqualFold(a, `\Drafts`) || strings.Contains(strings.ToLower(a), "draft") {
+				return f.Name, nil
+			}
+		}
+	}
+	for _, f := range folders {
+		n := strings.ToLower(f.Name)
+		if strings.Contains(n, "draft") || strings.Contains(n, "чернов") {
+			return f.Name, nil
+		}
+	}
+	return "", fmt.Errorf("drafts folder not found")
+}
+
+// AppendDraft stores a raw RFC822 message in Drafts with \Draft.
+func AppendDraft(creds session.Credentials, raw []byte) error {
+	name, err := FindDraftsFolder(creds)
+	if err != nil {
+		return err
+	}
+	c, err := ConnectIMAP(creds)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = c.Logout() }()
+	return c.Append(name, []string{imap.DraftFlag}, time.Now(), bytes.NewReader(raw))
+}
+
+// SearchMessages runs IMAP TEXT search and returns matching summaries (newest first, capped).
+func SearchMessages(creds session.Credentials, folder, query string, limit uint32) ([]MessageSummary, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return ListMessages(creds, folder, limit)
+	}
+	if folder == "" {
+		folder = "INBOX"
+	}
+	if limit == 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	c, err := ConnectIMAP(creds)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = c.Logout() }()
+
+	if _, err := c.Select(folder, true); err != nil {
+		return nil, err
+	}
+
+	criteria := imap.NewSearchCriteria()
+	criteria.Text = []string{query}
+	uids, err := c.UidSearch(criteria)
+	if err != nil {
+		return nil, err
+	}
+	if len(uids) == 0 {
+		return []MessageSummary{}, nil
+	}
+	// Newest UIDs last from many servers; take last `limit` then reverse.
+	if uint32(len(uids)) > limit {
+		uids = uids[len(uids)-int(limit):]
+	}
+
+	seqset := new(imap.SeqSet)
+	seqset.AddNum(uids...)
+	items := []imap.FetchItem{
+		imap.FetchEnvelope,
+		imap.FetchFlags,
+		imap.FetchUid,
+		imap.FetchRFC822Size,
+		imap.FetchInternalDate,
+		imap.FetchBodyStructure,
+	}
+	messages := make(chan *imap.Message, len(uids))
+	done := make(chan error, 1)
+	go func() {
+		done <- c.UidFetch(seqset, items, messages)
+	}()
+
+	byUID := make(map[uint32]MessageSummary, len(uids))
+	for msg := range messages {
+		if msg == nil || msg.Envelope == nil {
+			continue
+		}
+		date := msg.Envelope.Date
+		if date.IsZero() && !msg.InternalDate.IsZero() {
+			date = msg.InternalDate
+		}
+		byUID[msg.Uid] = MessageSummary{
+			ID:            fmt.Sprintf("%d", msg.Uid),
+			UID:           msg.Uid,
+			Subject:       msg.Envelope.Subject,
+			From:          mapAddresses(msg.Envelope.From),
+			To:            mapAddresses(msg.Envelope.To),
+			Date:          date,
+			Flags:         msg.Flags,
+			Size:          msg.Size,
+			HasAttachment: bodyStructureHasAttachment(msg.BodyStructure),
+			MessageID:     msg.Envelope.MessageId,
+		}
+	}
+	if err := <-done; err != nil {
+		return nil, err
+	}
+
+	out := make([]MessageSummary, 0, len(uids))
+	for i := len(uids) - 1; i >= 0; i-- {
+		if s, ok := byUID[uids[i]]; ok {
+			out = append(out, s)
+		}
+	}
+	return out, nil
+}
+
 // AppendToSent stores a raw RFC822 message in the Sent mailbox.
 func AppendToSent(creds session.Credentials, raw []byte) error {
 	name, err := FindSentFolder(creds)
@@ -473,35 +786,161 @@ func MarkSeen(creds session.Credentials, folder, id string) error {
 	return UpdateFlags(creds, folder, id, FlagUpdate{Add: []string{imap.SeenFlag}})
 }
 
+// TrashResult describes where a trashed message landed (for undo).
+type TrashResult struct {
+	TrashID     string `json:"trashId"`
+	TrashFolder string `json:"trashFolder"`
+	FromFolder  string `json:"fromFolder"`
+}
+
 // TrashMessage moves a message to Trash (COPY+DELETE) or flags \Deleted.
-func TrashMessage(creds session.Credentials, folder, id string) error {
+func TrashMessage(creds session.Credentials, folder, id string) (*TrashResult, error) {
 	if folder == "" {
 		folder = "INBOX"
 	}
 	var uid uint32
 	if _, err := fmt.Sscanf(id, "%d", &uid); err != nil || uid == 0 {
-		return fmt.Errorf("invalid message id")
+		return nil, fmt.Errorf("invalid message id")
 	}
 
 	c, err := ConnectIMAP(creds)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer func() { _ = c.Logout() }()
 
 	if _, err := c.Select(folder, false); err != nil {
-		return err
+		return nil, err
 	}
+
+	messageID := fetchMessageID(c, uid)
+
 	seqset := new(imap.SeqSet)
 	seqset.AddNum(uid)
 
 	trash, trashErr := FindTrashFolder(creds)
 	if trashErr == nil && !strings.EqualFold(trash, folder) {
 		if err := c.UidCopy(seqset, trash); err != nil {
-			return err
+			return nil, err
 		}
+	} else if trashErr != nil {
+		trash = folder
 	}
 
+	item := imap.FormatFlagsOp(imap.AddFlags, true)
+	if err := c.UidStore(seqset, item, []interface{}{imap.DeletedFlag}, nil); err != nil {
+		return nil, err
+	}
+	if err := c.Expunge(nil); err != nil {
+		return nil, err
+	}
+
+	result := &TrashResult{FromFolder: folder, TrashFolder: trash, TrashID: id}
+	if trashErr == nil && !strings.EqualFold(trash, folder) {
+		if tid := findUIDByMessageID(c, trash, messageID); tid != "" {
+			result.TrashID = tid
+		} else if tid := newestUID(c, trash); tid != "" {
+			result.TrashID = tid
+		}
+	}
+	return result, nil
+}
+
+func fetchMessageID(c *client.Client, uid uint32) string {
+	seqset := new(imap.SeqSet)
+	seqset.AddNum(uid)
+	messages := make(chan *imap.Message, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- c.UidFetch(seqset, []imap.FetchItem{imap.FetchEnvelope}, messages)
+	}()
+	var msg *imap.Message
+	for m := range messages {
+		msg = m
+	}
+	_ = <-done
+	if msg != nil && msg.Envelope != nil {
+		return strings.TrimSpace(msg.Envelope.MessageId)
+	}
+	return ""
+}
+
+func findUIDByMessageID(c *client.Client, folder, messageID string) string {
+	messageID = strings.TrimSpace(messageID)
+	if messageID == "" {
+		return ""
+	}
+	if _, err := c.Select(folder, true); err != nil {
+		return ""
+	}
+	criteria := imap.NewSearchCriteria()
+	criteria.Header.Add("Message-ID", messageID)
+	uids, err := c.UidSearch(criteria)
+	if err != nil || len(uids) == 0 {
+		// try without angle brackets variants
+		alt := strings.Trim(messageID, "<>")
+		criteria = imap.NewSearchCriteria()
+		criteria.Header.Add("Message-ID", alt)
+		uids, err = c.UidSearch(criteria)
+		if err != nil || len(uids) == 0 {
+			return ""
+		}
+	}
+	return fmt.Sprintf("%d", uids[len(uids)-1])
+}
+
+func newestUID(c *client.Client, folder string) string {
+	mbox, err := c.Select(folder, true)
+	if err != nil || mbox.Messages == 0 {
+		return ""
+	}
+	seqset := new(imap.SeqSet)
+	seqset.AddNum(mbox.Messages)
+	messages := make(chan *imap.Message, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- c.Fetch(seqset, []imap.FetchItem{imap.FetchUid}, messages)
+	}()
+	var msg *imap.Message
+	for m := range messages {
+		msg = m
+	}
+	_ = <-done
+	if msg == nil || msg.Uid == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%d", msg.Uid)
+}
+
+// MoveMessage copies a UID to another folder then deletes it from the source.
+func MoveMessage(creds session.Credentials, fromFolder, toFolder, id string) error {
+	if fromFolder == "" {
+		fromFolder = "INBOX"
+	}
+	if toFolder == "" {
+		return fmt.Errorf("missing destination folder")
+	}
+	if strings.EqualFold(fromFolder, toFolder) {
+		return nil
+	}
+	var uid uint32
+	if _, err := fmt.Sscanf(id, "%d", &uid); err != nil || uid == 0 {
+		return fmt.Errorf("invalid message id")
+	}
+	c, err := ConnectIMAP(creds)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = c.Logout() }()
+
+	if _, err := c.Select(fromFolder, false); err != nil {
+		return err
+	}
+	seqset := new(imap.SeqSet)
+	seqset.AddNum(uid)
+	if err := c.UidCopy(seqset, toFolder); err != nil {
+		return err
+	}
 	item := imap.FormatFlagsOp(imap.AddFlags, true)
 	if err := c.UidStore(seqset, item, []interface{}{imap.DeletedFlag}, nil); err != nil {
 		return err

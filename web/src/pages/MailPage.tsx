@@ -3,9 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
   ApiError,
+  attachmentToBase64,
   fetchFolders,
   fetchMessage,
   fetchMessages,
+  moveMessage,
+  searchMessages,
   trashMessage,
   updateMessageFlags,
 } from '../api/client'
@@ -53,6 +56,11 @@ export function MailPage() {
   const [composeOpen, setComposeOpen] = useState(false)
   const [composeDraft, setComposeDraft] = useState<ComposeDraft | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [searching, setSearching] = useState(false)
+  const [online, setOnline] = useState(
+    typeof navigator === 'undefined' ? true : navigator.onLine,
+  )
+  const [foldersOpen, setFoldersOpen] = useState(false)
 
   const messagesRef = useRef(messages)
   const folderNameRef = useRef(folderName)
@@ -68,6 +76,17 @@ export function MailPage() {
     pollReadyRef.current = false
     knownIdsRef.current = new Set()
   }, [folderName])
+
+  useEffect(() => {
+    const on = () => setOnline(true)
+    const off = () => setOnline(false)
+    window.addEventListener('online', on)
+    window.addEventListener('offline', off)
+    return () => {
+      window.removeEventListener('online', on)
+      window.removeEventListener('offline', off)
+    }
+  }, [])
 
   const sidebarFolders = useMemo(() => {
     const ranked = [...folders].sort((a, b) => {
@@ -92,11 +111,6 @@ export function MailPage() {
     }
     return primary
   }, [folders])
-
-  const sentFolder = useMemo(
-    () => sidebarFolders.find((f) => folderRole(f) === 'sent') ?? null,
-    [sidebarFolders],
-  )
 
   const activeRole = useMemo(() => {
     const f = folders.find((x) => x.name === folderName)
@@ -168,7 +182,11 @@ export function MailPage() {
       setMessages(list)
       setSelectedId((prev) => {
         if (prev && list.some((m) => m.id === prev)) return prev
-        return list[0]?.id ?? null
+        // Desktop: keep a selection when possible. Mobile: stay on list until tap.
+        if (typeof window !== 'undefined' && window.matchMedia('(max-width: 960px)').matches) {
+          return null
+        }
+        return prev ?? list[0]?.id ?? null
       })
     },
     [pushToast, t],
@@ -207,6 +225,35 @@ export function MailPage() {
   }, [folderName, loadMessages])
 
   useEffect(() => {
+    const q = searchQuery.trim()
+    if (!q) {
+      setSearching(false)
+      return
+    }
+    let cancelled = false
+    const timer = window.setTimeout(() => {
+      setSearching(true)
+      void searchMessages(folderName, q, 50)
+        .then((list) => {
+          if (cancelled) return
+          setMessages(list.map((m) => summaryToUi(m, folderName)))
+        })
+        .catch((err) => {
+          if (cancelled) return
+          if (handleAuthError(err)) return
+          pushToast({ tone: 'error', title: t('errors.generic') })
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false)
+        })
+    }, 320)
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
+  }, [searchQuery, folderName, handleAuthError, pushToast, t])
+
+  useEffect(() => {
     if (!selectedId) {
       setSelected(null)
       return
@@ -217,22 +264,28 @@ export function MailPage() {
       .then((detail) => {
         if (cancelled) return
         const ui = detailToUi(detail, folderName)
+        const wasUnread = messagesRef.current.find((m) => m.id === selectedId)?.unread
         setSelected(ui)
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === selectedId ? { ...m, unread: false, preview: ui.preview || m.preview } : m,
+            m.id === selectedId
+              ? { ...m, unread: false, preview: ui.preview || m.preview, cc: ui.cc }
+              : m,
           ),
         )
-        setFolders((prev) =>
-          prev.map((f) => {
-            if (f.name !== folderName || !f.unseen) return f
-            return { ...f, unseen: Math.max(0, (f.unseen ?? 0) - 1) }
-          }),
-        )
+        if (wasUnread) {
+          setFolders((prev) =>
+            prev.map((f) => {
+              if (f.name !== folderName || !f.unseen) return f
+              return { ...f, unseen: Math.max(0, (f.unseen ?? 0) - 1) }
+            }),
+          )
+        }
       })
       .catch((err) => {
         if (cancelled) return
         if (handleAuthError(err)) return
+        pushToast({ tone: 'error', title: t('errors.generic') })
         setSelected(null)
       })
       .finally(() => {
@@ -262,50 +315,120 @@ export function MailPage() {
     }
   }, [loadFolders, loadMessages])
 
-  const filteredMessages = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return messages
-    return messages.filter((m) => {
-      const hay = `${m.subject} ${m.from.name} ${m.from.email} ${m.to.email} ${m.body || ''}`.toLowerCase()
-      return hay.includes(q)
-    })
-  }, [messages, searchQuery])
+  const filteredMessages = useMemo(() => messages, [messages])
+
+  function replyHeaders(message: UiMessage) {
+    const mid = message.messageId?.trim()
+    if (!mid) return {}
+    const normalized = mid.startsWith('<') ? mid : `<${mid}>`
+    return { inReplyTo: normalized, references: normalized }
+  }
 
   function handleReply(message: UiMessage) {
     openCompose({
       to: message.from.email,
       subject: withRePrefix(message.subject || '', 'Re'),
       body: quoteBody(message),
+      ...replyHeaders(message),
     })
   }
 
   function handleReplyAll(message: UiMessage) {
-    const others = [message.to.email].filter(
-      (e) => e && e.toLowerCase() !== message.from.email.toLowerCase(),
-    )
+    const from = message.from.email.toLowerCase()
+    const recipients = [
+      message.to.email,
+      ...message.cc.map((c) => c.email),
+    ]
+      .map((e) => e.trim())
+      .filter((e) => e && e.toLowerCase() !== from)
+    const cc = [...new Set(recipients)].join(', ')
     openCompose({
       to: message.from.email,
-      cc: others.join(', '),
+      cc,
       subject: withRePrefix(message.subject || '', 'Re'),
       body: quoteBody(message),
+      ...replyHeaders(message),
     })
   }
 
-  function handleForward(message: UiMessage) {
-    openCompose({
+  async function handleForward(message: UiMessage) {
+    const draft: ComposeDraft = {
       subject: withRePrefix(message.subject || '', 'Fwd'),
       body: `\n\n---------- Forwarded message ----------\nFrom: ${message.from.name || message.from.email} <${message.from.email}>\nDate: ${message.date}\nSubject: ${message.subject || ''}\nTo: ${message.to.email}\n\n${message.body || ''}`,
-    })
+    }
+    if (message.attachments.length > 0) {
+      try {
+        const attachments = await Promise.all(
+          message.attachments.map(async (a) => {
+            const { content, contentType } = await attachmentToBase64(
+              message.id,
+              message.folder || folderName,
+              a.id,
+            )
+            return {
+              filename: a.name,
+              contentType: a.contentType || contentType,
+              content,
+            }
+          }),
+        )
+        draft.attachments = attachments
+      } catch (err) {
+        if (handleAuthError(err)) return
+        pushToast({ tone: 'error', title: t('mail.downloadFailed') })
+      }
+    }
+    openCompose(draft)
   }
 
   async function handleTrash(message: UiMessage) {
+    const fromFolder = message.folder || folderName
+    const snapshot = message
+    // Optimistic remove — feels instant; undo restores from Trash.
+    setMessages((prev) => prev.filter((m) => m.id !== message.id))
+    if (selectedId === message.id) {
+      setSelectedId(null)
+      setSelected(null)
+    }
     try {
-      await trashMessage(message.id, message.folder || folderName)
-      pushToast({ tone: 'success', title: t('mail.trashed') })
-      await loadMessages(folderName)
+      const result = await trashMessage(message.id, fromFolder)
+      const dest = (result.fromFolder || fromFolder).toLowerCase()
+      const canUndo =
+        Boolean(result.trashId) &&
+        Boolean(result.trashFolder) &&
+        result.trashFolder.toLowerCase() !== dest
+
+      if (canUndo) {
+        pushToast({
+          tone: 'success',
+          title: t('mail.trashed'),
+          actionLabel: t('mail.undo'),
+          durationMs: 6000,
+          onAction: () => {
+            void (async () => {
+              try {
+                await moveMessage(result.trashId, result.trashFolder, result.fromFolder || fromFolder)
+                pushToast({ tone: 'success', title: t('mail.restored') })
+                await loadMessages(folderName)
+                void loadFolders()
+              } catch (err) {
+                if (handleAuthError(err)) return
+                pushToast({ tone: 'error', title: t('errors.generic') })
+              }
+            })()
+          },
+        })
+      } else {
+        pushToast({ tone: 'success', title: t('mail.trashed') })
+      }
       void loadFolders()
     } catch (err) {
       if (handleAuthError(err)) return
+      // Roll back optimistic remove
+      setMessages((prev) => {
+        if (prev.some((m) => m.id === snapshot.id)) return prev
+        return [snapshot, ...prev]
+      })
       pushToast({ tone: 'error', title: t('errors.generic') })
     }
   }
@@ -326,7 +449,7 @@ export function MailPage() {
 
       if (e.key === '/' && !typing) {
         e.preventDefault()
-        document.querySelector<HTMLInputElement>('input[type="search"]')?.focus()
+        document.getElementById('mail-search')?.focus()
         return
       }
       if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !typing) {
@@ -378,61 +501,124 @@ export function MailPage() {
   }
 
   return (
-    <div className={styles.page}>
-      <Sidebar
-        folders={sidebarFolders}
-        activeFolder={folderName}
-        onSelectFolder={(name) => setFolderName(name)}
-        onCompose={() => openCompose()}
-      />
-      <MessageList
-        messages={filteredMessages}
-        selectedId={selectedId}
-        loading={loadingList}
-        folderRole={activeRole}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        onSelect={setSelectedId}
-        onRefresh={() => {
-          void loadMessages(folderName)
-          void loadFolders()
-        }}
-        onToggleStar={(id) => {
-          const msg = messages.find((m) => m.id === id)
-          if (msg) void handleToggleStar(msg)
-        }}
-        onTrashSelected={() => {
-          const msg = messages.find((m) => m.id === selectedId) ?? selected
-          if (msg) void handleTrash(msg)
-        }}
-      />
-      <ReadingPane
-        message={selected}
-        loading={loadingMsg}
-        onReply={handleReply}
-        onReplyAll={handleReplyAll}
-        onForward={handleForward}
-        onTrash={handleTrash}
-        onToggleStar={handleToggleStar}
-      />
+    <div
+      className={`${styles.page} ${selectedId ? styles.pageReadMode : styles.pageListMode}`}
+    >
+      {!online ? (
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 5,
+            padding: '0.4rem 1rem',
+            textAlign: 'center',
+            fontSize: '0.85rem',
+            background: 'color-mix(in srgb, #c44 18%, var(--bg-elevated))',
+            color: 'var(--text-primary)',
+          }}
+        >
+          {t('mail.offline')}
+        </div>
+      ) : null}
+      <div className={`${styles.navColumn} ${foldersOpen ? styles.navOpen : ''}`}>
+        <Sidebar
+          folders={sidebarFolders}
+          activeFolder={folderName}
+          onSelectFolder={(name) => {
+            setSelectedId(null)
+            setSelected(null)
+            setSearchQuery('')
+            setFolderName(name)
+            setFoldersOpen(false)
+          }}
+          onCompose={() => {
+            setFoldersOpen(false)
+            openCompose()
+          }}
+        />
+      </div>
+      {foldersOpen ? (
+        <button
+          type="button"
+          className={styles.drawerBackdrop}
+          aria-label={t('common.close')}
+          onClick={() => setFoldersOpen(false)}
+        />
+      ) : null}
+      <div className={styles.listColumn}>
+        <MessageList
+          messages={filteredMessages}
+          selectedId={selectedId}
+          loading={loadingList || searching}
+          folderRole={activeRole}
+          searchQuery={searchQuery}
+          onSearchChange={(q) => {
+            setSearchQuery(q)
+            if (!q.trim()) void loadMessages(folderName)
+          }}
+          onSelect={setSelectedId}
+          onCompose={() => openCompose()}
+          onOpenFolders={() => setFoldersOpen(true)}
+          onRefresh={() => {
+            setSearchQuery('')
+            void loadMessages(folderName)
+            void loadFolders()
+          }}
+          onToggleStar={(id) => {
+            const msg = messages.find((m) => m.id === id)
+            if (msg) void handleToggleStar(msg)
+          }}
+          onTrashSelected={() => {
+            const msg = messages.find((m) => m.id === selectedId) ?? selected
+            if (msg) void handleTrash(msg)
+          }}
+        />
+      </div>
+      <div className={styles.readColumn}>
+        <ReadingPane
+          message={selected}
+          loading={loadingMsg}
+          onBack={() => {
+            setSelectedId(null)
+            setSelected(null)
+          }}
+          onReply={handleReply}
+          onReplyAll={handleReplyAll}
+          onForward={(m) => void handleForward(m)}
+          onTrash={handleTrash}
+          onToggleStar={handleToggleStar}
+          onDownloadError={() =>
+            pushToast({ tone: 'error', title: t('mail.downloadFailed') })
+          }
+        />
+      </div>
       <ComposeDialog
         open={composeOpen}
         draft={composeDraft}
         onClose={closeCompose}
+        onDraftSaved={() => {
+          pushToast({
+            tone: 'success',
+            title: t('compose.draftSaved'),
+            actionLabel: t('compose.viewDraft'),
+            onAction: () => {
+              const drafts = sidebarFolders.find((f) => folderRole(f) === 'drafts')
+              if (drafts) {
+                setFolderName(drafts.name)
+                void loadMessages(drafts.name)
+              }
+            },
+          })
+          void loadFolders()
+        }}
         onSent={() => {
           pushToast({
             tone: 'success',
             title: t('mail.sent'),
-            detail: `${t('mail.sentSaved')} ${t('mail.sentSpamHint')}`,
-            durationMs: 7500,
+            durationMs: 3200,
           })
-          if (sentFolder) {
-            if (folderName === sentFolder.name) {
-              void loadMessages(folderName)
-            } else {
-              setFolderName(sentFolder.name)
-            }
-          }
           void loadFolders()
         }}
       />

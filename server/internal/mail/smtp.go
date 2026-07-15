@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -11,22 +12,38 @@ import (
 	"mime/quotedprintable"
 	"net"
 	"net/smtp"
+	"net/url"
+	"path"
 	"strings"
 	"time"
+	"unicode"
 
-	"github.com/Baddysays/wernanmail/server/internal/session"
 	"github.com/Baddysays/wernanmail/server/internal/mailtmpl"
+	"github.com/Baddysays/wernanmail/server/internal/session"
 )
 
-// SendMessage sends mail via SMTP and best-effort saves a copy to Sent.
-func SendMessage(creds session.Credentials, req SendRequest) error {
-	return SendMessageWithPolicy(creds, req, mailtmpl.Policy{})
+const (
+	maxAttachmentBytes      = 15 << 20 // 15 MiB per file
+	maxTotalAttachmentBytes = 25 << 20 // 25 MiB total
+)
+
+// SaveDraft builds MIME and APPEND to the Drafts mailbox.
+func SaveDraft(creds session.Credentials, req SendRequest) error {
+	if _, err := DecodeOutboundAttachments(req.Attachments); err != nil {
+		return err
+	}
+	from := creds.Username
+	raw := buildMIME(from, req, creds.SMTPHost, false)
+	return AppendDraft(creds, raw)
 }
 
 // SendMessageWithPolicy applies body templates/footers before MIME build so Sent matches outbound.
 func SendMessageWithPolicy(creds session.Credentials, req SendRequest, policy mailtmpl.Policy) error {
 	if len(req.To) == 0 {
 		return fmt.Errorf("missing recipients")
+	}
+	if _, err := DecodeOutboundAttachments(req.Attachments); err != nil {
+		return err
 	}
 	from := creds.Username
 	recipients := append([]string{}, req.To...)
@@ -138,7 +155,67 @@ func writeMail(c *smtp.Client, from string, to []string, msg []byte) error {
 	return c.Quit()
 }
 
+// DecodeOutboundAttachments validates and decodes base64 attachment payloads.
+func DecodeOutboundAttachments(atts []OutboundAttachment) ([]decodedAttachment, error) {
+	if len(atts) == 0 {
+		return nil, nil
+	}
+	out := make([]decodedAttachment, 0, len(atts))
+	var total int
+	for i, a := range atts {
+		name := strings.TrimSpace(a.Filename)
+		if name == "" {
+			name = fmt.Sprintf("attachment-%d", i+1)
+		}
+		name = path.Base(strings.ReplaceAll(name, "\\", "/"))
+		if name == "." || name == ".." || name == "" {
+			name = fmt.Sprintf("attachment-%d", i+1)
+		}
+		raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(a.Content))
+		if err != nil {
+			// Some clients omit padding.
+			raw, err = base64.RawStdEncoding.DecodeString(strings.TrimSpace(a.Content))
+			if err != nil {
+				return nil, fmt.Errorf("attachment %q: invalid base64", name)
+			}
+		}
+		if len(raw) == 0 {
+			return nil, fmt.Errorf("attachment %q: empty", name)
+		}
+		if len(raw) > maxAttachmentBytes {
+			return nil, fmt.Errorf("attachment %q: exceeds size limit", name)
+		}
+		total += len(raw)
+		if total > maxTotalAttachmentBytes {
+			return nil, fmt.Errorf("attachments exceed total size limit")
+		}
+		ct := strings.TrimSpace(a.ContentType)
+		if ct == "" || !strings.Contains(ct, "/") {
+			ct = "application/octet-stream"
+		}
+		ct = strings.Split(ct, ";")[0]
+		out = append(out, decodedAttachment{
+			Filename:    name,
+			ContentType: ct,
+			Data:        raw,
+		})
+	}
+	return out, nil
+}
+
+type decodedAttachment struct {
+	Filename    string
+	ContentType string
+	Data        []byte
+}
+
 func buildMIME(from string, req SendRequest, smtpHost string, policyApplied bool) []byte {
+	decoded, err := DecodeOutboundAttachments(req.Attachments)
+	if err != nil {
+		// SendMessage validates earlier; keep build resilient.
+		decoded = nil
+	}
+
 	var b strings.Builder
 	b.WriteString("From: " + from + "\r\n")
 	b.WriteString("To: " + strings.Join(req.To, ", ") + "\r\n")
@@ -148,22 +225,54 @@ func buildMIME(from string, req SendRequest, smtpHost string, policyApplied bool
 	b.WriteString("Subject: " + encodeHeader(req.Subject) + "\r\n")
 	b.WriteString("Date: " + time.Now().Format(time.RFC1123Z) + "\r\n")
 	b.WriteString("Message-ID: <" + newMessageID(smtpHost) + ">\r\n")
+	if irt := strings.TrimSpace(req.InReplyTo); irt != "" {
+		if !strings.HasPrefix(irt, "<") {
+			irt = "<" + irt + ">"
+		}
+		b.WriteString("In-Reply-To: " + irt + "\r\n")
+	}
+	if refs := strings.TrimSpace(req.References); refs != "" {
+		b.WriteString("References: " + refs + "\r\n")
+	}
 	b.WriteString("MIME-Version: 1.0\r\n")
 	if policyApplied {
 		b.WriteString("X-Wernanmail-Outbound: 1\r\n")
 	}
 
-	if req.HTML != "" {
-		b.WriteString("Content-Type: multipart/alternative; boundary=\"wernan-boundary\"\r\n\r\n")
-		b.WriteString("--wernan-boundary\r\n")
-		writeTextPart(&b, "text/plain", req.Text)
-		b.WriteString("--wernan-boundary\r\n")
-		writeTextPart(&b, "text/html", req.HTML)
-		b.WriteString("--wernan-boundary--\r\n")
-	} else {
+	hasHTML := strings.TrimSpace(req.HTML) != ""
+	hasAtt := len(decoded) > 0
+
+	switch {
+	case hasAtt:
+		const mixed = "wernan-mixed"
+		b.WriteString("Content-Type: multipart/mixed; boundary=\"" + mixed + "\"\r\n\r\n")
+		b.WriteString("--" + mixed + "\r\n")
+		writeBodyParts(&b, req.Text, req.HTML, hasHTML)
+		for _, att := range decoded {
+			b.WriteString("--" + mixed + "\r\n")
+			writeAttachmentPart(&b, att)
+		}
+		b.WriteString("--" + mixed + "--\r\n")
+	case hasHTML:
+		writeBodyParts(&b, req.Text, req.HTML, true)
+	default:
 		writeTextPart(&b, "text/plain", req.Text)
 	}
 	return []byte(b.String())
+}
+
+func writeBodyParts(b *strings.Builder, text, html string, hasHTML bool) {
+	if !hasHTML {
+		writeTextPart(b, "text/plain", text)
+		return
+	}
+	const alt = "wernan-alt"
+	b.WriteString("Content-Type: multipart/alternative; boundary=\"" + alt + "\"\r\n\r\n")
+	b.WriteString("--" + alt + "\r\n")
+	writeTextPart(b, "text/plain", text)
+	b.WriteString("--" + alt + "\r\n")
+	writeTextPart(b, "text/html", html)
+	b.WriteString("--" + alt + "--\r\n")
 }
 
 func writeTextPart(b *strings.Builder, contentType, body string) {
@@ -173,6 +282,58 @@ func writeTextPart(b *strings.Builder, contentType, body string) {
 	if !strings.HasSuffix(body, "\n") {
 		b.WriteString("\r\n")
 	}
+}
+
+func writeAttachmentPart(b *strings.Builder, att decodedAttachment) {
+	ct := att.ContentType
+	if ct == "" {
+		ct = "application/octet-stream"
+	}
+	b.WriteString("Content-Type: " + ct + "\r\n")
+	b.WriteString("Content-Transfer-Encoding: base64\r\n")
+	b.WriteString("Content-Disposition: " + attachmentDisposition(att.Filename) + "\r\n\r\n")
+	b.WriteString(wrapBase64(base64.StdEncoding.EncodeToString(att.Data)))
+	b.WriteString("\r\n")
+}
+
+func attachmentDisposition(filename string) string {
+	ascii := make([]rune, 0, len(filename))
+	needsStar := false
+	for _, r := range filename {
+		if r > 127 || r == '"' || r == '\\' || unicode.IsControl(r) {
+			needsStar = true
+			if r > 127 {
+				ascii = append(ascii, '_')
+			}
+			continue
+		}
+		ascii = append(ascii, r)
+	}
+	fallback := string(ascii)
+	if fallback == "" {
+		fallback = "attachment"
+	}
+	disp := fmt.Sprintf("attachment; filename=\"%s\"", fallback)
+	if needsStar || fallback != filename {
+		disp += "; filename*=UTF-8''" + url.PathEscape(filename)
+	}
+	return disp
+}
+
+func wrapBase64(s string) string {
+	const line = 76
+	if len(s) <= line {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s) + len(s)/line)
+	for len(s) > line {
+		b.WriteString(s[:line])
+		b.WriteString("\r\n")
+		s = s[line:]
+	}
+	b.WriteString(s)
+	return b.String()
 }
 
 func encodeHeader(s string) string {

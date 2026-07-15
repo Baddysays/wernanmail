@@ -43,18 +43,46 @@ func main() {
 		float64(sm.GetInt(settings.KeySpamQuarantineAt, 5)),
 		splitCSV(sm.Get(settings.KeySpamRBLs)),
 	)
-	var av antivirus.Scanner = antivirus.Light{}
+	spam.Signals = st
+	spam.SetConfig(antispam.Config{
+		RejectAt:      float64(sm.GetInt(settings.KeySpamRejectAt, 10)),
+		QuarantineAt:  float64(sm.GetInt(settings.KeySpamQuarantineAt, 5)),
+		FlagAt:        float64(sm.GetInt(settings.KeySpamFlagAt, 3)),
+		RBLs:          splitCSV(sm.Get(settings.KeySpamRBLs)),
+		RejectMessage: sm.Get(settings.KeySpamRejectMessage),
+	})
+	var av antivirus.Scanner = antivirus.Noop{}
 	if sm.GetBool(settings.KeyAVEnabled, true) {
-		if cfg.ClamAddr != "" {
-			av = antivirus.ClamAV{Addr: cfg.ClamAddr}
-		}
-	} else {
-		av = antivirus.Noop{}
+		// Light attachment policy is the default AV — ClamAV stays optional/off-host.
+		av = antivirus.Light{MaxBytes: sm.GetInt(settings.KeyMaxMessageBytes, 25<<20)}
 	}
 	pipe := &pipeline.Inbound{
-		Store: st, Queue: qs, Spam: spam, AV: av,
-		MaxBytes: sm.GetInt(settings.KeyMaxMessageBytes, 25<<20),
+		Store: st, Queue: qs, Spam: spam,
 	}
+	pipe.SetPolicy(av, sm.GetInt(settings.KeyMaxMessageBytes, 25<<20))
+
+	// Hot-reload spam/AV settings so admin UI changes apply without MTA restart.
+	go func() {
+		t := time.NewTicker(30 * time.Second)
+		defer t.Stop()
+		for range t.C {
+			if err := sm.Reload(context.Background()); err != nil {
+				continue
+			}
+			spam.SetConfig(antispam.Config{
+				RejectAt:      float64(sm.GetInt(settings.KeySpamRejectAt, 10)),
+				QuarantineAt:  float64(sm.GetInt(settings.KeySpamQuarantineAt, 5)),
+				FlagAt:        float64(sm.GetInt(settings.KeySpamFlagAt, 3)),
+				RBLs:          splitCSV(sm.Get(settings.KeySpamRBLs)),
+				RejectMessage: sm.Get(settings.KeySpamRejectMessage),
+			})
+			var next antivirus.Scanner = antivirus.Noop{}
+			if sm.GetBool(settings.KeyAVEnabled, true) {
+				next = antivirus.Light{MaxBytes: sm.GetInt(settings.KeyMaxMessageBytes, 25<<20)}
+			}
+			pipe.SetPolicy(next, sm.GetInt(settings.KeyMaxMessageBytes, 25<<20))
+		}
+	}()
 
 	glSecs := sm.GetInt(settings.KeyGreylistSeconds, 0)
 	gl := greylist.New(24 * time.Hour)
@@ -107,7 +135,7 @@ func main() {
 	}()
 	go func() {
 		be := &smtpd.Backend{
-			Store:            st, Pipeline: pipe, Queue: qs,
+			Store: st, Pipeline: pipe, Queue: qs,
 			Limiter:          settings.NewLimiter(sm.GetInt(settings.KeyRateSubmitPerMin, 60)),
 			SendLimiter:      sendLim,
 			AuthLimiter:      authLim,
@@ -118,10 +146,10 @@ func main() {
 			OutboundPolicy:   outboundPolicy,
 		}
 		errCh <- smtpd.Listen(smtpd.ListenOpts{
-			Addr:              cfg.SubmitAddr,
-			Backend:           be,
-			Domain:            cfg.Hostname,
-			TLSConfig:         tlsCfg,
+			Addr:      cfg.SubmitAddr,
+			Backend:   be,
+			Domain:    cfg.Hostname,
+			TLSConfig: tlsCfg,
 			// stunnel :465 → plaintext :587 needs AUTH without STARTTLS
 			AllowInsecureAuth: true,
 		})

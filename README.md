@@ -1,8 +1,14 @@
 # Wernanmail
 
-Self-hosted mail that stays light: **webmail + Go mail server + admin** — without Mailcow-class RAM.
+**Full corporate mail that stays light.**  
+Webmail + Go MTA/IMAP + operator admin — Mailcow-class capability without Mailcow-class RAM.
 
-**Target:** ~700 MB running · **host:** 1 GB min / 2 GB recommended
+| | |
+|--|--|
+| **Running aim** | under **500 MB** |
+| **Host** | **1 GB** min · **2 GB** recommended |
+| **Install** | **one command** with Docker Compose |
+| **Stack** | SMTP · submission · IMAP · queue · webmail · admin |
 
 <p align="center">
   <img src="docs/mockups/login-moods.png" alt="Wernanmail sign-in" width="780" />
@@ -12,74 +18,79 @@ Self-hosted mail that stays light: **webmail + Go mail server + admin** — with
   <img src="docs/mockups/admin-variant-c-quiet-console.png" alt="Wernanmail admin overview" width="780" />
 </p>
 
-## What you get
+## Why teams pick it
 
-| Piece | Role |
-|-------|------|
-| **Webmail** | React inbox — folders, compose, moods, 12 languages |
-| **Mail server** | SMTP · IMAP · queue · antispam · quarantine |
-| **Admin** | Domains, mailboxes, DNS helper, settings, audit |
-| **Mailport** | Embed inbox/compose in other products (iframe / SDK) |
+- **Actually light** — five small Go processes + React SPAs. No SOGo, no ClamAV by default, no multi‑GB baseline.
+- **Operator-first admin** — domains, DKIM, DNS helper chips (MX/SPF/DKIM/DMARC/TLS), queue, quarantine, deliverability card, mailbox filters.
+- **Real webmail** — three-pane inbox, HTML compose, attachments, drafts, search, threading, undo trash, remote-image blocking, 12 languages.
+- **Outbound you can trust** — SPF/DKIM/DMARC hooks, MTA-STS helper, DMARC aggregate storage, worker logs that say `outbound ok`.
+- **Defense without bloat** — MIME-aware light attachment policy + scoring antispam (URI/heuristics + learn-from-quarantine). Optional ClamAV later on larger hosts.
+- **One-command install** — secrets, bootstrap TLS, full stack on `docker compose up --build -d`.
 
-## Install (simple)
+## Install in one command
 
-### 1) Webmail only (use an existing IMAP/SMTP server)
+Linux host with Docker Engine + Compose v2:
 
 ```bash
-cp .env.example .env
+git clone https://github.com/Baddysays/wernanmail.git
+cd wernanmail
+chmod +x install.sh && ./install.sh
+```
+
+Same as:
+
+```bash
 docker compose up --build -d
 ```
 
-Open **http://localhost:3080**
-
-### 2) Full stack (own mail server + webmail + admin)
+That builds and starts **SMTP, submission, IMAP, queue worker, API, webmail, and admin**.  
+First boot generates admin password, session key, master password, and a bootstrap TLS cert.
 
 ```bash
-cp .env.mail.example .env.mail
-docker compose -f docker-compose.mail.yml --env-file .env.mail up --build -d
+docker compose run --rm init /app/docker-init show-admin-password
 ```
 
-| Service | URL / port |
+| Surface | URL / port |
 |---------|------------|
-| Webmail | http://localhost:3080 |
-| Admin | http://localhost:3090 |
-| SMTP submit | `localhost:2587` → `:587` |
-| IMAP | `localhost:2143` → `:143` |
+| Webmail | `https://localhost/` |
+| Admin | `https://localhost/admin/` |
+| SMTP | `25` |
+| Submission (STARTTLS) | `587` |
+| IMAP (STARTTLS) | `143` |
 
-Optional antivirus (needs ≥2 GB RAM):
+### Before you go live
 
-```bash
-docker compose -f docker-compose.mail.yml --env-file .env.mail --profile av up -d
-```
+1. Copy `.env.example` → `.env` and set `MAIL_HOSTNAME`, `MAIL_EHLO`, `PUBLIC_URL`
+2. Replace self-signed certs in the `mail_tls` volume with `fullchain.pem` + `privkey.pem` (Certbot / commercial)
+3. Publish DNS: **MX · SPF · DKIM · DMARC · PTR** (MTA-STS / TLS-RPT optional)
+4. Open firewall: **25, 465, 587, 993, 443**
+5. Send a test both ways → check admin **Deliverability**
 
-### 3) Bare metal (light binaries)
-
-```bash
-# build linux amd64 binaries, then on the host:
-cd /opt/wernanmail
-./run.sh start
-```
-
-See [docs/SERVER.md](docs/SERVER.md) for DNS (MX / SPF / DKIM / DMARC), TLS, and ops.
-
-## Dev (without Docker)
+Full operator checklist: **[docs/SERVER.md](docs/SERVER.md)** · product rules: **[docs/POLICY.md](docs/POLICY.md)**
 
 ```bash
-# API
-cd server && cp .env.example .env && go run ./cmd/api
-
-# Webmail
-pnpm --dir web install && pnpm --dir web dev
-
-# Admin
-npm --prefix admin install && npm --prefix admin run dev
+docker compose ps
+docker compose logs -f
+docker compose restart
+docker compose down             # keeps mail + secrets
+docker compose down --volumes   # wipe mail + secrets
 ```
+
+## What ships in the stack
+
+| Piece | Role |
+|-------|------|
+| **Webmail** | React inbox — compose, folders, undo delete, remote images gated, moods, i18n |
+| **MTA** | Inbound SMTP + authenticated submission, pipeline (spam → light AV → store/queue) |
+| **IMAP** | Folders, APPEND, IDLE (poll), quotas |
+| **Worker** | Local deliver, outbound SMTP, bounce path |
+| **Admin** | Domains, mailboxes, aliases, filters, quarantine learn, DNS/deliverability, settings, audit |
+| **Mailport** | Embed inbox/compose in other products |
 
 ## Design
 
-**Paper Quiet** — calm teal, three-column mail, soft motion.
-
-Admin direction: quiet overview console + operator health strip on working screens.
+**Paper Quiet** — calm teal, three-column mail, soft motion.  
+Admin = quiet overview console + operator health strip on working screens.
 
 More shots: [`docs/mockups/`](docs/mockups/) · notes: [docs/DESIGN.md](docs/DESIGN.md)
 
@@ -87,21 +98,35 @@ More shots: [`docs/mockups/`](docs/mockups/) · notes: [docs/DESIGN.md](docs/DES
   <img src="docs/mockups/admin-variant-b-operator-strip.png" alt="Admin with operator health strip" width="780" />
 </p>
 
-## Repo
+## Repo map
 
 ```
+install.sh           one-command Docker entry
+docker-compose.yml   full production stack
 web/                 webmail (React + TypeScript)
 admin/               operator console (React + TypeScript)
-server/              Go API + MTA + IMAP + worker + admin API
-deploy/mail-host/    binary host helpers
-docs/                design, policy, server, mockups
+server/              Go: api · mta · imapd · worker · admin · docker-init
+docs/                design, policy, server ops, mockups
+deploy/mail-host/    native binary host helpers
 ```
+
+## Dev (without Docker)
+
+```bash
+cd server && cp .env.example .env && go run ./cmd/api
+pnpm --dir web install && pnpm --dir web dev
+npm --prefix admin install && npm --prefix admin run dev
+```
+
+Native binaries (existing `/opt/wernanmail` installs) remain supported via `./run.sh start`.
 
 ## Policy
 
-Light · fast · reliable. No secrets or private infra in git.  
-Details: [docs/POLICY.md](docs/POLICY.md)
+Light · fast · reliable.  
+No secrets or private infra inventory in git. Details: [docs/POLICY.md](docs/POLICY.md)
 
 ---
+
+*Built to feel obvious. Clone it. One command. Own your mail.*
 
 *by [baddysays](https://github.com/Baddysays)*

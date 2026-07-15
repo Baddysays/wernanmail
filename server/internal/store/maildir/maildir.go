@@ -99,3 +99,11 @@ func (r *Root) Remove(rel string) error {
 	}
 	return os.Remove(filepath.Join(r.Base, filepath.FromSlash(rel)))
 }
+
+// RemoveMailbox deletes the entire maildir tree for a mailbox ID.
+func (r *Root) RemoveMailbox(mailboxID int64) error {
+	if mailboxID <= 0 {
+		return nil
+	}
+	return os.RemoveAll(filepath.Join(r.Base, fmt.Sprintf("%d", mailboxID)))
+}

@@ -9,10 +9,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
-	_ "modernc.org/sqlite"
 	"golang.org/x/crypto/bcrypt"
+	_ "modernc.org/sqlite"
 
 	"github.com/Baddysays/wernanmail/server/internal/domain"
 	"github.com/Baddysays/wernanmail/server/internal/store"
@@ -21,8 +22,9 @@ import (
 
 // Store is SQLite + Maildir persistence.
 type Store struct {
-	db *sql.DB
-	md *maildir.Root
+	db       *sql.DB
+	md       *maildir.Root
+	appendMu sync.Mutex
 }
 
 var (
@@ -143,6 +145,12 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS spam_signals (
+  key TEXT PRIMARY KEY,
+  weight REAL NOT NULL,
+  hits INTEGER NOT NULL,
+  updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS audit_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   actor TEXT NOT NULL,
@@ -151,6 +159,34 @@ CREATE TABLE IF NOT EXISTS audit_log (
   detail TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS dmarc_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mailbox_id INTEGER NOT NULL REFERENCES mailboxes(id) ON DELETE CASCADE,
+  org_name TEXT NOT NULL,
+  report_id TEXT NOT NULL DEFAULT '',
+  date_begin TEXT NOT NULL,
+  date_end TEXT NOT NULL,
+  source_ip TEXT NOT NULL,
+  message_count INTEGER NOT NULL DEFAULT 0,
+  dkim_result TEXT NOT NULL DEFAULT '',
+  spf_result TEXT NOT NULL DEFAULT '',
+  disposition TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  UNIQUE(mailbox_id, report_id, date_begin, date_end, source_ip, dkim_result, spf_result, disposition)
+);
+CREATE INDEX IF NOT EXISTS idx_dmarc_reports_created ON dmarc_reports(id DESC);
+CREATE TABLE IF NOT EXISTS mail_filters (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mailbox_id INTEGER NOT NULL REFERENCES mailboxes(id) ON DELETE CASCADE,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  priority INTEGER NOT NULL DEFAULT 0,
+  match_field TEXT NOT NULL,
+  match_op TEXT NOT NULL,
+  match_value TEXT NOT NULL,
+  action TEXT NOT NULL,
+  action_arg TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_mail_filters_mailbox ON mail_filters(mailbox_id, priority, id);
 `)
 	if err != nil {
 		return err
@@ -172,7 +208,10 @@ func parseTime(s string) time.Time {
 }
 
 func (s *Store) ListDomains(ctx context.Context) ([]domain.Domain, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,name,enabled,catch_all,COALESCE(default_quota_bytes,0),dkim_selector,dkim_private,dkim_public,created_at FROM domains ORDER BY name`)
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT d.id,d.name,d.enabled,d.catch_all,COALESCE(d.default_quota_bytes,0),d.dkim_selector,d.dkim_private,d.dkim_public,d.created_at,
+			(SELECT COUNT(*) FROM mailboxes m WHERE m.domain_id=d.id) AS mailbox_count
+		FROM domains d ORDER BY d.name`)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +221,7 @@ func (s *Store) ListDomains(ctx context.Context) ([]domain.Domain, error) {
 		var d domain.Domain
 		var en int
 		var created string
-		if err := rows.Scan(&d.ID, &d.Name, &en, &d.CatchAll, &d.DefaultQuotaBytes, &d.DKIMSelector, &d.DKIMPrivate, &d.DKIMPublic, &created); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &en, &d.CatchAll, &d.DefaultQuotaBytes, &d.DKIMSelector, &d.DKIMPrivate, &d.DKIMPublic, &created, &d.MailboxCount); err != nil {
 			return nil, err
 		}
 		d.Enabled = en == 1
@@ -308,6 +347,65 @@ func (s *Store) UpsertMailbox(ctx context.Context, m *domain.Mailbox) error {
 	return err
 }
 
+func (s *Store) DeleteMailbox(ctx context.Context, domainID, mailboxID int64) error {
+	m, err := s.GetMailboxByID(ctx, mailboxID)
+	if err != nil {
+		return err
+	}
+	if m == nil || m.DomainID != domainID {
+		return sql.ErrNoRows
+	}
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM folder_uid WHERE mailbox_id=?`, mailboxID)
+	rows, qerr := s.db.QueryContext(ctx, `SELECT maildir_rel FROM quarantine WHERE mailbox_id=?`, mailboxID)
+	if qerr == nil {
+		for rows.Next() {
+			var rel string
+			if rows.Scan(&rel) == nil {
+				_ = s.md.Remove(rel)
+			}
+		}
+		_ = rows.Close()
+	}
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM quarantine WHERE mailbox_id=?`, mailboxID)
+	_, _ = s.db.ExecContext(ctx, `DELETE FROM queue_jobs WHERE payload_json LIKE ?`, fmt.Sprintf(`%%"mailboxId":%d%%`, mailboxID))
+	drow := s.db.QueryRowContext(ctx, `SELECT catch_all FROM domains WHERE id=?`, domainID)
+	var catchAll string
+	if drow.Scan(&catchAll) == nil && strings.EqualFold(strings.TrimSpace(catchAll), m.LocalPart) {
+		_, _ = s.db.ExecContext(ctx, `UPDATE domains SET catch_all='' WHERE id=?`, domainID)
+	}
+	res, err := s.db.ExecContext(ctx, `DELETE FROM mailboxes WHERE id=? AND domain_id=?`, mailboxID, domainID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	_ = s.md.RemoveMailbox(mailboxID)
+	return nil
+}
+
+func (s *Store) DeleteDomain(ctx context.Context, domainID int64) error {
+	mboxes, err := s.ListMailboxes(ctx, domainID)
+	if err != nil {
+		return err
+	}
+	for _, m := range mboxes {
+		if err := s.DeleteMailbox(ctx, domainID, m.ID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return err
+		}
+	}
+	res, err := s.db.ExecContext(ctx, `DELETE FROM domains WHERE id=?`, domainID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 // HashPassword returns a bcrypt hash.
 func HashPassword(password string) (string, error) {
 	b, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -373,6 +471,18 @@ func (s *Store) UpsertAlias(ctx context.Context, a *domain.Alias) error {
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE aliases SET local_part=?, mailbox_id=?, enabled=? WHERE id=?`, a.LocalPart, a.MailboxID, en, a.ID)
 	return err
+}
+
+func (s *Store) DeleteAlias(ctx context.Context, domainID, aliasID int64) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM aliases WHERE id=? AND domain_id=?`, aliasID, domainID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func (s *Store) ResolveRecipient(ctx context.Context, address string) (int64, error) {
@@ -479,6 +589,25 @@ func (s *Store) FolderStats(ctx context.Context, mailboxID int64, folder string)
 }
 
 func (s *Store) AppendMessage(ctx context.Context, msg *domain.Message, raw []byte) error {
+	s.appendMu.Lock()
+	defer s.appendMu.Unlock()
+
+	mb, err := s.GetMailboxByID(ctx, msg.MailboxID)
+	if err != nil {
+		return err
+	}
+	if mb == nil {
+		return fmt.Errorf("mailbox %d not found", msg.MailboxID)
+	}
+	if mb.QuotaBytes > 0 {
+		used, err := s.UsageBytes(ctx, msg.MailboxID)
+		if err != nil {
+			return err
+		}
+		if used+int64(len(raw)) > mb.QuotaBytes {
+			return store.ErrQuotaExceeded
+		}
+	}
 	if msg.Folder == "" {
 		msg.Folder = domain.FolderInbox
 	}
@@ -506,6 +635,9 @@ func (s *Store) AppendMessage(ctx context.Context, msg *domain.Message, raw []by
 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		msg.MailboxID, msg.Folder, msg.UID, msg.MessageID, msg.Subject, msg.FromAddr, msg.ToAddrs,
 		msg.Date.UTC().Format(time.RFC3339Nano), msg.Size, string(flags), msg.MaildirRel, msg.SpamScore, now())
+	if err != nil {
+		_ = s.md.Remove(rel)
+	}
 	return err
 }
 
@@ -713,6 +845,12 @@ func (s *Store) ListQuarantine(ctx context.Context, limit int) ([]domain.Quarant
 	return out, rows.Err()
 }
 
+func (s *Store) CountQuarantine(ctx context.Context) (int, error) {
+	var n int
+	err := s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM quarantine WHERE resolution=''`).Scan(&n)
+	return n, err
+}
+
 func (s *Store) ResolveQuarantine(ctx context.Context, id int64, resolution string) error {
 	_, err := s.db.ExecContext(ctx, `UPDATE quarantine SET resolution=?, resolved_at=? WHERE id=?`, resolution, now(), id)
 	return err
@@ -807,6 +945,104 @@ func (s *Store) DeleteMessagesOlderThan(ctx context.Context, olderThan time.Time
 	return n, nil
 }
 
+func (s *Store) AddDMARCReports(ctx context.Context, reports []domain.DMARCReport) error {
+	if len(reports) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for i := range reports {
+		r := &reports[i]
+		res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO dmarc_reports
+(mailbox_id,org_name,report_id,date_begin,date_end,source_ip,message_count,dkim_result,spf_result,disposition,created_at)
+VALUES(?,?,?,?,?,?,?,?,?,?,?)`, r.MailboxID, r.OrgName, r.ReportID,
+			r.DateBegin.UTC().Format(time.RFC3339Nano), r.DateEnd.UTC().Format(time.RFC3339Nano),
+			r.SourceIP, r.Count, r.DKIMResult, r.SPFResult, r.Disposition, now())
+		if err != nil {
+			return err
+		}
+		if id, _ := res.LastInsertId(); id > 0 {
+			r.ID = id
+			r.CreatedAt = time.Now().UTC()
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) ListDMARCReports(ctx context.Context, limit int) ([]domain.DMARCReport, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT id,mailbox_id,org_name,report_id,date_begin,date_end,
+source_ip,message_count,dkim_result,spf_result,disposition,created_at
+FROM dmarc_reports ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.DMARCReport
+	for rows.Next() {
+		var r domain.DMARCReport
+		var begin, end, created string
+		if err := rows.Scan(&r.ID, &r.MailboxID, &r.OrgName, &r.ReportID, &begin, &end,
+			&r.SourceIP, &r.Count, &r.DKIMResult, &r.SPFResult, &r.Disposition, &created); err != nil {
+			return nil, err
+		}
+		r.DateBegin, r.DateEnd, r.CreatedAt = parseTime(begin), parseTime(end), parseTime(created)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) ListMailFilters(ctx context.Context, mailboxID int64) ([]domain.MailFilter, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id,mailbox_id,enabled,priority,match_field,match_op,match_value,action,action_arg
+FROM mail_filters WHERE mailbox_id=? ORDER BY priority ASC,id ASC`, mailboxID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.MailFilter
+	for rows.Next() {
+		var f domain.MailFilter
+		var enabled int
+		if err := rows.Scan(&f.ID, &f.MailboxID, &enabled, &f.Priority, &f.MatchField, &f.MatchOp, &f.MatchValue, &f.Action, &f.ActionArg); err != nil {
+			return nil, err
+		}
+		f.Enabled = enabled == 1
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+func (s *Store) ReplaceMailFilters(ctx context.Context, mailboxID int64, filters []domain.MailFilter) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ExecContext(ctx, `DELETE FROM mail_filters WHERE mailbox_id=?`, mailboxID); err != nil {
+		return err
+	}
+	for _, f := range filters {
+		enabled := 0
+		if f.Enabled {
+			enabled = 1
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO mail_filters
+(mailbox_id,enabled,priority,match_field,match_op,match_value,action,action_arg) VALUES(?,?,?,?,?,?,?,?)`,
+			mailboxID, enabled, f.Priority, f.MatchField, f.MatchOp, f.MatchValue, f.Action, f.ActionArg); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 func (s *Store) GetSetting(ctx context.Context, key string) (string, error) {
 	var v string
 	err := s.db.QueryRowContext(ctx, `SELECT value FROM settings WHERE key=?`, key).Scan(&v)
@@ -820,6 +1056,64 @@ func (s *Store) SetSetting(ctx context.Context, key, value string) error {
 	_, err := s.db.ExecContext(ctx, `INSERT INTO settings(key,value,updated_at) VALUES(?,?,?)
 ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at`, key, value, now())
 	return err
+}
+
+// LearnSpamSignals adjusts a bounded set of lightweight antispam weights.
+func (s *Store) LearnSpamSignals(ctx context.Context, keys []string, delta float64) error {
+	if len(keys) == 0 || delta == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, key := range keys {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO spam_signals(key,weight,hits,updated_at) VALUES(?,?,1,?)
+ON CONFLICT(key) DO UPDATE SET weight=spam_signals.weight+excluded.weight, hits=spam_signals.hits+1, updated_at=excluded.updated_at`,
+			key, delta, now()); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// LookupSpamSignals returns weights for the requested keys only.
+func (s *Store) LookupSpamSignals(ctx context.Context, keys []string) (map[string]float64, error) {
+	out := make(map[string]float64, len(keys))
+	if len(keys) == 0 {
+		return out, nil
+	}
+	args := make([]any, 0, len(keys))
+	placeholders := make([]string, 0, len(keys))
+	for _, key := range keys {
+		if key == "" {
+			continue
+		}
+		args = append(args, key)
+		placeholders = append(placeholders, "?")
+	}
+	if len(args) == 0 {
+		return out, nil
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT key,weight FROM spam_signals WHERE key IN (`+strings.Join(placeholders, ",")+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var key string
+		var weight float64
+		if err := rows.Scan(&key, &weight); err != nil {
+			return nil, err
+		}
+		out[key] = weight
+	}
+	return out, rows.Err()
 }
 
 func (s *Store) ListSettings(ctx context.Context) ([]domain.Setting, error) {

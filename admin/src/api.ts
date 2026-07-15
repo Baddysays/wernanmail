@@ -21,6 +21,21 @@ type ApiErrorBody = {
   error?: { message?: string; code?: string }
 }
 
+export class ApiError extends Error {
+  status: number
+  code?: string
+  constructor(message: string, status: number, code?: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.code = code
+  }
+}
+
+export function isUnauthorized(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 401
+}
+
 export async function api<T = unknown>(path: string, opts: ApiOptions | AdminCreds = {}): Promise<T> {
   const { token, user, pass, method = 'GET', body } = opts as ApiOptions & AdminCreds
   const headers: Record<string, string> = {
@@ -38,9 +53,13 @@ export async function api<T = unknown>(path: string, opts: ApiOptions | AdminCre
   })
   const json = (await res.json().catch(() => ({}))) as ApiErrorBody & { data?: T }
   if (!res.ok) {
-    throw new Error(json?.error?.message || json?.error?.code || res.statusText)
+    throw new ApiError(json?.error?.message || json?.error?.code || res.statusText, res.status, json?.error?.code)
   }
   return json.data as T
+}
+
+export function asList<T>(v: T[] | null | undefined): T[] {
+  return Array.isArray(v) ? v : []
 }
 
 export function domainName(d: Domain | null | undefined): string {
@@ -48,20 +67,29 @@ export function domainName(d: Domain | null | undefined): string {
 }
 
 export function domainId(d: Domain | null | undefined): string | undefined {
-  return d?.id ?? d?.ID
+  const id = d?.id ?? d?.ID
+  return id == null ? undefined : String(id)
 }
 
 export function dnsRecordsFor(domain: Domain | null | undefined): DnsRecord[] {
   const name = domainName(domain) || 'example.com'
   const selector = domain?.dkimSelector || domain?.DKIMSelector || 'wernan'
   const dkim = domain?.dkimPublic || domain?.DKIMPublic || ''
+  const mailHost = `mail.${name}`
   return [
+    {
+      id: 'mx',
+      label: 'MX',
+      host: '@',
+      type: 'MX',
+      value: `10 ${mailHost}.`,
+    },
     {
       id: 'spf',
       label: 'SPF',
       host: '@',
       type: 'TXT',
-      value: `v=spf1 mx a:mail.${name} -all`,
+      value: `v=spf1 a mx a:${mailHost} ip4:62.109.27.220 -all`,
     },
     {
       id: 'dkim',
@@ -76,7 +104,28 @@ export function dnsRecordsFor(domain: Domain | null | undefined): DnsRecord[] {
       label: 'DMARC',
       host: '_dmarc',
       type: 'TXT',
-      value: `v=DMARC1; p=none; rua=mailto:postmaster@${name}`,
+      value: `v=DMARC1; p=none; rua=mailto:postmaster@${name}; adkim=r; aspf=r`,
+    },
+    {
+      id: 'mta-sts',
+      label: 'MTA-STS',
+      host: '_mta-sts',
+      type: 'TXT',
+      value: 'v=STSv1; id=1',
+    },
+    {
+      id: 'tls-rpt',
+      label: 'TLS-RPT',
+      host: '_smtp._tls',
+      type: 'TXT',
+      value: `v=TLSRPTv1; rua=mailto:postmaster@${name}`,
+    },
+    {
+      id: 'ptr',
+      label: 'PTR (reverse DNS)',
+      host: '62.109.27.220',
+      type: 'PTR',
+      value: `${mailHost}.  (set at VPS panel; must match MAIL_EHLO)`,
     },
   ]
 }

@@ -2,13 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LOCALES, setAdminLang } from './i18n'
-import { api, dnsRecordsFor, domainId, domainName } from './api'
+import { api, asList, dnsRecordsFor, domainId, domainName, isUnauthorized } from './api'
+import { MailboxFilters } from './MailboxFilters'
 import { Select } from './Select'
 import type {
   AdminCreds,
   Alias,
   AuditEntry,
   Dashboard,
+  DmarcReport,
   DnsCheck,
   DnsStatus,
   Domain,
@@ -19,6 +21,7 @@ import type {
   QuarantineItem,
   QueueJob,
   SettingGroup,
+  SpamReason,
   SparkSample,
 } from './types'
 
@@ -111,6 +114,29 @@ function formatBytes(n: unknown): string {
   return `${v} B`
 }
 
+function QuotaBar({ used, quota }: { used?: number; quota?: number }) {
+  const u = Number(used) || 0
+  const q = Number(quota) || 0
+  if (!q) {
+    return (
+      <div className="quota-cell">
+        <span>{formatBytes(u)} / ∞</span>
+      </div>
+    )
+  }
+  const pct = Math.max(0, Math.min(100, (u / q) * 100))
+  return (
+    <div className="quota-cell">
+      <span>
+        {formatBytes(u)} / {formatBytes(q)}
+      </span>
+      <div className="quota-bar" aria-hidden>
+        <span style={{ width: `${pct}%` }} />
+      </div>
+    </div>
+  )
+}
+
 function bytesToMbInput(bytes: number | undefined): string {
   const v = Number(bytes) || 0
   if (!v) return ''
@@ -123,6 +149,70 @@ function mbInputToBytes(raw: string): number {
   const n = Number(s)
   if (!Number.isFinite(n) || n < 0) throw new Error('invalid quota')
   return Math.round(n * (1 << 20))
+}
+
+function formatWhen(raw?: string): string {
+  if (!raw) return '—'
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return String(raw)
+  return d.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function parseVerdict(raw?: string): { score?: number; action?: string; reasons: string[] } {
+  if (!raw) return { reasons: [] }
+  try {
+    const v = JSON.parse(raw) as { score?: number; action?: string; reasons?: SpamReason[] }
+    const reasons = (v.reasons || [])
+      .map((r) => [r.code, r.detail].filter(Boolean).join(': '))
+      .filter(Boolean)
+    return { score: v.score, action: v.action, reasons }
+  } catch {
+    return { reasons: [] }
+  }
+}
+
+function settingKeyLabel(
+  t: (key: string, opts?: Record<string, unknown>) => string,
+  key: string,
+): string {
+  const bag = t('settings.keys', { returnObjects: true }) as unknown
+  if (bag && typeof bag === 'object' && !Array.isArray(bag) && key in (bag as Record<string, unknown>)) {
+    const v = (bag as Record<string, unknown>)[key]
+    if (typeof v === 'string' && v) return v
+  }
+  return key
+}
+
+function queueKindLabel(kind: string, t: (key: string, opts?: Record<string, unknown>) => string): string {
+  const key = `queue.kinds.${kind}`
+  const label = t(key, { defaultValue: '' })
+  return label || kind
+}
+
+function queuePayloadSummary(raw?: string): string {
+  if (!raw) return ''
+  try {
+    const p = JSON.parse(raw) as {
+      to?: string | string[]
+      from?: string
+      failedTo?: string
+      subject?: string
+    }
+    const to = Array.isArray(p.to) ? p.to.filter(Boolean).join(', ') : p.to
+    if (to) return String(to)
+    if (p.failedTo) return String(p.failedTo)
+    if (p.from) return String(p.from)
+    if (p.subject) return String(p.subject)
+  } catch {
+    /* ignore */
+  }
+  return ''
 }
 
 function Sparkline({ samples }: { samples: SparkSample[] }) {
@@ -150,6 +240,7 @@ function LangSelect() {
   const code = i18n.language?.slice(0, 2) || 'en'
   return (
     <Select
+      id="admin-lang"
       className="lang-select"
       aria-label={t('lang.label')}
       value={code}
@@ -280,6 +371,14 @@ function DNSDrawer({
   domain: Domain | null
 }) {
   const { t } = useTranslation()
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, onClose])
   if (!open) return null
   const records = dnsRecordsFor(domain)
   const name = domainName(domain) || '—'
@@ -343,29 +442,108 @@ function dnsChip(check: DnsCheck | undefined, labels: DnsChipLabels) {
   }
 }
 
+function DeliverabilityCard({
+  dns,
+  reports,
+}: {
+  dns: DnsStatus | null
+  reports: DmarcReport[] | null
+}) {
+  const { t } = useTranslation()
+  const checks = [
+    { id: 'spf', label: 'SPF', check: dns?.spf },
+    { id: 'dkim', label: 'DKIM', check: dns?.dkim },
+    { id: 'dmarc', label: 'DMARC', check: dns?.dmarc },
+  ]
+
+  return (
+    <section className="panel deliverability-card">
+      <h3>{t('deliverability.title')}</h3>
+      <div className="deliverability-checks">
+        {checks.map(({ id, label, check }) => {
+          const status = dnsChip(check, {
+            ok: t('deliverability.ready'),
+            missing: t('deliverability.missing'),
+            checking: t('health.checking'),
+          })
+          return (
+            <div className="deliverability-check" key={id} title={check?.detail}>
+              <span className={`status-dot ${status.state === 'ok' ? 'on' : status.state === 'bad' ? 'off' : ''}`} />
+              <strong>{label}</strong>
+              <span>{status.text}</span>
+            </div>
+          )
+        })}
+      </div>
+      <p className="deliverability-hint">
+        <a href="https://postmaster.google.com/" target="_blank" rel="noreferrer">
+          {t('deliverability.postmaster')}
+        </a>
+        <span>{t('deliverability.recipientHint')}</span>
+      </p>
+      {reports ? (
+        <div className="dmarc-summary">
+          <p className="dmarc-summary-title">{t('deliverability.reports')}</p>
+          {reports.length ? (
+            <div className="dmarc-report-list">
+              {reports.slice(0, 5).map((report, index) => (
+                <div className="dmarc-report-row" key={report.id ?? `${report.ip || report.sourceIp}-${index}`}>
+                  <code>{report.ip || report.sourceIp || '—'}</code>
+                  <span>×{report.count ?? report.messageCount ?? 0}</span>
+                  <span>DKIM {report.dkim || '—'}</span>
+                  <span>SPF {report.spf || '—'}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="muted dmarc-empty">{t('deliverability.noReports')}</p>
+          )}
+        </div>
+      ) : null}
+    </section>
+  )
+}
+
 function HealthStrip({
   dash,
   dns,
+  ops,
   updatedAt,
+  onRefresh,
 }: {
   dash: Dashboard | null
   dns: DnsStatus | null
+  ops: OpsStatus | null
   updatedAt: number | null
+  onRefresh?: () => void
 }) {
   const { t } = useTranslation()
   const queueN = dash?.queuePending ?? 0
   const dead = dash?.queueDead ?? 0
-  const tlsOk = typeof location !== 'undefined' && location.protocol === 'https:'
+  const tlsOk = Boolean(ops?.tlsConfigured)
+  const systemsOk = dead === 0 && queueN < 50
 
-  const mx = dnsChip(dns?.mx, { ok: t('health.ready'), missing: t('health.missing'), checking: t('health.checking'), warn: dns?.mx?.detail })
+  const [, setTick] = useState(0)
+  useEffect(() => {
+    if (!updatedAt) return
+    const id = setInterval(() => setTick((n) => n + 1), 1000)
+    return () => clearInterval(id)
+  }, [updatedAt])
+
+  const mx = dnsChip(dns?.mx, {
+    ok: t('health.ok'),
+    missing: t('health.missing'),
+    checking: t('health.checking'),
+    warn: dns?.mx?.detail,
+  })
   const spf = dnsChip(dns?.spf, {
-    ok: t('health.published'),
+    ok: t('health.ok'),
     missing: t('health.publishTxt'),
     checking: t('health.checking'),
     warn: t('health.publishTxt'),
   })
   const dkim = dnsChip(dns?.dkim, {
-    ok: t('health.published'),
+    ok: t('health.ok'),
     missing: t('health.notInDns'),
     checking: t('health.checking'),
     warn:
@@ -376,7 +554,7 @@ function HealthStrip({
           : t('health.notInDns'),
   })
   const dmarc = dnsChip(dns?.dmarc, {
-    ok: t('health.published'),
+    ok: t('health.ok'),
     missing: t('health.publishTxt'),
     checking: t('health.checking'),
     warn: t('health.publishTxt'),
@@ -387,8 +565,8 @@ function HealthStrip({
     { id: 'spf', label: 'SPF', title: dns?.spf?.detail, ...spf },
     { id: 'dkim', label: 'DKIM', title: dns?.dkim?.detail, ...dkim },
     { id: 'dmarc', label: 'DMARC', title: dns?.dmarc?.detail, ...dmarc },
-    { id: 'tls', label: 'TLS', state: tlsOk ? 'ok' : 'warn', text: tlsOk ? 'https' : 'http' },
-    { id: 'queue', label: 'QUEUE', state: dead > 0 ? 'bad' : queueN > 20 ? 'warn' : 'ok', text: String(queueN) },
+    { id: 'tls', label: 'TLS', state: tlsOk ? 'ok' : 'warn', text: tlsOk ? t('health.ok') : t('health.tlsWarn') },
+    { id: 'queue', label: 'QUEUE', state: dead > 0 ? 'bad' : queueN >= 50 ? 'warn' : 'ok', text: String(queueN) },
   ]
   const ago = updatedAt ? Math.max(0, Math.round((Date.now() - updatedAt) / 1000)) : null
   return (
@@ -400,8 +578,17 @@ function HealthStrip({
         </span>
       ))}
       <span className="health-meta">
-        {dead > 0 ? `${t('health.dead', { n: dead })} · ` : ''}
-        {ago == null ? '—' : ago < 5 ? t('health.justNow') : t('health.updated', { s: ago })}
+        <span className={`health-systems ${systemsOk ? 'ok' : 'warn'}`}>
+          {systemsOk ? t('health.allOk') : dead > 0 ? t('health.dead', { n: dead }) : t('health.attention')}
+        </span>
+        <span className="health-ago">
+          {ago == null ? '—' : ago < 5 ? t('health.justNow') : t('health.updated', { s: ago })}
+        </span>
+        {onRefresh ? (
+          <button type="button" className="health-refresh" onClick={onRefresh} aria-label={t('actions.refresh')}>
+            ↻
+          </button>
+        ) : null}
       </span>
     </div>
   )
@@ -454,10 +641,17 @@ export function App() {
   const [dnsOpen, setDnsOpen] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
   const [dnsStatus, setDnsStatus] = useState<DnsStatus | null>(null)
+  const [dmarcReports, setDmarcReports] = useState<DmarcReport[] | null>(null)
   const [hostStats, setHostStats] = useState<HostStats | null>(null)
   const [ops, setOps] = useState<OpsStatus | null>(null)
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
+  const [mbSearch, setMbSearch] = useState('')
+  const [mbFilter, setMbFilter] = useState<'all' | 'active' | 'disabled'>('all')
+  const [mbDetailTab, setMbDetailTab] = useState<'general' | 'aliases' | 'filters'>('general')
+  const [mbSaved, setMbSaved] = useState(false)
+  const [settingsSaved, setSettingsSaved] = useState(false)
+  const [settingsDirty, setSettingsDirty] = useState(false)
 
   const authed = Boolean(creds?.token)
   const dnsDomain = selectedDomain || domains[0] || null
@@ -467,19 +661,17 @@ export function App() {
     setDash(d)
     setSpark(pushSpark(d.queuePending ?? 0))
     setUpdatedAt(Date.now())
-    try {
-      const q = dnsDomain?.name ? `?domain=${encodeURIComponent(dnsDomain.name)}` : ''
-      const [dns, host, opsData] = await Promise.all([
-        api<DnsStatus>(`/api/admin/dns-status${q}`, creds!),
-        api<HostStats>('/api/admin/host-stats', creds!),
-        api<OpsStatus>('/api/admin/ops', creds!),
-      ])
-      setDnsStatus(dns)
-      setHostStats(host)
-      setOps(opsData)
-    } catch {
-      /* ignore probe errors in strip */
-    }
+    const q = dnsDomain?.name ? `?domain=${encodeURIComponent(dnsDomain.name)}` : ''
+    const settled = await Promise.allSettled([
+      api<DnsStatus>(`/api/admin/dns-status${q}`, creds!),
+      api<HostStats>('/api/admin/host-stats', creds!),
+      api<OpsStatus>('/api/admin/ops', creds!),
+      api<DmarcReport[]>(`/api/admin/dmarc-reports${q}`, creds!),
+    ])
+    if (settled[0].status === 'fulfilled') setDnsStatus(settled[0].value)
+    if (settled[1].status === 'fulfilled') setHostStats(settled[1].value)
+    if (settled[2].status === 'fulfilled') setOps(settled[2].value)
+    if (settled[3].status === 'fulfilled') setDmarcReports(asList(settled[3].value))
     return d
   }, [creds, dnsDomain?.name])
 
@@ -490,31 +682,40 @@ export function App() {
         api<Mailbox[]>(`/api/admin/domains/${domain.id}/mailboxes`, creds!),
         api<Alias[]>(`/api/admin/domains/${domain.id}/aliases`, creds!),
       ])
-      setMailboxes(mbs)
-      setAliases(als)
+      setMailboxes(asList(mbs))
+      setAliases(asList(als))
     },
     [creds],
   )
+
+  const clearSession = useCallback(() => {
+    sessionStorage.removeItem('wm_admin')
+    setCreds(null)
+  }, [])
 
   const load = useCallback(async () => {
     if (!authed) return
     setError('')
     try {
-      const list = await api<Domain[]>('/api/admin/domains', creds!)
+      const list = asList(await api<Domain[]>('/api/admin/domains', creds!))
       setDomains(list)
       await refreshDash()
       const settingsData = await api<Record<string, unknown>>('/api/admin/settings', creds!)
-      setSettings(settingsData)
-      if (tab === 'queue') setQueue(await api<QueueJob[]>('/api/admin/queue', creds!))
-      if (tab === 'quarantine') setQuarantine(await api<QuarantineItem[]>('/api/admin/quarantine', creds!))
-      if (tab === 'audit') setAudit(await api<AuditEntry[]>('/api/admin/audit', creds!))
+      setSettings((prev) => (settingsDirty ? prev : settingsData))
+      if (tab === 'queue') setQueue(asList(await api<QueueJob[]>('/api/admin/queue', creds!)))
+      if (tab === 'quarantine') setQuarantine(asList(await api<QuarantineItem[]>('/api/admin/quarantine', creds!)))
+      if (tab === 'audit') setAudit(asList(await api<AuditEntry[]>('/api/admin/audit', creds!)))
       if ((tab === 'mailboxes' || tab === 'domains') && selectedDomain) {
         await loadDomainExtras(selectedDomain)
       }
     } catch (e) {
+      if (isUnauthorized(e)) {
+        clearSession()
+        return
+      }
       setError(e instanceof Error ? e.message : String(e))
     }
-  }, [authed, creds, tab, selectedDomain, refreshDash, loadDomainExtras])
+  }, [authed, creds, tab, selectedDomain, refreshDash, loadDomainExtras, clearSession, settingsDirty])
 
   useEffect(() => {
     void load()
@@ -552,6 +753,7 @@ export function App() {
   async function doLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError('')
+    setBusy(true)
     try {
       const data = await api<{ token: string; username?: string }>('/api/admin/login', {
         method: 'POST',
@@ -562,6 +764,8 @@ export function App() {
       setCreds(next)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -576,11 +780,22 @@ export function App() {
       catchAll: d.catchAll || '',
       defaultQuotaMb: bytesToMbInput(d.defaultQuotaBytes),
     })
+    setForm((f) => ({
+      ...f,
+      localPart: '',
+      displayName: '',
+      password: '',
+      quotaMb: '',
+      aliasLocal: '',
+      aliasMailboxId: '',
+    }))
     await loadDomainExtras(sel)
   }
 
   function selectMailbox(m: Mailbox) {
     setSelectedMailbox(m)
+    setMbDetailTab('general')
+    setMbSaved(false)
     setMbEdit({
       displayName: m.displayName || '',
       quotaMb: bytesToMbInput(m.quotaBytes),
@@ -593,14 +808,18 @@ export function App() {
   async function createDomain(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setBusy(true)
+    setError('')
     try {
-      await api('/api/admin/domains', {
+      const created = await api<Domain>('/api/admin/domains', {
         ...creds,
         method: 'POST',
         body: { name: form.domain, catchAll: form.catchAll || '' },
       })
       setForm((f) => ({ ...f, domain: '', catchAll: '' }))
-      setDomains(await api<Domain[]>('/api/admin/domains', creds!))
+      const list = asList(await api<Domain[]>('/api/admin/domains', creds!))
+      setDomains(list)
+      const next = list.find((d) => domainId(d) === domainId(created)) || created
+      if (next) void selectDomain(next)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -629,7 +848,7 @@ export function App() {
           defaultQuotaBytes,
         },
       })
-      const list = await api<Domain[]>('/api/admin/domains', creds!)
+      const list = asList(await api<Domain[]>('/api/admin/domains', creds!))
       setDomains(list)
       const refreshed = list.find((d) => domainId(d) === selectedDomain.id) || updated
       setSelectedDomain({
@@ -653,6 +872,7 @@ export function App() {
     e.preventDefault()
     if (!selectedDomain) return
     setBusy(true)
+    setError('')
     try {
       const body: {
         localPart: string
@@ -679,6 +899,16 @@ export function App() {
       })
       setForm((f) => ({ ...f, localPart: '', password: '', displayName: '', quotaMb: '' }))
       await loadDomainExtras(selectedDomain)
+      const list = asList(await api<Domain[]>('/api/admin/domains', creds!))
+      setDomains(list)
+      const refreshed = list.find((d) => domainId(d) === String(selectedDomain.id))
+      if (refreshed) {
+        setSelectedDomain({
+          ...refreshed,
+          id: domainId(refreshed) ?? selectedDomain.id,
+          name: domainName(refreshed),
+        })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -722,6 +952,8 @@ export function App() {
         enabled: updated.enabled !== false,
         password: '',
       })
+      setMbSaved(true)
+      window.setTimeout(() => setMbSaved(false), 1600)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -742,14 +974,20 @@ export function App() {
         },
       )
       if (data.url) {
-        window.open(data.url, '_blank', 'noopener,noreferrer')
+        const win = window.open(data.url, '_blank', 'noopener,noreferrer')
+        if (!win) setError(t('mailboxes.popupBlocked'))
       } else if (data.token) {
         const base = String(settings['admin.webmail_url'] || '').replace(/\/$/, '')
         if (!base) {
           setError(t('mailboxes.webmailUrlMissing'))
           return
         }
-        window.open(`${base}/login?impersonate=${encodeURIComponent(data.token)}`, '_blank', 'noopener,noreferrer')
+        const win = window.open(
+          `${base}/login?impersonate=${encodeURIComponent(data.token)}`,
+          '_blank',
+          'noopener,noreferrer',
+        )
+        if (!win) setError(t('mailboxes.popupBlocked'))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
@@ -760,8 +998,18 @@ export function App() {
 
   async function createAlias(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
-    if (!selectedDomain || !form.aliasLocal || !form.aliasMailboxId) return
+    if (!selectedDomain) return
+    if (!form.aliasLocal.trim() || !form.aliasMailboxId) {
+      setError(t('domains.aliasNeedTarget'))
+      return
+    }
+    const clash = mailboxes.some((m) => m.localPart.toLowerCase() === form.aliasLocal.trim().toLowerCase())
+    if (clash) {
+      setError(t('domains.aliasConflictsMailbox'))
+      return
+    }
     setBusy(true)
+    setError('')
     try {
       await api(`/api/admin/domains/${selectedDomain.id}/aliases`, {
         ...creds,
@@ -777,12 +1025,142 @@ export function App() {
     }
   }
 
+  async function deleteAlias(aliasId: string | number) {
+    if (!selectedDomain) return
+    if (!window.confirm(t('actions.confirmDelete'))) return
+    setBusy(true)
+    setError('')
+    try {
+      await api(`/api/admin/domains/${selectedDomain.id}/aliases/${aliasId}`, {
+        ...creds,
+        method: 'DELETE',
+      })
+      await loadDomainExtras(selectedDomain)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function deleteMailbox() {
+    if (!selectedDomain || !selectedMailbox) return
+    const addr = `${selectedMailbox.localPart}@${selectedDomain.name}`
+    if (!window.confirm(t('mailboxes.confirmDelete', { addr }))) return
+    setBusy(true)
+    setError('')
+    try {
+      await api(`/api/admin/domains/${selectedDomain.id}/mailboxes/${selectedMailbox.id}`, {
+        ...creds,
+        method: 'DELETE',
+      })
+      setSelectedMailbox(null)
+      await loadDomainExtras(selectedDomain)
+      const list = asList(await api<Domain[]>('/api/admin/domains', creds!))
+      setDomains(list)
+      const refreshed = list.find((d) => domainId(d) === String(selectedDomain.id))
+      if (refreshed) {
+        setSelectedDomain({
+          ...refreshed,
+          id: domainId(refreshed) ?? selectedDomain.id,
+          name: domainName(refreshed),
+        })
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function deleteDomain() {
+    if (!selectedDomain) return
+    const name = selectedDomain.name
+    if (!window.confirm(t('domains.confirmDelete', { name, n: mailboxes.length }))) return
+    setBusy(true)
+    setError('')
+    try {
+      await api(`/api/admin/domains/${selectedDomain.id}`, { ...creds, method: 'DELETE' })
+      setSelectedDomain(null)
+      setSelectedMailbox(null)
+      setMailboxes([])
+      setAliases([])
+      const list = asList(await api<Domain[]>('/api/admin/domains', creds!))
+      setDomains(list)
+      if (list[0]) void selectDomain(list[0])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function retryQueueJob(id: string | number) {
+    setBusy(true)
+    setError('')
+    try {
+      await api(`/api/admin/queue/${id}/retry`, { ...creds, method: 'POST' })
+      setQueue(asList(await api<QueueJob[]>('/api/admin/queue', creds!)))
+      await refreshDash()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function deleteQueueJob(id: string | number) {
+    if (!window.confirm(t('queue.confirmDelete'))) return
+    setBusy(true)
+    setError('')
+    try {
+      await api(`/api/admin/queue/${id}/delete`, { ...creds, method: 'POST' })
+      setQueue(asList(await api<QueueJob[]>('/api/admin/queue', creds!)))
+      await refreshDash()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function releaseQuarantineItem(id: string | number) {
+    setBusy(true)
+    setError('')
+    try {
+      await api(`/api/admin/quarantine/${id}/release`, { ...creds, method: 'POST' })
+      setQuarantine(asList(await api<QuarantineItem[]>('/api/admin/quarantine', creds!)))
+      await refreshDash()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function deleteQuarantineItem(id: string | number) {
+    if (!window.confirm(t('quarantine.confirmDelete'))) return
+    setBusy(true)
+    setError('')
+    try {
+      await api(`/api/admin/quarantine/${id}/delete`, { ...creds, method: 'POST' })
+      setQuarantine(asList(await api<QuarantineItem[]>('/api/admin/quarantine', creds!)))
+      await refreshDash()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function genDkim() {
     if (!selectedDomain) return
+    if (selectedDomain.dkimPublic && !window.confirm(t('domains.confirmRotateDkim'))) return
     setBusy(true)
+    setError('')
     try {
       await api(`/api/admin/domains/${selectedDomain.id}/dkim`, { ...creds, method: 'POST' })
-      const list = await api<Domain[]>('/api/admin/domains', creds!)
+      const list = asList(await api<Domain[]>('/api/admin/domains', creds!))
       setDomains(list)
       const refreshed = list.find((d) => domainId(d) === selectedDomain.id)
       if (refreshed) {
@@ -803,10 +1181,15 @@ export function App() {
   async function saveSettings(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setBusy(true)
+    setError('')
+    setSettingsSaved(false)
     try {
       setSettings(
         await api<Record<string, unknown>>('/api/admin/settings', { ...creds, method: 'PUT', body: settings }),
       )
+      setSettingsDirty(false)
+      setSettingsSaved(true)
+      window.setTimeout(() => setSettingsSaved(false), 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -844,17 +1227,28 @@ export function App() {
         domains?: Domain[]
       }
       const payload = parsed?.data && typeof parsed.data === 'object' ? parsed.data : parsed
-      const result = await api<{ settings?: number; domains?: number }>('/api/admin/backup/restore', {
-        ...creds,
-        method: 'POST',
-        body: {
-          settings: payload.settings || {},
-          domains: payload.domains || [],
+      const result = await api<{ settings?: number; domains?: number; mailboxes?: number; aliases?: number }>(
+        '/api/admin/backup/restore',
+        {
+          ...creds,
+          method: 'POST',
+          body: {
+            settings: payload.settings || {},
+            domains: payload.domains || [],
+          },
         },
-      })
+      )
+      setSettingsDirty(false)
       await load()
       setError('')
-      alert(t('backup.restored', { s: result.settings ?? 0, d: result.domains ?? 0 }))
+      alert(
+        t('backup.restored', {
+          s: result.settings ?? 0,
+          d: result.domains ?? 0,
+          m: result.mailboxes ?? 0,
+          a: result.aliases ?? 0,
+        }),
+      )
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -868,8 +1262,19 @@ export function App() {
     return dead === 0 && pending < 50
   }, [dash])
 
-  const mailboxLabel = (id: string) => {
-    const m = mailboxes.find((x) => x.id === id)
+  const filteredMailboxes = useMemo(() => {
+    const q = mbSearch.trim().toLowerCase()
+    return mailboxes.filter((m) => {
+      if (mbFilter === 'active' && m.enabled === false) return false
+      if (mbFilter === 'disabled' && m.enabled !== false) return false
+      if (!q) return true
+      const hay = `${m.localPart} ${m.displayName || ''}`.toLowerCase()
+      return hay.includes(q)
+    })
+  }, [mailboxes, mbSearch, mbFilter])
+
+  const mailboxLabel = (id: string | number) => {
+    const m = mailboxes.find((x) => String(x.id) === String(id))
     return m ? `${m.localPart}@${selectedDomain?.name || ''}` : `#${id}`
   }
 
@@ -930,8 +1335,8 @@ export function App() {
               />
             </div>
             {error ? <p className="login-err" role="alert">{error}</p> : null}
-            <button className="login-submit" type="submit">
-              {t('login.submit')}
+            <button className="login-submit" type="submit" disabled={busy}>
+              {busy ? '…' : t('login.submit')}
             </button>
           </form>
         </section>
@@ -943,8 +1348,7 @@ export function App() {
     if (creds?.token) {
       void api('/api/admin/logout', { method: 'POST', token: creds.token }).catch(() => {})
     }
-    sessionStorage.removeItem('wm_admin')
-    setCreds(null)
+    clearSession()
     setNavOpen(false)
   }
 
@@ -1008,7 +1412,15 @@ export function App() {
         </button>
       </nav>
 
-      {tab !== 'overview' ? <HealthStrip dash={dash} dns={dnsStatus} updatedAt={updatedAt} /> : null}
+      {tab !== 'overview' ? (
+        <HealthStrip
+          dash={dash}
+          dns={dnsStatus}
+          ops={ops}
+          updatedAt={updatedAt}
+          onRefresh={() => void refreshDash().catch(() => {})}
+        />
+      ) : null}
 
       <main className="main">
         {error ? <p className="err">{error}</p> : null}
@@ -1017,7 +1429,16 @@ export function App() {
           <div className="overview">
             <div>
               <section className="hero">
-                <h2>{healthy ? t('overview.healthyTitle') : t('overview.attentionTitle')}</h2>
+                <h2>
+                  {healthy ? (
+                    <>
+                      {t('overview.healthyTitleBefore')}
+                      <em>{t('overview.healthyTitleEm')}</em>
+                    </>
+                  ) : (
+                    t('overview.attentionTitle')
+                  )}
+                </h2>
                 <p>
                   {healthy
                     ? dnsStatus?.dkim?.state === 'ok'
@@ -1026,11 +1447,18 @@ export function App() {
                     : t('overview.attentionBody')}
                 </p>
               </section>
-              <HealthStrip dash={dash} dns={dnsStatus} updatedAt={updatedAt} />
+              <HealthStrip
+                dash={dash}
+                dns={dnsStatus}
+                ops={ops}
+                updatedAt={updatedAt}
+                onRefresh={() => void refreshDash().catch(() => {})}
+              />
               <ResourcesPanel host={hostStats} />
               <div className="overview-metrics">
                 <div className="metric">
                   <h3>{t('overview.queueTitle')}</h3>
+                  <p className="muted spark-label">{t('overview.queueWindow')}</p>
                   <Sparkline samples={spark} />
                   <p className="muted metric-foot">
                     {t('overview.pendingNow')}: <strong>{dash?.queuePending ?? '—'}</strong>
@@ -1040,6 +1468,7 @@ export function App() {
                 <div className="metric">
                   <h3>{t('overview.quarantineTitle')}</h3>
                   <p className="big">{dash?.quarantine ?? '—'}</p>
+                  <p className="muted metric-foot">{t('overview.quarantineTotal')}</p>
                   <button type="button" className="linkish" onClick={() => setTab('quarantine')}>
                     {t('overview.viewQuarantine')}
                   </button>
@@ -1098,6 +1527,7 @@ export function App() {
               </div>
             </div>
             <aside className="stack-aside">
+              <DeliverabilityCard dns={dnsStatus} reports={dmarcReports} />
               <div className="panel">
                 <h3>{t('overview.dnsTitle')}</h3>
                 <p className="muted">{t('overview.dnsBody')}</p>
@@ -1124,29 +1554,38 @@ export function App() {
                 <h2>{t('domains.title')}</h2>
                 <p>{t('domains.subtitle')}</p>
               </div>
-              <form className="row" onSubmit={createDomain}>
-                <input
-                  placeholder={t('domains.placeholder')}
-                  value={form.domain}
-                  onChange={(e) => setForm({ ...form, domain: e.target.value })}
-                  required
-                />
-                <input
-                  placeholder={t('domains.catchAll')}
-                  value={form.catchAll}
-                  onChange={(e) => setForm({ ...form, catchAll: e.target.value })}
-                />
+              <form className="toolbar-form" onSubmit={createDomain}>
+                <div className="field">
+                  <label htmlFor="new-domain">{t('domains.colDomain')}</label>
+                  <input
+                    id="new-domain"
+                    placeholder={t('domains.placeholder')}
+                    value={form.domain}
+                    onChange={(e) => setForm({ ...form, domain: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="new-domain-catchall">{t('domains.catchAll')}</label>
+                  <input
+                    id="new-domain-catchall"
+                    placeholder={t('domains.catchAllPh')}
+                    value={form.catchAll}
+                    onChange={(e) => setForm({ ...form, catchAll: e.target.value })}
+                  />
+                </div>
                 <button className="primary" type="submit" disabled={busy}>
                   {t('domains.add')}
                 </button>
               </form>
             </div>
-            <div className="split">
+            <div className="split master-detail">
               <div className="panel list-panel">
                 <table>
                   <thead>
                     <tr>
                       <th>{t('domains.colDomain')}</th>
+                      <th>{t('domains.colMailboxes')}</th>
                       <th>{t('domains.colDkim')}</th>
                       <th>{t('domains.colStatus')}</th>
                     </tr>
@@ -1157,13 +1596,24 @@ export function App() {
                       return (
                         <tr
                           key={id}
-                          className={selectedDomain?.id === id ? 'selected' : ''}
+                          className={String(selectedDomain?.id) === String(id) ? 'selected' : ''}
                           onClick={() => void selectDomain(d)}
                         >
-                          <td>{domainName(d)}</td>
-                          <td>{d.dkimPublic ? t('domains.dkimReady') : '—'}</td>
                           <td>
-                            <span className="badge">{d.enabled === false ? t('domains.off') : t('domains.active')}</span>
+                            <span className="cell-strong">{domainName(d)}</span>
+                          </td>
+                          <td>{d.mailboxCount ?? '—'}</td>
+                          <td>
+                            {d.dkimPublic ? (
+                              <span className="status-ok">{t('domains.dkimReady')}</span>
+                            ) : (
+                              <span className="muted">—</span>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`badge ${d.enabled === false ? 'off' : 'ok'}`}>
+                              {d.enabled === false ? t('domains.off') : t('domains.active')}
+                            </span>
                           </td>
                         </tr>
                       )
@@ -1175,19 +1625,33 @@ export function App() {
               <div className="panel detail-panel">
                 {selectedDomain ? (
                   <>
-                    <h3>{selectedDomain.name}</h3>
-                    <div className="row">
-                      <button type="button" className="primary" onClick={() => void genDkim()} disabled={busy}>
-                        {selectedDomain.dkimPublic ? t('domains.rotateDkim') : t('domains.genDkim')}
-                      </button>
-                      <button type="button" className="ghost" onClick={() => setDnsOpen(true)}>
-                        {t('domains.dnsRecords')}
-                      </button>
-                      <button type="button" className="ghost" onClick={() => setTab('mailboxes')}>
-                        {t('domains.mailboxes')}
-                      </button>
-                    </div>
-                    <div className="detail-section">
+                    <header className="detail-head">
+                      <div>
+                        <h3>{selectedDomain.name}</h3>
+                        <div className="detail-meta">
+                          <span className={`badge ${selectedDomain.enabled === false ? 'off' : 'ok'}`}>
+                            {selectedDomain.enabled === false ? t('domains.off') : t('domains.active')}
+                          </span>
+                          <span className={`meta-chip ${selectedDomain.dkimPublic ? 'ok' : ''}`}>
+                            {selectedDomain.dkimPublic ? t('domains.dkimReady') : t('health.noKey')}
+                          </span>
+                          <span className="meta-chip">{t('domains.mailboxCount', { n: mailboxes.length })}</span>
+                        </div>
+                      </div>
+                      <div className="detail-actions">
+                        <button type="button" className="primary" onClick={() => void genDkim()} disabled={busy}>
+                          {selectedDomain.dkimPublic ? t('domains.rotateDkim') : t('domains.genDkim')}
+                        </button>
+                        <button type="button" className="ghost" onClick={() => setDnsOpen(true)}>
+                          {t('domains.dnsRecords')}
+                        </button>
+                        <button type="button" className="ghost" onClick={() => setTab('mailboxes')}>
+                          {t('domains.mailboxes')}
+                        </button>
+                      </div>
+                    </header>
+
+                    <section className="detail-card">
                       <h4>{t('domains.settings')}</h4>
                       <form className="form-stack" onSubmit={saveDomainSettings}>
                         <label className="check-row">
@@ -1199,16 +1663,18 @@ export function App() {
                           <span>{t('domains.enabled')}</span>
                         </label>
                         <div className="field">
-                          <label>{t('domains.catchAll')}</label>
+                          <label htmlFor="domain-catchall">{t('domains.catchAll')}</label>
                           <input
+                            id="domain-catchall"
                             value={domainEdit.catchAll}
                             onChange={(e) => setDomainEdit({ ...domainEdit, catchAll: e.target.value })}
                             placeholder={t('domains.catchAllPh')}
                           />
                         </div>
                         <div className="field">
-                          <label>{t('domains.defaultQuotaMb')}</label>
+                          <label htmlFor="domain-quota">{t('domains.defaultQuotaMb')}</label>
                           <input
+                            id="domain-quota"
                             type="number"
                             min="0"
                             step="1"
@@ -1222,50 +1688,65 @@ export function App() {
                           <button className="primary" type="submit" disabled={busy}>
                             {t('actions.save')}
                           </button>
+                          <button type="button" className="ghost danger" disabled={busy} onClick={() => void deleteDomain()}>
+                            {t('domains.delete')}
+                          </button>
                         </div>
                       </form>
-                    </div>
-                    <div className="detail-section">
+                    </section>
+
+                    <section className="detail-card">
                       <h4>{t('domains.selector')}</h4>
-                      <code>{selectedDomain.dkimSelector || 'wernan'}</code>
-                    </div>
-                    <div className="detail-section">
+                      <code className="selector-chip">{selectedDomain.dkimSelector || 'wernan'}</code>
+                      <p className="muted foot-note">{t('domains.selectorHint')}</p>
+                    </section>
+
+                    <section className="detail-card">
                       <h4>{t('domains.quickAdd')}</h4>
                       <form className="form-stack" onSubmit={createMailbox}>
-                        <div className="field">
-                          <label>{t('domains.localPart')}</label>
-                          <input
-                            value={form.localPart}
-                            onChange={(e) => setForm({ ...form, localPart: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label>{t('domains.displayName')}</label>
-                          <input
-                            value={form.displayName}
-                            onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-                          />
-                        </div>
-                        <div className="field">
-                          <label>{t('domains.password')}</label>
-                          <input
-                            type="password"
-                            value={form.password}
-                            onChange={(e) => setForm({ ...form, password: e.target.value })}
-                            required
-                          />
-                        </div>
-                        <div className="field">
-                          <label>{t('mailboxes.quotaMb')}</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={form.quotaMb}
-                            onChange={(e) => setForm({ ...form, quotaMb: e.target.value })}
-                            placeholder={t('mailboxes.quotaDefault')}
-                          />
+                        <div className="field-grid">
+                          <div className="field">
+                            <label htmlFor="quick-local">{t('domains.localPart')}</label>
+                            <input
+                              id="quick-local"
+                              value={form.localPart}
+                              onChange={(e) => setForm({ ...form, localPart: e.target.value })}
+                              autoComplete="off"
+                              required
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="quick-name">{t('domains.displayName')}</label>
+                            <input
+                              id="quick-name"
+                              value={form.displayName}
+                              onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+                              autoComplete="off"
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="quick-pass">{t('domains.password')}</label>
+                            <input
+                              id="quick-pass"
+                              type="password"
+                              value={form.password}
+                              onChange={(e) => setForm({ ...form, password: e.target.value })}
+                              autoComplete="new-password"
+                              required
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="quick-quota">{t('mailboxes.quotaMb')}</label>
+                            <input
+                              id="quick-quota"
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={form.quotaMb}
+                              onChange={(e) => setForm({ ...form, quotaMb: e.target.value })}
+                              placeholder={t('mailboxes.quotaDefault')}
+                            />
+                          </div>
                         </div>
                         <div className="detail-actions">
                           <button className="primary" type="submit" disabled={busy}>
@@ -1273,11 +1754,11 @@ export function App() {
                           </button>
                         </div>
                       </form>
-                      <p className="muted foot-note">{t('domains.mailboxCount', { n: mailboxes.length })}</p>
-                    </div>
-                    <div className="detail-section">
+                    </section>
+
+                    <section className="detail-card">
                       <h4>{t('domains.aliases')}</h4>
-                      <form className="row" onSubmit={createAlias}>
+                      <form className="row alias-add" onSubmit={createAlias}>
                         <input
                           placeholder={t('domains.aliasLocal')}
                           value={form.aliasLocal}
@@ -1299,25 +1780,35 @@ export function App() {
                         </button>
                       </form>
                       {aliases.length ? (
-                        <table>
-                          <tbody>
-                            {aliases.map((a) => (
-                              <tr key={a.id} style={{ cursor: 'default' }}>
-                                <td>
-                                  {a.localPart}@{selectedDomain.name}
-                                </td>
-                                <td>→ {mailboxLabel(a.mailboxId)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+                        <ul className="alias-list">
+                          {aliases.map((a) => (
+                            <li key={a.id}>
+                              <span>
+                                {a.localPart}@{selectedDomain.name}
+                                <span className="muted"> → {mailboxLabel(a.mailboxId)}</span>
+                              </span>
+                              <button
+                                type="button"
+                                className="ghost alias-del"
+                                disabled={busy}
+                                onClick={() => void deleteAlias(a.id)}
+                                aria-label={t('actions.delete')}
+                              >
+                                {t('actions.delete')}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
                       ) : (
                         <p className="muted">{t('domains.noAliases')}</p>
                       )}
-                    </div>
+                    </section>
                   </>
                 ) : (
-                  <p className="empty">{t('domains.select')}</p>
+                  <div className="empty-state">
+                    <p className="empty-title">{t('domains.select')}</p>
+                    <p className="muted">{t('domains.selectHint')}</p>
+                  </div>
                 )}
               </div>
             </div>
@@ -1332,26 +1823,46 @@ export function App() {
                 <p>{t('mailboxes.subtitle')}</p>
               </div>
             </div>
-            <div className="list-toolbar panel" style={{ marginBottom: '0.85rem' }}>
+            <div className="list-toolbar panel" style={{ marginBottom: '0.45rem' }}>
               <Select
                 aria-label={t('mailboxes.selectDomain')}
                 placeholder={t('mailboxes.selectDomain')}
-                value={selectedDomain?.id || ''}
+                value={selectedDomain?.id != null ? String(selectedDomain.id) : ''}
                 onChange={(v) => {
                   const d = domains.find((x) => String(domainId(x)) === String(v))
                   if (d) void selectDomain(d)
                 }}
+                options={domains.map((d) => ({ value: String(domainId(d)), label: domainName(d) }))}
+              />
+              <input
+                className="mb-search"
+                type="search"
+                placeholder={t('mailboxes.search')}
+                value={mbSearch}
+                onChange={(e) => setMbSearch(e.target.value)}
+                disabled={!selectedDomain}
+              />
+              <Select
+                aria-label={t('mailboxes.filter')}
+                value={mbFilter}
+                onChange={(v) => setMbFilter(v as 'all' | 'active' | 'disabled')}
                 options={[
-                  { value: '', label: t('mailboxes.selectDomain') },
-                  ...domains.map((d) => ({ value: String(domainId(d)), label: domainName(d) })),
+                  { value: 'all', label: t('mailboxes.filterAll') },
+                  { value: 'active', label: t('mailboxes.filterActive') },
+                  { value: 'disabled', label: t('mailboxes.filterDisabled') },
                 ]}
               />
+              <span className="muted mb-count">
+                {selectedDomain
+                  ? t('mailboxes.count', { n: filteredMailboxes.length, total: mailboxes.length })
+                  : null}
+              </span>
               <button type="button" className="ghost" onClick={() => void load()} disabled={!selectedDomain}>
                 {t('actions.refresh')}
               </button>
             </div>
             {selectedDomain ? (
-              <div className="split">
+              <div className="split master-detail">
                 <div className="panel list-panel">
                   <table>
                     <thead>
@@ -1362,159 +1873,263 @@ export function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {mailboxes.map((m) => (
+                      {filteredMailboxes.map((m) => (
                         <tr
                           key={m.id}
-                          className={selectedMailbox?.id === m.id ? 'selected' : ''}
+                          className={String(selectedMailbox?.id) === String(m.id) ? 'selected' : ''}
                           onClick={() => selectMailbox(m)}
                         >
                           <td>
                             {m.localPart}@{selectedDomain.name}
                           </td>
-                          <td>{m.quotaBytes ? formatBytes(m.quotaBytes) : '∞'}</td>
                           <td>
-                            <span className="badge">{m.enabled === false ? t('domains.off') : t('domains.active')}</span>
+                            <QuotaBar used={m.usedBytes} quota={m.quotaBytes} />
+                          </td>
+                          <td>
+                            <span className={`badge ${m.enabled === false ? 'off' : ''}`}>
+                              {m.enabled === false ? t('domains.off') : t('domains.active')}
+                            </span>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
-                  {!mailboxes.length ? <p className="empty">{t('mailboxes.empty')}</p> : null}
+                  {!filteredMailboxes.length ? <p className="empty">{t('mailboxes.empty')}</p> : null}
                 </div>
                 <div className="panel detail-panel">
                   {selectedMailbox ? (
                     <>
-                      <h3>
-                        {selectedMailbox.localPart}@{selectedDomain.name}
-                      </h3>
-                      <div className="detail-section">
-                        <h4>{t('mailboxes.details')}</h4>
-                        <form className="form-stack" onSubmit={saveMailboxSettings}>
-                          <div className="field">
-                            <label>{t('domains.displayName')}</label>
-                            <input
-                              value={mbEdit.displayName}
-                              onChange={(e) => setMbEdit({ ...mbEdit, displayName: e.target.value })}
-                            />
+                      <header className="detail-head">
+                        <div>
+                          <h3>
+                            {selectedMailbox.localPart}@{selectedDomain.name}
+                          </h3>
+                          <div className="detail-meta">
+                            <span className={`badge ${selectedMailbox.enabled === false ? 'off' : 'ok'}`}>
+                              {selectedMailbox.enabled === false ? t('domains.off') : t('domains.active')}
+                            </span>
+                            <span className="meta-chip">
+                              {t('mailboxes.created')}: {formatWhen(selectedMailbox.createdAt)}
+                            </span>
                           </div>
-                          <div className="field">
-                            <label>{t('mailboxes.quotaMb')}</label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="1"
-                              value={mbEdit.quotaMb}
-                              onChange={(e) => setMbEdit({ ...mbEdit, quotaMb: e.target.value })}
-                              placeholder={t('mailboxes.unlimited')}
-                            />
-                            <p className="muted foot-note">{t('mailboxes.quotaHint')}</p>
-                          </div>
-                          <div className="field">
-                            <label>{t('mailboxes.newPassword')}</label>
-                            <input
-                              type="password"
-                              value={mbEdit.password}
-                              onChange={(e) => setMbEdit({ ...mbEdit, password: e.target.value })}
-                              autoComplete="new-password"
-                              placeholder={t('mailboxes.passwordOptional')}
-                            />
-                          </div>
-                          <label className="check-row">
-                            <input
-                              type="checkbox"
-                              checked={mbEdit.enabled}
-                              onChange={(e) => setMbEdit({ ...mbEdit, enabled: e.target.checked })}
-                            />
-                            <span>{t('domains.enabled')}</span>
-                          </label>
-                          <div className="detail-actions">
-                            <button className="primary" type="submit" disabled={busy}>
-                              {t('actions.save')}
-                            </button>
-                            <button
-                              type="button"
-                              className="ghost"
-                              disabled={busy || String(settings['admin.superuser_enabled']).toLowerCase() !== 'true'}
-                              onClick={() => void openAsUser()}
-                              title={
-                                String(settings['admin.superuser_enabled']).toLowerCase() !== 'true'
-                                  ? t('mailboxes.superuserOff')
-                                  : t('mailboxes.openAsUser')
-                              }
-                            >
-                              {t('mailboxes.openAsUser')}
-                            </button>
-                          </div>
-                        </form>
-                        <p className="muted created-line">
-                          {t('mailboxes.created')}: {selectedMailbox.createdAt || '—'}
-                        </p>
-                      </div>
-                      <div className="detail-section">
-                        <h4>{t('domains.aliases')}</h4>
-                        <form className="row" onSubmit={createAlias}>
-                          <input
-                            placeholder={t('domains.aliasLocal')}
-                            value={form.aliasLocal}
-                            onChange={(e) => setForm({ ...form, aliasLocal: e.target.value })}
-                            required
-                          />
-                          <button className="primary" type="submit" disabled={busy}>
-                            {t('domains.addAlias')}
+                        </div>
+                        <div className="detail-actions">
+                          <button
+                            type="button"
+                            className="ghost"
+                            disabled={busy || String(settings['admin.superuser_enabled']).toLowerCase() !== 'true'}
+                            title={
+                              String(settings['admin.superuser_enabled']).toLowerCase() !== 'true'
+                                ? t('mailboxes.superuserOff')
+                                : undefined
+                            }
+                            onClick={() => void openAsUser()}
+                          >
+                            {t('mailboxes.openAsUser')}
                           </button>
-                        </form>
-                        {aliases.filter((a) => a.mailboxId === selectedMailbox.id).length ? (
-                          <ul className="alias-list">
-                            {aliases
-                              .filter((a) => a.mailboxId === selectedMailbox.id)
-                              .map((a) => (
-                                <li key={a.id}>
-                                  {a.localPart}@{selectedDomain.name}
-                                </li>
-                              ))}
-                          </ul>
-                        ) : (
-                          <p className="muted">{t('domains.noAliases')}</p>
-                        )}
+                          <button type="button" className="ghost danger" disabled={busy} onClick={() => void deleteMailbox()}>
+                            {t('mailboxes.delete')}
+                          </button>
+                        </div>
+                      </header>
+                      <div className="detail-tabs" role="tablist">
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={mbDetailTab === 'general'}
+                          className={mbDetailTab === 'general' ? 'active' : ''}
+                          onClick={() => setMbDetailTab('general')}
+                        >
+                          {t('mailboxes.tabGeneral')}
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={mbDetailTab === 'aliases'}
+                          className={mbDetailTab === 'aliases' ? 'active' : ''}
+                          onClick={() => setMbDetailTab('aliases')}
+                        >
+                          {t('mailboxes.tabAliases', {
+                            n: aliases.filter((a) => String(a.mailboxId) === String(selectedMailbox.id)).length,
+                          })}
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          aria-selected={mbDetailTab === 'filters'}
+                          className={mbDetailTab === 'filters' ? 'active' : ''}
+                          onClick={() => setMbDetailTab('filters')}
+                        >
+                          {t('mailboxes.tabFilters')}
+                        </button>
                       </div>
-                      <div className="detail-section">
-                        <h4>{t('mailboxes.addAnother')}</h4>
-                        <form onSubmit={createMailbox}>
-                          <div className="row">
+                      {mbDetailTab === 'general' ? (
+                        <>
+                          <section className="detail-card">
+                            <h4>{t('mailboxes.details')}</h4>
+                            <form className="form-stack" onSubmit={saveMailboxSettings}>
+                              <div className="field">
+                                <label htmlFor="mb-name">{t('domains.displayName')}</label>
+                                <input
+                                  id="mb-name"
+                                  value={mbEdit.displayName}
+                                  onChange={(e) => setMbEdit({ ...mbEdit, displayName: e.target.value })}
+                                />
+                              </div>
+                              <div className="field">
+                                <label htmlFor="mb-quota">{t('mailboxes.quotaMb')}</label>
+                                <input
+                                  id="mb-quota"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  value={mbEdit.quotaMb}
+                                  onChange={(e) => setMbEdit({ ...mbEdit, quotaMb: e.target.value })}
+                                  placeholder={t('mailboxes.unlimited')}
+                                />
+                                <div className="quota-detail">
+                                  <QuotaBar used={selectedMailbox.usedBytes} quota={selectedMailbox.quotaBytes} />
+                                </div>
+                                <p className="muted foot-note">{t('mailboxes.quotaHint')}</p>
+                              </div>
+                              <div className="field">
+                                <label htmlFor="mb-pass">{t('mailboxes.newPassword')}</label>
+                                <input
+                                  id="mb-pass"
+                                  type="password"
+                                  value={mbEdit.password}
+                                  onChange={(e) => setMbEdit({ ...mbEdit, password: e.target.value })}
+                                  autoComplete="new-password"
+                                  placeholder={t('mailboxes.passwordOptional')}
+                                />
+                              </div>
+                              <label className="check-row">
+                                <input
+                                  type="checkbox"
+                                  checked={mbEdit.enabled}
+                                  onChange={(e) => setMbEdit({ ...mbEdit, enabled: e.target.checked })}
+                                />
+                                <span>{t('domains.enabled')}</span>
+                              </label>
+                              <div className="detail-actions">
+                                <button className="primary" type="submit" disabled={busy}>
+                                  {t('actions.save')}
+                                </button>
+                                {mbSaved ? <span className="save-flash">{t('mailboxes.saved')}</span> : null}
+                              </div>
+                            </form>
+                          </section>
+                          <section className="detail-card">
+                            <h4>{t('mailboxes.addAnother')}</h4>
+                            <form className="form-stack" onSubmit={createMailbox}>
+                              <div className="field-grid">
+                                <div className="field">
+                                  <label htmlFor="mb-quick-local">{t('domains.localPart')}</label>
+                                  <input
+                                    id="mb-quick-local"
+                                    value={form.localPart}
+                                    onChange={(e) => setForm({ ...form, localPart: e.target.value })}
+                                    required
+                                  />
+                                </div>
+                                <div className="field">
+                                  <label htmlFor="mb-quick-name">{t('domains.displayName')}</label>
+                                  <input
+                                    id="mb-quick-name"
+                                    value={form.displayName}
+                                    onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+                                  />
+                                </div>
+                                <div className="field">
+                                  <label htmlFor="mb-quick-pass">{t('domains.password')}</label>
+                                  <input
+                                    id="mb-quick-pass"
+                                    type="password"
+                                    value={form.password}
+                                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                                    required
+                                  />
+                                </div>
+                                <div className="field">
+                                  <label htmlFor="mb-quick-quota">{t('mailboxes.quotaMb')}</label>
+                                  <input
+                                    id="mb-quick-quota"
+                                    type="number"
+                                    min="0"
+                                    value={form.quotaMb}
+                                    onChange={(e) => setForm({ ...form, quotaMb: e.target.value })}
+                                    placeholder={t('mailboxes.quotaDefault')}
+                                  />
+                                </div>
+                              </div>
+                              <div className="detail-actions">
+                                <button className="primary" type="submit" disabled={busy}>
+                                  {t('actions.add')}
+                                </button>
+                              </div>
+                            </form>
+                          </section>
+                        </>
+                      ) : mbDetailTab === 'aliases' ? (
+                        <section className="detail-card">
+                          <h4>{t('domains.aliases')}</h4>
+                          <form className="row alias-add" onSubmit={createAlias}>
                             <input
-                              placeholder={t('domains.localPart')}
-                              value={form.localPart}
-                              onChange={(e) => setForm({ ...form, localPart: e.target.value })}
+                              placeholder={t('domains.aliasLocal')}
+                              value={form.aliasLocal}
+                              onChange={(e) =>
+                                setForm({
+                                  ...form,
+                                  aliasLocal: e.target.value,
+                                  aliasMailboxId: String(selectedMailbox.id),
+                                })
+                              }
                               required
-                            />
-                            <input
-                              placeholder={t('domains.displayName')}
-                              value={form.displayName}
-                              onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-                            />
-                            <input
-                              type="password"
-                              placeholder={t('domains.password')}
-                              value={form.password}
-                              onChange={(e) => setForm({ ...form, password: e.target.value })}
-                              required
-                            />
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder={t('mailboxes.quotaMb')}
-                              value={form.quotaMb}
-                              onChange={(e) => setForm({ ...form, quotaMb: e.target.value })}
                             />
                             <button className="primary" type="submit" disabled={busy}>
-                              {t('actions.add')}
+                              {t('domains.addAlias')}
                             </button>
-                          </div>
-                        </form>
-                      </div>
+                          </form>
+                          {aliases.filter((a) => String(a.mailboxId) === String(selectedMailbox.id)).length ? (
+                            <ul className="alias-list">
+                              {aliases
+                                .filter((a) => String(a.mailboxId) === String(selectedMailbox.id))
+                                .map((a) => (
+                                  <li key={a.id}>
+                                    <span>
+                                      {a.localPart}@{selectedDomain.name}
+                                    </span>
+                                    <button
+                                      type="button"
+                                      className="ghost alias-del"
+                                      disabled={busy}
+                                      onClick={() => void deleteAlias(a.id)}
+                                      aria-label={t('actions.delete')}
+                                    >
+                                      {t('actions.delete')}
+                                    </button>
+                                  </li>
+                                ))}
+                            </ul>
+                          ) : (
+                            <p className="empty soft">{t('domains.noAliases')}</p>
+                          )}
+                        </section>
+                      ) : (
+                        <section className="detail-card filter-section">
+                          <MailboxFilters
+                            key={String(selectedMailbox.id)}
+                            mailboxId={selectedMailbox.id}
+                            creds={creds!}
+                          />
+                        </section>
+                      )}
                     </>
                   ) : (
-                    <p className="empty">{t('mailboxes.select')}</p>
+                    <div className="empty-state">
+                      <p className="empty-title">{t('mailboxes.select')}</p>
+                      <p className="muted">{t('mailboxes.selectHint')}</p>
+                    </div>
                   )}
                 </div>
               </div>
@@ -1531,52 +2146,70 @@ export function App() {
                 <h2>{t('queue.title')}</h2>
                 <p>{t('queue.subtitle')}</p>
               </div>
+              <div className="page-head-meta">
+                <span className="muted">
+                  {queue.length
+                    ? t('queue.count', {
+                        n: queue.length,
+                        dead: queue.filter((j) => j.attempts >= j.maxAttempts).length,
+                      })
+                    : null}
+                  {queue.length >= 100 ? ` · ${t('list.capped', { n: 100 })}` : ''}
+                </span>
+                <button type="button" className="ghost" onClick={() => void load()} disabled={busy}>
+                  {t('actions.refresh')}
+                </button>
+              </div>
             </div>
             <div className="panel list-panel">
               <table>
                 <thead>
                   <tr>
-                    <th>{t('queue.colId')}</th>
                     <th>{t('queue.colKind')}</th>
+                    <th>{t('queue.colStatus')}</th>
                     <th>{t('queue.colAttempts')}</th>
                     <th>{t('queue.colError')}</th>
+                    <th>{t('queue.colWhen')}</th>
                     <th>{t('queue.colActions')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {queue.map((j) => {
                     const dead = j.attempts >= j.maxAttempts
+                    const target = queuePayloadSummary(j.payloadJson)
                     return (
-                      <tr key={j.id}>
-                        <td>{j.id}</td>
+                      <tr key={j.id} className={dead ? 'row-dead' : ''}>
                         <td>
-                          {j.kind}
-                          {dead ? <span className="pill bad">{t('queue.dead')}</span> : null}
+                          <div className="cell-stack">
+                            <strong>{queueKindLabel(j.kind, t)}</strong>
+                            {target ? <span className="muted">{target}</span> : null}
+                            <span className="muted mono-id">#{j.id}</span>
+                          </div>
+                        </td>
+                        <td>
+                          <span className={`badge ${dead ? 'off' : ''}`}>
+                            {dead ? t('queue.dead') : t('queue.pending')}
+                          </span>
                         </td>
                         <td>
                           {j.attempts}/{j.maxAttempts}
                         </td>
-                        <td>{j.lastError || '—'}</td>
+                        <td className="cell-error">{j.lastError || '—'}</td>
+                        <td className="muted">{formatWhen(j.updatedAt || j.createdAt || j.nextAt)}</td>
                         <td className="row">
                           <button
                             type="button"
                             className="ghost"
-                            onClick={async () => {
-                              await api(`/api/admin/queue/${j.id}/retry`, { ...creds, method: 'POST' })
-                              setQueue(await api<QueueJob[]>('/api/admin/queue', creds!))
-                              await refreshDash()
-                            }}
+                            disabled={busy}
+                            onClick={() => void retryQueueJob(j.id)}
                           >
                             {t('queue.retry')}
                           </button>
                           <button
                             type="button"
                             className="ghost"
-                            onClick={async () => {
-                              await api(`/api/admin/queue/${j.id}/delete`, { ...creds, method: 'POST' })
-                              setQueue(await api<QueueJob[]>('/api/admin/queue', creds!))
-                              await refreshDash()
-                            }}
+                            disabled={busy}
+                            onClick={() => void deleteQueueJob(j.id)}
                           >
                             {t('actions.delete')}
                           </button>
@@ -1598,6 +2231,15 @@ export function App() {
                 <h2>{t('quarantine.title')}</h2>
                 <p>{t('quarantine.subtitle')}</p>
               </div>
+              <div className="page-head-meta">
+                <span className="muted">
+                  {quarantine.length ? t('quarantine.count', { n: quarantine.length }) : null}
+                  {quarantine.length >= 100 ? ` · ${t('list.capped', { n: 100 })}` : ''}
+                </span>
+                <button type="button" className="ghost" onClick={() => void load()} disabled={busy}>
+                  {t('actions.refresh')}
+                </button>
+              </div>
             </div>
             <div className="panel list-panel">
               <table>
@@ -1605,44 +2247,62 @@ export function App() {
                   <tr>
                     <th>{t('quarantine.colFrom')}</th>
                     <th>{t('quarantine.colSubject')}</th>
-                    <th>{t('quarantine.colVerdict')}</th>
+                    <th>{t('quarantine.colMailbox')}</th>
+                    <th>{t('quarantine.colScore')}</th>
+                    <th>{t('quarantine.colReasons')}</th>
+                    <th>{t('quarantine.colWhen')}</th>
                     <th />
                   </tr>
                 </thead>
                 <tbody>
-                  {quarantine.map((q) => (
-                    <tr key={q.id} style={{ cursor: 'default' }}>
-                      <td>{q.fromAddr}</td>
-                      <td>{q.subject}</td>
-                      <td>
-                        <code style={{ fontSize: '0.75rem' }}>{q.verdictJson}</code>
-                      </td>
-                      <td className="row">
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={async () => {
-                            await api(`/api/admin/quarantine/${q.id}/release`, { ...creds, method: 'POST' })
-                            setQuarantine(await api<QuarantineItem[]>('/api/admin/quarantine', creds!))
-                            await refreshDash()
-                          }}
-                        >
-                          {t('actions.release')}
-                        </button>
-                        <button
-                          type="button"
-                          className="ghost"
-                          onClick={async () => {
-                            await api(`/api/admin/quarantine/${q.id}/delete`, { ...creds, method: 'POST' })
-                            setQuarantine(await api<QuarantineItem[]>('/api/admin/quarantine', creds!))
-                            await refreshDash()
-                          }}
-                        >
-                          {t('actions.delete')}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {quarantine.map((q) => {
+                    const verdict = parseVerdict(q.verdictJson)
+                    const score = q.score ?? verdict.score
+                    return (
+                      <tr key={q.id}>
+                        <td>{q.fromAddr || q.from || '—'}</td>
+                        <td>{q.subject || t('quarantine.noSubject')}</td>
+                        <td className="muted">{q.mailboxAddr || (q.mailboxId != null ? `#${q.mailboxId}` : '—')}</td>
+                        <td>
+                          {score != null ? (
+                            <span className="score-pill">{Number(score).toFixed(1)}</span>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+                        <td>
+                          {verdict.reasons.length ? (
+                            <ul className="reason-list">
+                              {verdict.reasons.slice(0, 4).map((r, i) => (
+                                <li key={i}>{r}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <span className="muted">—</span>
+                          )}
+                        </td>
+                        <td className="muted">{formatWhen(q.createdAt)}</td>
+                        <td className="row">
+                          <button
+                            type="button"
+                            className="ghost"
+                            disabled={busy}
+                            onClick={() => void releaseQuarantineItem(q.id)}
+                          >
+                            {t('actions.release')}
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost"
+                            disabled={busy}
+                            onClick={() => void deleteQuarantineItem(q.id)}
+                          >
+                            {t('actions.delete')}
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
                 </tbody>
               </table>
               {!quarantine.length ? <p className="empty">{t('quarantine.empty')}</p> : null}
@@ -1681,7 +2341,7 @@ export function App() {
                   </div>
                   <div className="settings-fields">
                     {g.fields.map((field) => {
-                      const label = t(`settings.keys.${field.key}`, { defaultValue: field.key })
+                      const label = settingKeyLabel(t, field.key)
                       const value = String(settings[field.key] ?? '')
                       const boolOn = String(value).toLowerCase() === 'true'
                       return (
@@ -1695,9 +2355,10 @@ export function App() {
                                 id={`set-${field.key}`}
                                 type="checkbox"
                                 checked={boolOn}
-                                onChange={(e) =>
+                                onChange={(e) => {
+                                  setSettingsDirty(true)
                                   setSettings({ ...settings, [field.key]: e.target.checked ? 'true' : 'false' })
-                                }
+                                }}
                               />
                               <span>{boolOn ? t('overview.on') : t('overview.off')}</span>
                             </label>
@@ -1706,14 +2367,20 @@ export function App() {
                               id={`set-${field.key}`}
                               rows={3}
                               value={value}
-                              onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })}
+                              onChange={(e) => {
+                                setSettingsDirty(true)
+                                setSettings({ ...settings, [field.key]: e.target.value })
+                              }}
                             />
                           ) : (
                             <input
                               id={`set-${field.key}`}
                               type={field.type === 'number' ? 'number' : 'text'}
                               value={value}
-                              onChange={(e) => setSettings({ ...settings, [field.key]: e.target.value })}
+                              onChange={(e) => {
+                                setSettingsDirty(true)
+                                setSettings({ ...settings, [field.key]: e.target.value })
+                              }}
                             />
                           )}
                         </div>
@@ -1728,6 +2395,7 @@ export function App() {
                 <button className="primary" type="submit" disabled={busy}>
                   {t('settings.save')}
                 </button>
+                {settingsSaved ? <span className="save-flash">{t('settings.saved')}</span> : null}
               </div>
             </form>
           </>
@@ -1776,6 +2444,15 @@ export function App() {
                 <h2>{t('audit.title')}</h2>
                 <p>{t('audit.subtitle')}</p>
               </div>
+              <div className="page-head-meta">
+                <span className="muted">
+                  {audit.length ? t('audit.count', { n: audit.length }) : null}
+                  {audit.length >= 200 ? ` · ${t('list.capped', { n: 200 })}` : ''}
+                </span>
+                <button type="button" className="ghost" onClick={() => void load()} disabled={busy}>
+                  {t('actions.refresh')}
+                </button>
+              </div>
             </div>
             <div className="panel list-panel">
               <table>
@@ -1785,15 +2462,17 @@ export function App() {
                     <th>{t('audit.colActor')}</th>
                     <th>{t('audit.colAction')}</th>
                     <th>{t('audit.colTarget')}</th>
+                    <th>{t('audit.colDetail')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {audit.map((a) => (
-                    <tr key={a.id} style={{ cursor: 'default' }}>
-                      <td>{a.createdAt}</td>
-                      <td>{a.actor}</td>
-                      <td>{a.action}</td>
-                      <td>{a.target}</td>
+                    <tr key={a.id ?? `${a.at}-${a.action}-${a.target}`}>
+                      <td className="muted">{formatWhen(a.createdAt || a.at)}</td>
+                      <td>{a.actor || '—'}</td>
+                      <td>{a.action || '—'}</td>
+                      <td>{a.target || '—'}</td>
+                      <td className="cell-error">{a.detail || '—'}</td>
                     </tr>
                   ))}
                 </tbody>

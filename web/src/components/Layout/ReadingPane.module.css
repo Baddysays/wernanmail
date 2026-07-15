@@ -1,22 +1,24 @@
 .pane {
   display: flex;
   flex-direction: column;
+  flex: 1;
   min-height: 0;
+  height: 100%;
   background: var(--bg-elevated);
 }
 
 .empty {
   display: grid;
   place-content: center;
-  gap: 0.4rem;
+  gap: 0.35rem;
   height: 100%;
-  padding: 2rem;
+  padding: 1.5rem;
   text-align: center;
   color: var(--text-muted);
 }
 
 .emptyTitle {
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-lg);
   font-weight: var(--font-weight-semibold);
   color: var(--text-secondary);
   letter-spacing: -0.02em;
@@ -26,14 +28,36 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
-  padding: 1.15rem 1.5rem 0.9rem;
+  gap: 0.75rem;
+  padding: 0.85rem 1.15rem 0.7rem;
   border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.headerMain {
+  min-width: 0;
+}
+
+.backBtn {
+  display: none;
+  margin: 0 0 0.35rem;
+  padding: 0.15rem 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+@media (max-width: 960px) {
+  .backBtn {
+    display: inline-flex;
+  }
 }
 
 .subject {
   margin: 0;
-  font-size: var(--font-size-xl);
+  font-size: 1.2rem;
   font-weight: var(--font-weight-semibold);
   letter-spacing: -0.03em;
   line-height: var(--line-height-tight);
@@ -41,8 +65,8 @@
 
 .folderTag {
   display: inline-block;
-  margin-top: 0.45rem;
-  padding: 0.15rem 0.45rem;
+  margin-top: 0.3rem;
+  padding: 0.1rem 0.4rem;
   border-radius: var(--radius-sm);
   background: var(--bg-hover);
   color: var(--text-secondary);
@@ -51,7 +75,8 @@
 
 .actions {
   display: flex;
-  gap: 0.2rem;
+  align-items: center;
+  gap: 0.1rem;
   flex-shrink: 0;
 }
 
@@ -64,6 +89,12 @@
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out), background 140ms ease, color 140ms ease;
+}
+
+.iconBtn:active {
+  transform: scale(0.96);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -73,24 +104,33 @@
   }
 }
 
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
 .senderRow {
   display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.95rem 1.5rem;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.75rem 1.15rem 0.55rem;
+  flex-shrink: 0;
 }
 
 .avatar {
   display: grid;
   place-items: center;
-  width: 2.35rem;
-  height: 2.35rem;
+  width: 2.1rem;
+  height: 2.1rem;
   border-radius: 999px;
   background: var(--accent-subtle);
   color: var(--accent-700);
   font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-sm);
-  box-shadow: inset 0 0 0 1px var(--accent-muted);
+  flex-shrink: 0;
 }
 
 [data-theme='dark'] .avatar {
@@ -100,11 +140,13 @@
 .senderMeta {
   display: flex;
   flex-direction: column;
+  gap: 0.05rem;
   min-width: 0;
 }
 
 .senderName {
   font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
 }
 
 .senderEmail,
@@ -119,79 +161,182 @@
   color: var(--text-muted);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  padding-top: 0.15rem;
 }
 
 .body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0.35rem 1.5rem 1.4rem;
+  padding: 0.25rem 1.15rem 0.85rem;
   font-family: var(--font-reading);
   white-space: pre-wrap;
   color: var(--text-primary);
   line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.htmlFrame {
+  display: block;
+  width: 100%;
+  min-height: 3rem;
+  height: 3rem;
+  border: none;
+  padding: 0.15rem 1rem 0.5rem;
+  background: transparent;
+}
+
+.privacyBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin: 0 1.15rem 0.45rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.privacyBtn {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.65rem;
+  background: var(--accent-600);
+  color: var(--text-inverse);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 140ms var(--ease-out), background 140ms ease;
+}
+
+.privacyBtn:active {
+  transform: scale(0.97);
+}
+
+.privacyBtn:hover {
+  background: var(--accent-hover);
 }
 
 .attachments {
-  padding: 0 1.5rem 1rem;
+  padding: 0.35rem 1.15rem 0.85rem;
+  flex-shrink: 0;
 }
 
 .attachmentsTitle {
-  margin: 0 0 0.55rem;
-  font-size: var(--font-size-sm);
+  margin: 0 0 0.4rem;
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .attachmentList {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.35rem;
 }
 
 .attachment {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
-  min-width: 14rem;
-  padding: 0.55rem 0.7rem;
-  border: none;
-  border-radius: var(--radius-md);
+  gap: 0.4rem;
+  max-width: 100%;
+  padding: 0.3rem 0.45rem 0.3rem 0.4rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
   background: var(--bg-panel);
-  box-shadow: var(--shadow-sm);
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+  transition: transform 140ms var(--ease-out), background 140ms ease;
+}
+
+.attachment:active {
+  transform: scale(0.98);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .attachment:hover {
+    background: var(--bg-hover);
+  }
+}
+
+.attachmentIcon,
+.attachmentDl {
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.attachmentMeta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0;
 }
 
 .attachmentName {
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12rem;
 }
 
 .attachmentSize {
-  font-size: var(--font-size-xs);
+  font-size: 0.7rem;
   color: var(--text-muted);
+  line-height: 1.2;
 }
 
 .footer {
   display: flex;
-  gap: 0.5rem;
-  padding: 0.9rem 1.5rem 1.15rem;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0.65rem 1.15rem 0.75rem;
   border-top: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+  flex-shrink: 0;
 }
 
 .footerBtn {
   display: inline-flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 0.9rem;
-  border: none;
-  border-radius: var(--radius-md);
-  background: var(--bg-panel);
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: transparent;
   color: var(--text-primary);
-  box-shadow: var(--shadow-sm);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: transform 140ms var(--ease-out), background 140ms ease;
+}
+
+.footerBtn:active {
+  transform: scale(0.97);
 }
 
 @media (hover: hover) and (pointer: fine) {
   .footerBtn:hover {
     background: var(--bg-hover);
+  }
+}
+
+.footerDanger {
+  color: var(--text-secondary);
+  margin-left: auto;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .footerDanger:hover {
+    color: #b42318;
+    background: color-mix(in srgb, #b42318 8%, transparent);
   }
 }

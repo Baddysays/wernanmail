@@ -82,11 +82,7 @@ export function AppLayout() {
           <span className={styles.brandName}>{t('app.name')}</span>
         </Link>
 
-        <label className={styles.search}>
-          <SearchIcon />
-          <input type="search" placeholder={t('nav.search')} />
-          <kbd className={styles.searchHint}>/</kbd>
-        </label>
+        <div className={styles.headerSpacer} aria-hidden />
 
         <div className={styles.headerActions}>
           <Link
@@ -129,15 +125,6 @@ function MailIcon() {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-    </svg>
-  )
-}
-
-function SearchIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="11" cy="11" r="6.5" stroke="currentColor" strokeWidth="1.6" />
-      <path d="M16 16l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
     </svg>
   )
 }

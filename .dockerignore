@@ -1,0 +1,11 @@
+.git
+.cursor
+.env
+.env.*
+data
+tmp
+**/node_modules
+**/dist
+**/*.log
+deploy
+docs

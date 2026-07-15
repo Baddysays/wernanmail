@@ -12,21 +12,21 @@ import (
 
 // Config for Phase 2 mail daemons.
 type Config struct {
-	DataDir       string
-	SMTPAddr      string
-	SubmitAddr    string
-	IMAPAddr      string
-	AdminAddr     string
-	Hostname      string
-	EHLOHost      string // outbound EHLO; should match PTR when possible
-	AdminUser     string
-	AdminPassHash []byte // bcrypt hash; never store plaintext after Load
-	RelayHost     string
-	ClamAddr      string
-	TLSCertFile   string
-	TLSKeyFile    string
-	AdminCORS     []string
-	SessionSecret string // 32+ bytes preferred; used to encrypt webmail session secrets
+	DataDir        string
+	SMTPAddr       string
+	SubmitAddr     string
+	IMAPAddr       string
+	AdminAddr      string
+	Hostname       string
+	EHLOHost       string // outbound EHLO; should match PTR when possible
+	AdminUser      string
+	AdminPassHash  []byte // bcrypt hash; never store plaintext after Load
+	RelayHost      string
+	ClamAddr       string
+	TLSCertFile    string
+	TLSKeyFile     string
+	AdminCORS      []string
+	SessionSecret  string // 32+ bytes preferred; used to encrypt webmail session secrets
 	MasterPassword string // IMAP/SMTP master password for admin impersonation
 	WebmailURL     string // public webmail base URL for "open as user"
 }
@@ -37,7 +37,7 @@ func Load() Config {
 	if err := validateFQDN(ehlo); err != nil {
 		log.Printf("mailcfg: MAIL_EHLO %q looks invalid: %v (continuing)", ehlo, err)
 	}
-	pass := getenv("ADMIN_PASSWORD", "changeme")
+	pass := getenvSecret("ADMIN_PASSWORD", "changeme")
 	hashEnv := getenv("ADMIN_PASSWORD_HASH", "")
 	var hash []byte
 	if hashEnv != "" {
@@ -52,7 +52,7 @@ func Load() Config {
 			log.Printf("mailcfg: WARNING using default ADMIN_PASSWORD — set ADMIN_PASSWORD or ADMIN_PASSWORD_HASH")
 		}
 	}
-	secret := getenv("SESSION_SECRET", "")
+	secret := getenvSecret("SESSION_SECRET", "")
 	if secret == "" {
 		// Derive a stable-enough secret from data dir + admin hash so restarts keep sessions
 		// decryptable within one deployment without requiring extra env in MVP.
@@ -60,22 +60,22 @@ func Load() Config {
 		log.Printf("mailcfg: SESSION_SECRET unset — derived ephemeral key (set SESSION_SECRET in production)")
 	}
 	return Config{
-		DataDir:       getenv("DATA_DIR", "./data"),
-		SMTPAddr:      getenv("SMTP_ADDR", ":2525"),
-		SubmitAddr:    getenv("SUBMIT_ADDR", ":2587"),
-		IMAPAddr:      getenv("IMAP_ADDR", ":2143"),
-		AdminAddr:     getenv("ADMIN_ADDR", ":8090"),
-		Hostname:      host,
-		EHLOHost:      ehlo,
-		AdminUser:     getenv("ADMIN_USER", "admin"),
-		AdminPassHash: hash,
-		RelayHost:     getenv("RELAY_HOST", ""),
-		ClamAddr:      getenv("CLAMAV_ADDR", ""),
-		TLSCertFile:   getenv("MAIL_TLS_CERT", ""),
-		TLSKeyFile:    getenv("MAIL_TLS_KEY", ""),
-		AdminCORS:     splitCSV(getenv("ADMIN_CORS_ORIGINS", "http://localhost:5174,http://127.0.0.1:5174")),
-		SessionSecret: secret,
-		MasterPassword: getenv("MAIL_MASTER_PASSWORD", ""),
+		DataDir:        getenv("DATA_DIR", "./data"),
+		SMTPAddr:       getenv("SMTP_ADDR", ":2525"),
+		SubmitAddr:     getenv("SUBMIT_ADDR", ":2587"),
+		IMAPAddr:       getenv("IMAP_ADDR", ":2143"),
+		AdminAddr:      getenv("ADMIN_ADDR", ":8090"),
+		Hostname:       host,
+		EHLOHost:       ehlo,
+		AdminUser:      getenv("ADMIN_USER", "admin"),
+		AdminPassHash:  hash,
+		RelayHost:      getenv("RELAY_HOST", ""),
+		ClamAddr:       getenv("CLAMAV_ADDR", ""),
+		TLSCertFile:    getenv("MAIL_TLS_CERT", ""),
+		TLSKeyFile:     getenv("MAIL_TLS_KEY", ""),
+		AdminCORS:      splitCSV(getenv("ADMIN_CORS_ORIGINS", "http://localhost:5174,http://127.0.0.1:5174")),
+		SessionSecret:  secret,
+		MasterPassword: getenvSecret("MAIL_MASTER_PASSWORD", ""),
 		WebmailURL:     getenv("WEBMAIL_URL", ""),
 	}
 }
@@ -121,6 +121,20 @@ func (e errString) Error() string { return string(e) }
 func getenv(k, fb string) string {
 	if v := strings.TrimSpace(os.Getenv(k)); v != "" {
 		return v
+	}
+	return fb
+}
+
+func getenvSecret(k, fb string) string {
+	if v := strings.TrimSpace(os.Getenv(k)); v != "" {
+		return v
+	}
+	if path := strings.TrimSpace(os.Getenv(k + "_FILE")); path != "" {
+		if value, err := os.ReadFile(path); err == nil {
+			if v := strings.TrimSpace(string(value)); v != "" {
+				return v
+			}
+		}
 	}
 	return fb
 }

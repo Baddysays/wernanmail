@@ -13,6 +13,8 @@ type PushToastInput = {
   title: string
   detail?: string
   durationMs?: number
+  actionLabel?: string
+  onAction?: () => void
 }
 
 type ToastContextValue = {
@@ -41,6 +43,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         title: input.title,
         detail: input.detail,
         durationMs,
+        actionLabel: input.actionLabel,
+        onAction: input.onAction,
       },
     ])
   }, [])

@@ -7,9 +7,10 @@
 4. Reliability — healthchecks, restart, volumes, backups.
 
 ## Product shape
-- **Primary install:** mail server + webmail (+ admin) as one product.
+- **Primary install:** mail server + webmail (+ admin) as one product via **one Docker command** (`./install.sh` or `docker compose up --build -d`).
 - **Second wedge:** **Mailport** — embeddable inbox/compose for other apps on the same core.
 - **Optional at install:** calendar, contacts (and heavy AV on larger hosts) — not forced into the hot path.
+- **Default AV:** lightweight attachment policy (no ClamAV) so 1–2 GiB hosts stay viable.
 
 ## Phases
 1. **Client** — webmail against existing IMAP/SMTP (also works against our server).

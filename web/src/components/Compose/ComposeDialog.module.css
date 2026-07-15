@@ -12,8 +12,8 @@
 }
 
 .dialog {
-  width: min(100%, 36rem);
-  max-height: min(92vh, 40rem);
+  width: min(100%, 42rem);
+  max-height: min(92vh, 48rem);
   display: flex;
   flex-direction: column;
   border-radius: var(--radius-lg);
@@ -121,6 +121,136 @@
   font-family: var(--font-reading);
   line-height: 1.55;
   outline: none;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+
+.toolBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.85rem;
+  height: 1.85rem;
+  padding: 0 0.4rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+
+.toolSpacer {
+  flex: 1;
+  min-width: 0.5rem;
+}
+
+.underlineMark {
+  text-decoration: underline;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .toolBtn:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
+}
+
+.fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.editor {
+  flex: 1;
+  min-height: 12rem;
+  max-height: 22rem;
+  overflow-y: auto;
+  border: none;
+  padding: 0.9rem 1rem;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font-family: var(--font-reading);
+  line-height: 1.55;
+  outline: none;
+}
+
+.editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.editor :is(ul, ol) {
+  margin: 0.4rem 0;
+  padding-left: 1.25rem;
+}
+
+.editor a {
+  color: var(--accent);
+}
+
+.fileList {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
+}
+
+.fileItem {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border-radius: var(--radius-md);
+  background: var(--bg-panel);
+}
+
+.fileName {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+}
+
+.fileSize {
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.fileRemove {
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .fileRemove:hover {
+    background: var(--bg-hover);
+    color: var(--text-primary);
+  }
 }
 
 .error {

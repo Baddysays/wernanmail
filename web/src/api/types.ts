@@ -11,6 +11,13 @@ export type Folder = {
   messages?: number
 }
 
+export type AttachmentMeta = {
+  id: string
+  filename: string
+  contentType: string
+  size: number
+}
+
 export type MessageSummary = {
   id: string
   uid: number
@@ -20,6 +27,8 @@ export type MessageSummary = {
   date: string
   flags?: string[]
   size?: number
+  hasAttachment?: boolean
+  messageId?: string
 }
 
 export type MessageDetail = MessageSummary & {
@@ -27,6 +36,7 @@ export type MessageDetail = MessageSummary & {
   text?: string
   html?: string
   rawSize?: number
+  attachments?: AttachmentMeta[]
 }
 
 /** UI row shape used by list + reading pane */
@@ -38,10 +48,14 @@ export type UiMessage = {
   subject: string
   preview: string
   body: string
+  html?: string
+  messageId?: string
+  cc: { name: string; email: string }[]
   date: string
   unread: boolean
   starred: boolean
-  attachments: { id: string; name: string; size: number }[]
+  hasAttachment?: boolean
+  attachments: { id: string; name: string; size: number; contentType?: string }[]
 }
 
 export type FolderRole =
@@ -98,17 +112,34 @@ export function summaryToUi(msg: MessageSummary, folder: string): UiMessage {
     date: msg.date,
     unread: !seen,
     starred: flagged,
+    hasAttachment: Boolean(msg.hasAttachment),
+    cc: [],
     attachments: [],
   }
 }
 
 export function detailToUi(msg: MessageDetail, folder: string): UiMessage {
   const base = summaryToUi(msg, folder)
-  const body = msg.text?.trim() || stripHtml(msg.html ?? '') || ''
+  const text = msg.text?.trim() || ''
+  const html = msg.html?.trim() || ''
+  const body = text || stripHtml(html) || ''
   return {
     ...base,
     preview: body.slice(0, 140),
     body,
+    html: html || undefined,
+    messageId: msg.messageId,
+    cc: (msg.cc ?? []).map((a) => ({
+      name: a.name?.trim() || a.address,
+      email: a.address,
+    })),
+    hasAttachment: (msg.attachments?.length ?? 0) > 0 || Boolean(msg.hasAttachment),
+    attachments: (msg.attachments ?? []).map((a) => ({
+      id: a.id,
+      name: a.filename,
+      size: a.size,
+      contentType: a.contentType,
+    })),
   }
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ApiError, IMPERSONATE_KEY, impersonateLogin, login } from '../api/client'
 import {
@@ -142,9 +142,14 @@ export function LoginPage() {
 
   return (
     <div className={styles.page}>
-      <a className={styles.modeSwitch} href="/admin/">
-        {t('login.asAdmin')}
-      </a>
+      <div className={styles.topLinks}>
+        <Link className={styles.modeSwitch} to="/">
+          {t('login.about')}
+        </Link>
+        <a className={styles.modeSwitch} href="/admin/">
+          {t('login.asAdmin')}
+        </a>
+      </div>
       <aside className={styles.hero} aria-label={t('app.name')}>
         <div className={styles.aurora} aria-hidden>
           <span className={styles.blobA} />

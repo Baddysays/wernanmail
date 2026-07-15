@@ -55,19 +55,46 @@ Web client ────► existing BFF (Phase 1) ──► this IMAP/SMTP
 | `adminapi` | Admin REST |
 | `settings` | Typed settings tree + rate limits / quotas |
 
-## DNS checklist (operator)
+## Go-live checklist (operator)
 
-Do **not** commit real hostnames/IPs into the public repo. On your DNS provider:
+Do **not** commit real hostnames/IPs into the public repo.
+
+### DNS
 
 1. Wait until the domain is **delegated** at the TLD (public resolvers must answer)
 2. **A/AAAA** — apex (site) + `mail` host
 3. **MX** — domain → `mail.…` (priority 10)
-4. **SPF** — `v=spf1 mx a:mail.… -all`
+4. **SPF** — `v=spf1 mx a:mail.… -all` (or `ip4:` of the outbound IP)
 5. **DKIM** — publish public key from admin → Domains → DKIM
 6. **DMARC** — start with `v=DMARC1; p=none; rua=mailto:postmaster@…`
-7. **PTR** — reverse DNS for the outbound IP (VPS provider)
-8. Firewall: **25, 465, 587, 993** + admin **443**
-9. Prefer TLS cert covering **apex + `*.domain`** (DNS-01) once delegation works
+7. **PTR** — reverse DNS for the outbound IP (VPS provider) matching `MAIL_HOSTNAME`
+8. Optional: **MTA-STS** (`_mta-sts` TXT + `mta-sts.` HTTPS policy) and **TLS-RPT**
+9. Firewall: **25, 465, 587, 993** + HTTPS **443**
+
+### TLS
+
+Compose starts with a **self-signed** bootstrap cert so ports come up on day one.
+For production, replace files in the `mail_tls` volume (or bind-mount) as
+`fullchain.pem` + `privkey.pem`, then `docker compose restart`.
+
+Typical path with Certbot on the host (HTTP-01 via nginx/`/.well-known/acme-challenge/`):
+
+```bash
+certbot certonly --webroot -w /var/www/certbot -d mail.example.com
+# copy or bind the live fullchain/privkey into the mail_tls volume
+docker compose restart mta imapd
+```
+
+DNS-01 is preferred when covering apex + `mail` without opening HTTP on the mail host.
+Built-in ACME inside the MTA is not required for v1; host-level Certbot/Caddy is fine.
+
+### Smoke after install
+
+1. `docker compose ps` — all services healthy  
+2. Admin login → Domains → DNS chips green (or documented pending)  
+3. Send mailbox ↔ external MX; confirm HTML + attachment round-trip  
+4. Check worker log for `outbound ok` (TLS to remote MX)  
+5. Open admin **Deliverability** for DMARC aggregate rows once RUA mail arrives
 
 ## RAM budget
 
@@ -87,31 +114,30 @@ Do **not** commit real hostnames/IPs into the public repo. On your DNS provider:
 ### Docker (recommended)
 
 ```bash
-cp .env.mail.example .env.mail
-docker compose -f docker-compose.mail.yml --env-file .env.mail up --build -d
+docker compose up --build -d
 ```
 
 | What | Where |
 |------|-------|
-| Admin | http://127.0.0.1:3090 |
-| Webmail | point Phase 1 client at this IMAP/SMTP, or use Compose web |
-| SMTP submit | host `2587` → container `:587` |
-| IMAP | host `2143` → container `:143` |
+| Admin | `https://your-host/admin/` |
+| Webmail | `https://your-host/` |
+| SMTP | port `25` |
+| SMTP submit | port `587` with STARTTLS |
+| IMAP | port `143` with STARTTLS |
 
-Antivirus (optional, ≥2 GiB RAM):
-
-```bash
-docker compose -f docker-compose.mail.yml --env-file .env.mail --profile av up -d
-```
+The init service generates persistent secrets and a self-signed bootstrap
+certificate. Replace the certificate in the `mail_tls` Docker volume before
+public use. ClamAV is not started by default; lightweight attachment scanning
+is built into the MTA.
 
 ### Binaries (small VPS)
 
 1. Cross-compile `admin` `api` `imapd` `mta` `worker` for `linux/amd64`
 2. Copy into `/opt/wernanmail/bin/` with `www/` (webmail) and `www/admin/` (SPA)
-3. Configure `.env` (see `.env.mail.example`)
+3. Configure `.env` (see `.env.example`)
 4. Start: [`deploy/mail-host/run.sh`](../deploy/mail-host/run.sh) → `./run.sh start`
 
-Compose file: [`docker-compose.mail.yml`](../docker-compose.mail.yml)
+Compose file: [`docker-compose.yml`](../docker-compose.yml)
 
 ## Admin UI
 

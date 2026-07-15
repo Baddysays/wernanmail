@@ -3,10 +3,14 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/Baddysays/wernanmail/server/internal/domain"
 )
+
+// ErrQuotaExceeded is returned by every storage path that would exceed a mailbox quota.
+var ErrQuotaExceeded = errors.New("mailbox quota exceeded")
 
 // MessageStore is mailbox / message metadata + body paths.
 type MessageStore interface {
@@ -22,11 +26,14 @@ type MessageStore interface {
 	GetMailbox(ctx context.Context, domainName, localPart string) (*domain.Mailbox, *domain.Domain, error)
 	GetMailboxByID(ctx context.Context, id int64) (*domain.Mailbox, error)
 	UpsertMailbox(ctx context.Context, m *domain.Mailbox) error
+	DeleteMailbox(ctx context.Context, domainID, mailboxID int64) error
+	DeleteDomain(ctx context.Context, domainID int64) error
 	AuthenticateMailbox(ctx context.Context, address, password string) (*domain.Mailbox, *domain.Domain, error)
 
 	// Aliases
 	ListAliases(ctx context.Context, domainID int64) ([]domain.Alias, error)
 	UpsertAlias(ctx context.Context, a *domain.Alias) error
+	DeleteAlias(ctx context.Context, domainID, aliasID int64) error
 	ResolveRecipient(ctx context.Context, address string) (mailboxID int64, err error)
 
 	// Messages
@@ -45,10 +52,19 @@ type MessageStore interface {
 	// Quarantine
 	AddQuarantine(ctx context.Context, q *domain.QuarantineItem, raw []byte) error
 	ListQuarantine(ctx context.Context, limit int) ([]domain.QuarantineItem, error)
+	CountQuarantine(ctx context.Context) (int, error)
 	ResolveQuarantine(ctx context.Context, id int64, resolution string) error
 	GetQuarantineRaw(ctx context.Context, id int64) (*domain.QuarantineItem, []byte, error)
 	PurgeQuarantineOlderThan(ctx context.Context, olderThan time.Time, limit int) (int, error)
 	DeleteMessagesOlderThan(ctx context.Context, olderThan time.Time, limit int) (int, error)
+
+	// DMARC aggregate reports
+	AddDMARCReports(ctx context.Context, reports []domain.DMARCReport) error
+	ListDMARCReports(ctx context.Context, limit int) ([]domain.DMARCReport, error)
+
+	// Mailbox filters
+	ListMailFilters(ctx context.Context, mailboxID int64) ([]domain.MailFilter, error)
+	ReplaceMailFilters(ctx context.Context, mailboxID int64, filters []domain.MailFilter) error
 
 	// Settings & audit
 	GetSetting(ctx context.Context, key string) (string, error)

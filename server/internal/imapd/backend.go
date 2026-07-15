@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/mail"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/emersion/go-imap"
@@ -23,9 +24,20 @@ import (
 
 // Backend is an IMAP backend over MessageStore.
 type Backend struct {
-	Store              store.MessageStore
-	MasterPassword     string
-	SuperuserEnabled   func() bool
+	Store            store.MessageStore
+	MasterPassword   string
+	SuperuserEnabled func() bool
+
+	updatesOnce sync.Once
+	updates     chan backend.Update
+}
+
+var _ backend.BackendUpdater = (*Backend)(nil)
+
+// Updates enables go-imap's unilateral update path used by IDLE.
+func (b *Backend) Updates() <-chan backend.Update {
+	b.updatesOnce.Do(func() { b.updates = make(chan backend.Update, 128) })
+	return b.updates
 }
 
 func (b *Backend) Login(_ *imap.ConnInfo, username, password string) (backend.User, error) {
@@ -33,7 +45,13 @@ func (b *Backend) Login(_ *imap.ConnInfo, username, password string) (backend.Us
 	if err != nil || m == nil || d == nil {
 		return nil, errors.New("invalid credentials")
 	}
-	return &User{store: b.Store, mailbox: m, domain: d}, nil
+	u := &User{
+		store: b.Store, mailbox: m, domain: d, backend: b,
+		folders: make(map[string]mailboxSnapshot),
+		stop:    make(chan struct{}),
+	}
+	go u.pollUpdates()
+	return u, nil
 }
 
 func (b *Backend) authenticate(username, password string) (*domain.Mailbox, *domain.Domain, error) {
@@ -66,6 +84,12 @@ type User struct {
 	store   store.MessageStore
 	mailbox *domain.Mailbox
 	domain  *domain.Domain
+	backend *Backend
+
+	mu      sync.Mutex
+	folders map[string]mailboxSnapshot
+	stop    chan struct{}
+	once    sync.Once
 }
 
 func (u *User) Username() string { return u.mailbox.Address(u.domain.Name) }
@@ -91,12 +115,25 @@ func (u *User) ListMailboxes(subscribed bool) ([]backend.Mailbox, error) {
 }
 
 func (u *User) GetMailbox(name string) (backend.Mailbox, error) {
-	store := canonicalizeFolder(name)
-	list := store
-	if store == domain.FolderSpam {
+	folder := canonicalizeFolder(name)
+	list := folder
+	if folder == domain.FolderSpam {
 		list = "Junk"
 	}
-	return &Mailbox{user: u, name: store, listName: list}, nil
+	u.mu.Lock()
+	if _, ok := u.folders[folder]; !ok {
+		snapshot := mailboxSnapshot{}
+		if messages, unseen, uidNext, _, err := u.store.FolderStats(
+			context.Background(), u.mailbox.ID, folder,
+		); err == nil {
+			snapshot = mailboxSnapshot{
+				initialized: true, messages: messages, unseen: unseen, uidNext: uidNext,
+			}
+		}
+		u.folders[folder] = snapshot
+	}
+	u.mu.Unlock()
+	return &Mailbox{user: u, name: folder, listName: list}, nil
 }
 
 func (u *User) CreateMailbox(name string) error { _ = name; return nil }
@@ -106,7 +143,76 @@ func (u *User) RenameMailbox(existing, newName string) error {
 	_ = newName
 	return backend.ErrNoSuchMailbox
 }
-func (u *User) Logout() error { return nil }
+func (u *User) Logout() error {
+	u.once.Do(func() { close(u.stop) })
+	return nil
+}
+
+type mailboxSnapshot struct {
+	initialized bool
+	messages    uint32
+	unseen      uint32
+	uidNext     uint32
+}
+
+func (u *User) pollUpdates() {
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			u.pollFolders()
+		case <-u.stop:
+			return
+		}
+	}
+}
+
+func (u *User) pollFolders() {
+	u.mu.Lock()
+	folders := make([]string, 0, len(u.folders))
+	for folder := range u.folders {
+		folders = append(folders, folder)
+	}
+	u.mu.Unlock()
+
+	for _, folder := range folders {
+		messages, unseen, uidNext, uidValidity, err := u.store.FolderStats(
+			context.Background(), u.mailbox.ID, folder,
+		)
+		if err != nil {
+			continue
+		}
+		u.mu.Lock()
+		old := u.folders[folder]
+		next := mailboxSnapshot{initialized: true, messages: messages, unseen: unseen, uidNext: uidNext}
+		u.folders[folder] = next
+		u.mu.Unlock()
+		if !old.initialized || old == next {
+			continue
+		}
+		name := folder
+		if folder == domain.FolderSpam {
+			name = "Junk"
+		}
+		status := imap.NewMailboxStatus(name, []imap.StatusItem{
+			imap.StatusMessages, imap.StatusUnseen, imap.StatusUidNext, imap.StatusUidValidity,
+		})
+		status.Messages = messages
+		status.Unseen = unseen
+		status.UidNext = uidNext
+		status.UidValidity = uidValidity
+		update := &backend.MailboxUpdate{
+			Update:        backend.NewUpdate(u.Username(), name),
+			MailboxStatus: status,
+		}
+		select {
+		case u.backend.updates <- update:
+		default:
+			log.Printf("imap idle update dropped user=%s folder=%s", u.Username(), name)
+		}
+	}
+}
 
 // Mailbox is one IMAP folder.
 type Mailbox struct {
@@ -245,12 +351,24 @@ func (m *Mailbox) fetchOne(msg *domain.Message, seqNum uint32, items []imap.Fetc
 			}
 			im.BodyStructure = bs
 		case imap.FetchRFC822, imap.FetchRFC822Header, imap.FetchRFC822Text:
-			if raw != nil {
-				sect, err := imap.ParseBodySectionName(item)
-				if err == nil {
-					im.Body[sect] = &peekLiteral{b: raw}
-				}
+			if raw == nil {
+				continue
 			}
+			section, err := imap.ParseBodySectionName(item)
+			if err != nil {
+				continue
+			}
+			hdr, body, splitErr := splitRFC822(raw)
+			if splitErr != nil {
+				im.Body[section] = &peekLiteral{b: raw}
+				continue
+			}
+			l, ferr := backendutil.FetchBodySection(hdr, body, section)
+			if ferr != nil {
+				im.Body[section] = &peekLiteral{b: raw}
+				continue
+			}
+			im.Body[section] = l
 		default:
 			if strings.HasPrefix(string(item), "BODY[") || strings.HasPrefix(string(item), "BODY.PEEK[") {
 				section, err := imap.ParseBodySectionName(item)
@@ -288,14 +406,27 @@ func splitRFC822(raw []byte) (textproto.Header, io.Reader, error) {
 	return h, msg.Body, nil
 }
 
-type peekLiteral struct{ b []byte }
-
-func (p *peekLiteral) Len() int                           { return len(p.b) }
-func (p *peekLiteral) Read(b []byte) (int, error)         { return copy(b, p.b), io.EOF }
-func (p *peekLiteral) WriteTo(w io.Writer) (int64, error) {
-	n, err := w.Write(p.b)
-	return int64(n), err
+type peekLiteral struct {
+	b   []byte
+	off int
 }
+
+func (p *peekLiteral) Len() int { return len(p.b) }
+
+func (p *peekLiteral) Read(buf []byte) (int, error) {
+	if p.off >= len(p.b) {
+		return 0, io.EOF
+	}
+	n := copy(buf, p.b[p.off:])
+	p.off += n
+	if p.off >= len(p.b) {
+		return n, io.EOF
+	}
+	return n, nil
+}
+
+// Do not implement WriterTo: go-imap's writeLiteral uses CopyN then Copy(Discard).
+// WriterTo would re-emit the full payload on the Discard pass and trip LiteralLengthErr.
 
 func (m *Mailbox) SearchMessages(uid bool, criteria *imap.SearchCriteria) ([]uint32, error) {
 	msgs, err := m.user.store.ListMessages(context.Background(), m.user.mailbox.ID, m.name, 5000)
@@ -308,7 +439,21 @@ func (m *Mailbox) SearchMessages(uid bool, criteria *imap.SearchCriteria) ([]uin
 	var out []uint32
 	for i, msg := range msgs {
 		seq := uint32(i + 1)
-		if criteria != nil && !matchSearch(msg, seq, criteria) {
+		text, body := "", ""
+		if needsContentSearch(criteria) {
+			_, raw, err := m.user.store.GetMessage(context.Background(), m.user.mailbox.ID, m.name, msg.UID)
+			if err == nil {
+				text = strings.ToLower(string(raw))
+				if p := strings.Index(text, "\r\n\r\n"); p >= 0 {
+					body = text[p+4:]
+				} else if p := strings.Index(text, "\n\n"); p >= 0 {
+					body = text[p+2:]
+				} else {
+					body = text
+				}
+			}
+		}
+		if criteria != nil && !matchSearch(msg, seq, criteria, text, body) {
 			continue
 		}
 		if uid {
@@ -320,7 +465,7 @@ func (m *Mailbox) SearchMessages(uid bool, criteria *imap.SearchCriteria) ([]uin
 	return out, nil
 }
 
-func matchSearch(msg domain.Message, seq uint32, c *imap.SearchCriteria) bool {
+func matchSearch(msg domain.Message, seq uint32, c *imap.SearchCriteria, text, body string) bool {
 	if c.SeqNum != nil && !c.SeqNum.Contains(seq) {
 		return false
 	}
@@ -366,24 +511,51 @@ func matchSearch(msg domain.Message, seq uint32, c *imap.SearchCriteria) bool {
 		if q == "" {
 			continue
 		}
-		if !strings.Contains(subj, q) && !strings.Contains(from, q) && !strings.Contains(strings.ToLower(msg.ToAddrs), q) {
+		if !strings.Contains(subj, q) && !strings.Contains(from, q) &&
+			!strings.Contains(strings.ToLower(msg.ToAddrs), q) && !strings.Contains(text, q) {
+			return false
+		}
+	}
+	for _, t := range c.Body {
+		q := strings.ToLower(t)
+		if q != "" && !strings.Contains(body, q) {
 			return false
 		}
 	}
 	for _, or := range c.Or {
 		left, right := or[0], or[1]
-		okLeft := left == nil || matchSearch(msg, seq, left)
-		okRight := right == nil || matchSearch(msg, seq, right)
+		okLeft := left == nil || matchSearch(msg, seq, left, text, body)
+		okRight := right == nil || matchSearch(msg, seq, right, text, body)
 		if !okLeft && !okRight {
 			return false
 		}
 	}
 	for _, not := range c.Not {
-		if not != nil && matchSearch(msg, seq, not) {
+		if not != nil && matchSearch(msg, seq, not, text, body) {
 			return false
 		}
 	}
 	return true
+}
+
+func needsContentSearch(c *imap.SearchCriteria) bool {
+	if c == nil {
+		return false
+	}
+	if len(c.Text) > 0 || len(c.Body) > 0 {
+		return true
+	}
+	for _, pair := range c.Or {
+		if needsContentSearch(pair[0]) || needsContentSearch(pair[1]) {
+			return true
+		}
+	}
+	for _, not := range c.Not {
+		if needsContentSearch(not) {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Mailbox) CreateMessage(flags []string, date time.Time, body imap.Literal) error {
@@ -391,15 +563,50 @@ func (m *Mailbox) CreateMessage(flags []string, date time.Time, body imap.Litera
 	if err != nil {
 		return err
 	}
+	meta := parseRFC822Meta(raw)
 	msg := &domain.Message{
 		MailboxID: m.user.mailbox.ID,
 		Folder:    m.name,
 		Flags:     flags,
 		Date:      date,
-		Subject:   "",
-		FromAddr:  "",
+		Subject:   meta.Subject,
+		FromAddr:  meta.From,
+		ToAddrs:   meta.To,
+		MessageID: meta.MessageID,
+	}
+	if msg.Date.IsZero() && !meta.Date.IsZero() {
+		msg.Date = meta.Date
 	}
 	return m.user.store.AppendMessage(context.Background(), msg, raw)
+}
+
+type rfc822Meta struct {
+	Subject   string
+	From      string
+	To        string
+	MessageID string
+	Date      time.Time
+}
+
+func parseRFC822Meta(raw []byte) rfc822Meta {
+	var out rfc822Meta
+	msg, err := mail.ReadMessage(bytes.NewReader(raw))
+	if err != nil {
+		return out
+	}
+	out.Subject = msg.Header.Get("Subject")
+	out.From = msg.Header.Get("From")
+	out.To = msg.Header.Get("To")
+	out.MessageID = msg.Header.Get("Message-Id")
+	if out.MessageID == "" {
+		out.MessageID = msg.Header.Get("Message-ID")
+	}
+	if ds := msg.Header.Get("Date"); ds != "" {
+		if t, err := mail.ParseDate(ds); err == nil {
+			out.Date = t
+		}
+	}
+	return out
 }
 
 func (m *Mailbox) UpdateMessagesFlags(uid bool, seqSet *imap.SeqSet, op imap.FlagsOp, flags []string) error {

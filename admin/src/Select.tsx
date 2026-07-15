@@ -12,6 +12,7 @@ type SelectProps<T extends string | number = string> = {
   placeholder?: string
   disabled?: boolean
   className?: string
+  id?: string
   'aria-label'?: string
 }
 
@@ -22,11 +23,13 @@ export function Select<T extends string | number = string>({
   placeholder,
   disabled,
   className = '',
+  id,
   'aria-label': ariaLabel,
 }: SelectProps<T>) {
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
   const rootRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLUListElement>(null)
   const listId = useId()
   const selected = options.find((o) => String(o.value) === String(value))
   const label = selected?.label ?? placeholder ?? ''
@@ -35,6 +38,7 @@ export function Select<T extends string | number = string>({
   useEffect(() => {
     if (!open) return
     setActiveIdx(selectedIdx >= 0 ? selectedIdx : 0)
+    listRef.current?.focus()
     function onDoc(e: MouseEvent) {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
     }
@@ -49,17 +53,42 @@ export function Select<T extends string | number = string>({
     setOpen(false)
   }
 
+  function move(delta: number) {
+    setActiveIdx((i) => {
+      const start = i < 0 ? (selectedIdx >= 0 ? selectedIdx : 0) : i
+      const next = Math.min(options.length - 1, Math.max(0, start + delta))
+      return next
+    })
+  }
+
   function onTriggerKey(e: KeyboardEvent<HTMLButtonElement>) {
     if (disabled) return
-    if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
+    if (e.key === 'ArrowDown') {
       e.preventDefault()
       if (!open) {
         setOpen(true)
         return
       }
-      if (e.key === 'Enter' || e.key === ' ') {
-        commit(activeIdx >= 0 ? activeIdx : selectedIdx)
+      move(1)
+      return
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (!open) {
+        setOpen(true)
+        return
       }
+      move(-1)
+      return
+    }
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      if (!open) {
+        setOpen(true)
+        return
+      }
+      commit(activeIdx >= 0 ? activeIdx : selectedIdx)
+      return
     }
     if (e.key === 'Escape') {
       setOpen(false)
@@ -74,11 +103,11 @@ export function Select<T extends string | number = string>({
     }
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveIdx((i) => Math.min(options.length - 1, (i < 0 ? selectedIdx : i) + 1))
+      move(1)
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActiveIdx((i) => Math.max(0, (i < 0 ? selectedIdx : i) - 1))
+      move(-1)
     }
     if (e.key === 'Home') {
       e.preventDefault()
@@ -100,6 +129,7 @@ export function Select<T extends string | number = string>({
     <div className={`wm-select ${className} ${open ? 'open' : ''} ${disabled ? 'disabled' : ''}`} ref={rootRef}>
       <button
         type="button"
+        id={id}
         className="wm-select-trigger"
         disabled={disabled}
         aria-haspopup="listbox"
@@ -114,7 +144,14 @@ export function Select<T extends string | number = string>({
         <span className="wm-select-chevron" aria-hidden />
       </button>
       {open ? (
-        <ul className="wm-select-menu" role="listbox" id={listId} tabIndex={-1} onKeyDown={onListKey}>
+        <ul
+          className="wm-select-menu"
+          role="listbox"
+          id={listId}
+          tabIndex={-1}
+          ref={listRef}
+          onKeyDown={onListKey}
+        >
           {options.map((o, idx) => {
             const active = String(o.value) === String(value)
             const focused = idx === activeIdx

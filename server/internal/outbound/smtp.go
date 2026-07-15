@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"net/smtp"
 	"sort"
@@ -108,11 +109,17 @@ func sendToHost(ctx context.Context, addr, ehlo, from string, to []string, raw [
 	host, _, _ := net.SplitHostPort(addr)
 	err := dialAndSend(ctx, addr, host, ehlo, from, to, raw, timeout, false, requireTLS)
 	if err == nil {
+		log.Printf("outbound ok host=%s ehlo=%s to=%s tls=verify", host, ehlo, strings.Join(to, ","))
 		return nil
 	}
 	// Opportunistic insecure retry only when TLS is not required.
 	if !requireTLS && IsTLSError(err) {
-		return dialAndSend(ctx, addr, host, ehlo, from, to, raw, timeout, true, requireTLS)
+		err2 := dialAndSend(ctx, addr, host, ehlo, from, to, raw, timeout, true, requireTLS)
+		if err2 == nil {
+			log.Printf("outbound ok host=%s ehlo=%s to=%s tls=insecure", host, ehlo, strings.Join(to, ","))
+			return nil
+		}
+		return err2
 	}
 	return err
 }

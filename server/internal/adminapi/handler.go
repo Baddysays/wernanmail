@@ -1,8 +1,12 @@
-﻿package adminapi
+package adminapi
 
 import (
 	"context"
+	"crypto/rand"
+	"database/sql"
+	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net"
 	"net/http"
 	"net/url"
@@ -16,10 +20,12 @@ import (
 	"github.com/go-chi/cors"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/Baddysays/wernanmail/server/internal/antispam"
 	"github.com/Baddysays/wernanmail/server/internal/dnsauth"
 	"github.com/Baddysays/wernanmail/server/internal/domain"
 	"github.com/Baddysays/wernanmail/server/internal/impersonate"
 	"github.com/Baddysays/wernanmail/server/internal/mailcfg"
+	"github.com/Baddysays/wernanmail/server/internal/mailfilter"
 	"github.com/Baddysays/wernanmail/server/internal/settings"
 	"github.com/Baddysays/wernanmail/server/internal/store"
 	"github.com/Baddysays/wernanmail/server/internal/store/sqlite"
@@ -61,13 +67,16 @@ func NewRouter(h *Handler) http.Handler {
 		r.Get("/api/admin/domains", h.listDomains)
 		r.Post("/api/admin/domains", h.createDomain)
 		r.Patch("/api/admin/domains/{id}", h.updateDomain)
+		r.Delete("/api/admin/domains/{id}", h.deleteDomain)
 		r.Post("/api/admin/domains/{id}/dkim", h.genDKIM)
 		r.Get("/api/admin/domains/{id}/mailboxes", h.listMailboxes)
 		r.Post("/api/admin/domains/{id}/mailboxes", h.createMailbox)
 		r.Patch("/api/admin/domains/{id}/mailboxes/{mid}", h.updateMailbox)
+		r.Delete("/api/admin/domains/{id}/mailboxes/{mid}", h.deleteMailbox)
 		r.Post("/api/admin/domains/{id}/mailboxes/{mid}/impersonate", h.impersonateMailbox)
 		r.Get("/api/admin/domains/{id}/aliases", h.listAliases)
 		r.Post("/api/admin/domains/{id}/aliases", h.createAlias)
+		r.Delete("/api/admin/domains/{id}/aliases/{aid}", h.deleteAlias)
 		r.Get("/api/admin/queue", h.listQueue)
 		r.Post("/api/admin/queue/{id}/retry", h.retryQueue)
 		r.Post("/api/admin/queue/{id}/delete", h.deleteQueue)
@@ -79,6 +88,9 @@ func NewRouter(h *Handler) http.Handler {
 		r.Get("/api/admin/quarantine", h.listQuarantine)
 		r.Post("/api/admin/quarantine/{id}/release", h.releaseQuarantine)
 		r.Post("/api/admin/quarantine/{id}/delete", h.deleteQuarantine)
+		r.Get("/api/admin/dmarc-reports", h.listDMARCReports)
+		r.Get("/api/admin/mailboxes/{id}/filters", h.listMailboxFilters)
+		r.Put("/api/admin/mailboxes/{id}/filters", h.putMailboxFilters)
 		r.Get("/api/admin/settings", h.getSettings)
 		r.Put("/api/admin/settings", h.putSettings)
 		r.Get("/api/admin/audit", h.listAudit)
@@ -153,12 +165,12 @@ func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) dashboard(w http.ResponseWriter, r *http.Request) {
 	pending, dead, _ := h.Queue.Count(r.Context())
-	q, _ := h.Store.ListQuarantine(r.Context(), 5)
+	qCount, _ := h.Store.CountQuarantine(r.Context())
 	domains, _ := h.Store.ListDomains(r.Context())
 	writeJSON(w, http.StatusOK, map[string]any{
 		"queuePending": pending,
 		"queueDead":    dead,
-		"quarantine":   len(q),
+		"quarantine":   qCount,
 		"domains":      len(domains),
 	})
 }
@@ -172,6 +184,9 @@ func (h *Handler) listDomains(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
 		return
+	}
+	if list == nil {
+		list = []domain.Domain{}
 	}
 	writeJSON(w, http.StatusOK, list)
 }
@@ -252,6 +267,29 @@ func (h *Handler) updateDomain(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
+func (h *Handler) deleteDomain(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	d, err := h.findDomain(r.Context(), id)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if d == nil {
+		writeErr(w, http.StatusNotFound, "admin.not_found", "domain not found")
+		return
+	}
+	if err := h.Store.DeleteDomain(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeErr(w, http.StatusNotFound, "admin.not_found", "domain not found")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	_ = h.Store.AddAudit(r.Context(), &domain.AuditEntry{Actor: h.actor(r), Action: "domain.delete", Target: d.Name})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
 func (h *Handler) genDKIM(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	d, err := h.findDomain(r.Context(), id)
@@ -293,9 +331,10 @@ func (h *Handler) listMailboxes(w http.ResponseWriter, r *http.Request) {
 	// strip hashes
 	out := make([]map[string]any, 0, len(list))
 	for _, m := range list {
+		used, _ := h.Store.UsageBytes(r.Context(), m.ID)
 		out = append(out, map[string]any{
 			"id": m.ID, "domainId": m.DomainID, "localPart": m.LocalPart,
-			"displayName": m.DisplayName, "quotaBytes": m.QuotaBytes, "enabled": m.Enabled,
+			"displayName": m.DisplayName, "quotaBytes": m.QuotaBytes, "usedBytes": used, "enabled": m.Enabled,
 			"createdAt": m.CreatedAt,
 		})
 	}
@@ -349,6 +388,10 @@ func (h *Handler) createMailbox(w http.ResponseWriter, r *http.Request) {
 		PasswordHash: hash, DisplayName: body.DisplayName, QuotaBytes: quota, Enabled: true,
 	}
 	if err := h.Store.UpsertMailbox(r.Context(), m); err != nil {
+		if isUniqueConstraint(err) {
+			writeErr(w, http.StatusConflict, "admin.conflict", "mailbox already exists")
+			return
+		}
 		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
 		return
 	}
@@ -424,11 +467,46 @@ func (h *Handler) updateMailbox(w http.ResponseWriter, r *http.Request) {
 	_ = h.Store.AddAudit(r.Context(), &domain.AuditEntry{
 		Actor: h.actor(r), Action: "mailbox.update", Target: m.Address(d.Name),
 	})
+	used, _ := h.Store.UsageBytes(r.Context(), m.ID)
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": m.ID, "domainId": m.DomainID, "localPart": m.LocalPart,
-		"displayName": m.DisplayName, "quotaBytes": m.QuotaBytes, "enabled": m.Enabled,
+		"displayName": m.DisplayName, "quotaBytes": m.QuotaBytes, "usedBytes": used, "enabled": m.Enabled,
 		"createdAt": m.CreatedAt,
 	})
+}
+
+func (h *Handler) deleteMailbox(w http.ResponseWriter, r *http.Request) {
+	domainID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	mid, _ := strconv.ParseInt(chi.URLParam(r, "mid"), 10, 64)
+	d, err := h.findDomain(r.Context(), domainID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if d == nil {
+		writeErr(w, http.StatusNotFound, "admin.not_found", "domain not found")
+		return
+	}
+	m, err := h.Store.GetMailboxByID(r.Context(), mid)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if m == nil || m.DomainID != domainID {
+		writeErr(w, http.StatusNotFound, "admin.not_found", "mailbox not found")
+		return
+	}
+	target := m.Address(d.Name)
+	if err := h.Store.DeleteMailbox(r.Context(), domainID, mid); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeErr(w, http.StatusNotFound, "admin.not_found", "mailbox not found")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	_ = h.Store.AddAudit(r.Context(), &domain.AuditEntry{Actor: h.actor(r), Action: "mailbox.delete", Target: target})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (h *Handler) impersonateMailbox(w http.ResponseWriter, r *http.Request) {
@@ -491,9 +569,9 @@ func (h *Handler) impersonateMailbox(w http.ResponseWriter, r *http.Request) {
 		Actor: actor, Action: "mailbox.impersonate", Target: username,
 	})
 	writeJSON(w, http.StatusOK, map[string]any{
-		"token":    tok,
-		"username": username,
-		"url":      loginURL,
+		"token":     tok,
+		"username":  username,
+		"url":       loginURL,
 		"expiresIn": 120,
 	})
 }
@@ -525,18 +603,64 @@ func (h *Handler) createAlias(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "admin.bad_request", "localPart and mailboxId required")
 		return
 	}
+	local := strings.ToLower(strings.TrimSpace(body.LocalPart))
+	mb, err := h.Store.GetMailboxByID(r.Context(), body.MailboxID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if mb == nil || mb.DomainID != domainID {
+		writeErr(w, http.StatusBadRequest, "admin.bad_request", "mailbox must belong to this domain")
+		return
+	}
+	mboxes, err := h.Store.ListMailboxes(r.Context(), domainID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	for _, m := range mboxes {
+		if strings.EqualFold(m.LocalPart, local) {
+			writeErr(w, http.StatusConflict, "admin.conflict", "alias conflicts with mailbox local part")
+			return
+		}
+	}
 	a := &domain.Alias{
-		DomainID: domainID, LocalPart: strings.ToLower(strings.TrimSpace(body.LocalPart)),
+		DomainID: domainID, LocalPart: local,
 		MailboxID: body.MailboxID, Enabled: true,
 	}
 	if err := h.Store.UpsertAlias(r.Context(), a); err != nil {
+		if isUniqueConstraint(err) {
+			writeErr(w, http.StatusConflict, "admin.conflict", "alias already exists")
+			return
+		}
 		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
 		return
 	}
 	_ = h.Store.AddAudit(r.Context(), &domain.AuditEntry{
-		Actor: h.actor(r), Action: "alias.create", Target: body.LocalPart,
+		Actor: h.actor(r), Action: "alias.create", Target: local,
 	})
 	writeJSON(w, http.StatusCreated, map[string]any{"id": a.ID, "localPart": a.LocalPart, "mailboxId": a.MailboxID})
+}
+
+func (h *Handler) deleteAlias(w http.ResponseWriter, r *http.Request) {
+	domainID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	aid, _ := strconv.ParseInt(chi.URLParam(r, "aid"), 10, 64)
+	if domainID == 0 || aid == 0 {
+		writeErr(w, http.StatusBadRequest, "admin.bad_request", "ids required")
+		return
+	}
+	if err := h.Store.DeleteAlias(r.Context(), domainID, aid); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			writeErr(w, http.StatusNotFound, "admin.not_found", "alias not found")
+			return
+		}
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	_ = h.Store.AddAudit(r.Context(), &domain.AuditEntry{
+		Actor: h.actor(r), Action: "alias.delete", Target: strconv.FormatInt(aid, 10),
+	})
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
 }
 
 func (h *Handler) backup(w http.ResponseWriter, r *http.Request) {
@@ -554,34 +678,40 @@ func (h *Handler) backup(w http.ResponseWriter, r *http.Request) {
 		Enabled     bool   `json:"enabled"`
 	}
 	type aliasOut struct {
-		LocalPart string `json:"localPart"`
-		MailboxID int64  `json:"mailboxId"`
-		Enabled   bool   `json:"enabled"`
+		LocalPart        string `json:"localPart"`
+		MailboxID        int64  `json:"mailboxId"`
+		MailboxLocalPart string `json:"mailboxLocalPart"`
+		Enabled          bool   `json:"enabled"`
 	}
 	type domOut struct {
-		Name         string     `json:"name"`
-		Enabled      bool       `json:"enabled"`
-		CatchAll     string     `json:"catchAll"`
-		DKIMSelector string     `json:"dkimSelector"`
-		HasDKIM      bool       `json:"hasDkim"`
-		Mailboxes    []mbOut    `json:"mailboxes"`
-		Aliases      []aliasOut `json:"aliases"`
+		Name              string     `json:"name"`
+		Enabled           bool       `json:"enabled"`
+		CatchAll          string     `json:"catchAll"`
+		DKIMSelector      string     `json:"dkimSelector"`
+		DefaultQuotaBytes int64      `json:"defaultQuotaBytes"`
+		HasDKIM           bool       `json:"hasDkim"`
+		Mailboxes         []mbOut    `json:"mailboxes"`
+		Aliases           []aliasOut `json:"aliases"`
 	}
 	outDomains := make([]domOut, 0, len(domains))
 	for _, d := range domains {
 		mboxes, _ := h.Store.ListMailboxes(r.Context(), d.ID)
 		aliases, _ := h.Store.ListAliases(r.Context(), d.ID)
+		mbByID := map[int64]string{}
 		mb := make([]mbOut, 0, len(mboxes))
 		for _, m := range mboxes {
+			mbByID[m.ID] = m.LocalPart
 			mb = append(mb, mbOut{ID: m.ID, LocalPart: m.LocalPart, DisplayName: m.DisplayName, QuotaBytes: m.QuotaBytes, Enabled: m.Enabled})
 		}
 		al := make([]aliasOut, 0, len(aliases))
 		for _, a := range aliases {
-			al = append(al, aliasOut{LocalPart: a.LocalPart, MailboxID: a.MailboxID, Enabled: a.Enabled})
+			al = append(al, aliasOut{
+				LocalPart: a.LocalPart, MailboxID: a.MailboxID, MailboxLocalPart: mbByID[a.MailboxID], Enabled: a.Enabled,
+			})
 		}
 		outDomains = append(outDomains, domOut{
 			Name: d.Name, Enabled: d.Enabled, CatchAll: d.CatchAll, DKIMSelector: d.DKIMSelector,
-			HasDKIM: d.DKIMPublic != "", Mailboxes: mb, Aliases: al,
+			DefaultQuotaBytes: d.DefaultQuotaBytes, HasDKIM: d.DKIMPublic != "", Mailboxes: mb, Aliases: al,
 		})
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
@@ -610,17 +740,31 @@ func (h *Handler) restoreBackup(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Settings map[string]string `json:"settings"`
 		Domains  []struct {
-			Name         string `json:"name"`
-			Enabled      bool   `json:"enabled"`
-			CatchAll     string `json:"catchAll"`
-			DKIMSelector string `json:"dkimSelector"`
+			Name              string `json:"name"`
+			Enabled           bool   `json:"enabled"`
+			CatchAll          string `json:"catchAll"`
+			DKIMSelector      string `json:"dkimSelector"`
+			DefaultQuotaBytes int64  `json:"defaultQuotaBytes"`
+			Mailboxes         []struct {
+				ID          int64  `json:"id"`
+				LocalPart   string `json:"localPart"`
+				DisplayName string `json:"displayName"`
+				QuotaBytes  int64  `json:"quotaBytes"`
+				Enabled     bool   `json:"enabled"`
+			} `json:"mailboxes"`
+			Aliases []struct {
+				LocalPart        string `json:"localPart"`
+				MailboxID        int64  `json:"mailboxId"`
+				MailboxLocalPart string `json:"mailboxLocalPart"`
+				Enabled          bool   `json:"enabled"`
+			} `json:"aliases"`
 		} `json:"domains"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, http.StatusBadRequest, "admin.bad_request", "bad json")
 		return
 	}
-	nSettings, nDomains := 0, 0
+	nSettings, nDomains, nMailboxes, nAliases := 0, 0, 0, 0
 	for k, v := range body.Settings {
 		if v == "[redacted]" || k == "" {
 			continue
@@ -639,6 +783,7 @@ func (h *Handler) restoreBackup(w http.ResponseWriter, r *http.Request) {
 		existing, _ := h.Store.GetDomainByName(r.Context(), name)
 		dom := &domain.Domain{
 			Name: name, Enabled: d.Enabled, CatchAll: d.CatchAll, DKIMSelector: d.DKIMSelector,
+			DefaultQuotaBytes: d.DefaultQuotaBytes,
 		}
 		if dom.DKIMSelector == "" {
 			dom.DKIMSelector = "wernan"
@@ -650,18 +795,111 @@ func (h *Handler) restoreBackup(w http.ResponseWriter, r *http.Request) {
 			if dom.DKIMSelector == "" {
 				dom.DKIMSelector = existing.DKIMSelector
 			}
+			if d.DefaultQuotaBytes == 0 {
+				dom.DefaultQuotaBytes = existing.DefaultQuotaBytes
+			}
 		}
 		if err := h.Store.UpsertDomain(r.Context(), dom); err != nil {
 			writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
 			return
 		}
 		nDomains++
+
+		localToID := map[string]int64{}
+		existingMBs, _ := h.Store.ListMailboxes(r.Context(), dom.ID)
+		for _, m := range existingMBs {
+			localToID[strings.ToLower(m.LocalPart)] = m.ID
+		}
+		exportIDToLocal := map[int64]string{}
+		for _, mb := range d.Mailboxes {
+			lp := strings.ToLower(strings.TrimSpace(mb.LocalPart))
+			if lp == "" {
+				continue
+			}
+			if mb.ID > 0 {
+				exportIDToLocal[mb.ID] = lp
+			}
+			if id, ok := localToID[lp]; ok {
+				cur, _ := h.Store.GetMailboxByID(r.Context(), id)
+				if cur != nil {
+					cur.DisplayName = mb.DisplayName
+					if mb.QuotaBytes >= 0 {
+						cur.QuotaBytes = mb.QuotaBytes
+					}
+					_ = h.Store.UpsertMailbox(r.Context(), cur)
+				}
+				continue
+			}
+			hash, err := randomPasswordHash()
+			if err != nil {
+				writeErr(w, http.StatusInternalServerError, "admin.hash", err.Error())
+				return
+			}
+			m := &domain.Mailbox{
+				DomainID: dom.ID, LocalPart: lp, PasswordHash: hash,
+				DisplayName: mb.DisplayName, QuotaBytes: mb.QuotaBytes, Enabled: false,
+			}
+			if err := h.Store.UpsertMailbox(r.Context(), m); err != nil {
+				if isUniqueConstraint(err) {
+					continue
+				}
+				writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+				return
+			}
+			localToID[lp] = m.ID
+			nMailboxes++
+		}
+
+		for _, a := range d.Aliases {
+			lp := strings.ToLower(strings.TrimSpace(a.LocalPart))
+			if lp == "" {
+				continue
+			}
+			targetLocal := strings.ToLower(strings.TrimSpace(a.MailboxLocalPart))
+			if targetLocal == "" && a.MailboxID > 0 {
+				targetLocal = exportIDToLocal[a.MailboxID]
+			}
+			if targetLocal == "" {
+				continue
+			}
+			targetID, ok := localToID[targetLocal]
+			if !ok {
+				continue
+			}
+			if _, exists := localToID[lp]; exists {
+				continue
+			}
+			al := &domain.Alias{DomainID: dom.ID, LocalPart: lp, MailboxID: targetID, Enabled: true}
+			if !a.Enabled {
+				al.Enabled = false
+			}
+			if err := h.Store.UpsertAlias(r.Context(), al); err != nil {
+				if isUniqueConstraint(err) {
+					continue
+				}
+				writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+				return
+			}
+			nAliases++
+		}
 	}
 	_ = h.Store.AddAudit(r.Context(), &domain.AuditEntry{
 		Actor: h.actor(r), Action: "backup.restore",
-		Detail: "settings=" + strconv.Itoa(nSettings) + " domains=" + strconv.Itoa(nDomains),
+		Detail: "settings=" + strconv.Itoa(nSettings) + " domains=" + strconv.Itoa(nDomains) +
+			" mailboxes=" + strconv.Itoa(nMailboxes) + " aliases=" + strconv.Itoa(nAliases),
 	})
-	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "settings": nSettings, "domains": nDomains})
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok": true, "settings": nSettings, "domains": nDomains,
+		"mailboxes": nMailboxes, "aliases": nAliases,
+	})
+}
+
+func randomPasswordHash() (string, error) {
+	var b [24]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return sqlite.HashPassword(hex.EncodeToString(b[:]))
 }
 
 func (h *Handler) dnsStatus(w http.ResponseWriter, r *http.Request) {
@@ -815,6 +1053,9 @@ func (h *Handler) listQueue(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
 		return
 	}
+	if list == nil {
+		list = []domain.QueueJob{}
+	}
 	writeJSON(w, http.StatusOK, list)
 }
 
@@ -850,14 +1091,14 @@ func (h *Handler) opsStatus(w http.ResponseWriter, r *http.Request) {
 	_ = h.Settings.Reload(r.Context())
 	tlsOK := h.Cfg.TLSCertFile != "" && h.Cfg.TLSKeyFile != ""
 	writeJSON(w, http.StatusOK, map[string]any{
-		"hostname":       h.Cfg.Hostname,
-		"ehlo":           h.Cfg.EHLOHost,
-		"tlsConfigured":  tlsOK,
-		"greylistSeconds": h.Settings.GetInt(settings.KeyGreylistSeconds, 0),
-		"bounceEnabled":  h.Settings.GetBool(settings.KeyBounceEnabled, true),
-		"rateSendPerHour": h.Settings.GetInt(settings.KeyRateSendPerHour, 200),
+		"hostname":         h.Cfg.Hostname,
+		"ehlo":             h.Cfg.EHLOHost,
+		"tlsConfigured":    tlsOK,
+		"greylistSeconds":  h.Settings.GetInt(settings.KeyGreylistSeconds, 0),
+		"bounceEnabled":    h.Settings.GetBool(settings.KeyBounceEnabled, true),
+		"rateSendPerHour":  h.Settings.GetInt(settings.KeyRateSendPerHour, 200),
 		"rateSubmitPerMin": h.Settings.GetInt(settings.KeyRateSubmitPerMin, 60),
-		"relayHost":      h.Settings.Get(settings.KeyRelayHost),
+		"relayHost":        h.Settings.Get(settings.KeyRelayHost),
 	})
 }
 
@@ -867,13 +1108,45 @@ func (h *Handler) listQuarantine(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, list)
+	if list == nil {
+		list = []domain.QuarantineItem{}
+	}
+	domains, _ := h.Store.ListDomains(r.Context())
+	domName := map[int64]string{}
+	for _, d := range domains {
+		domName[d.ID] = d.Name
+	}
+	type qOut struct {
+		ID          int64     `json:"id"`
+		MailboxID   int64     `json:"mailboxId"`
+		MailboxAddr string    `json:"mailboxAddr,omitempty"`
+		Subject     string    `json:"subject"`
+		FromAddr    string    `json:"fromAddr"`
+		VerdictJSON string    `json:"verdictJson"`
+		CreatedAt   time.Time `json:"createdAt"`
+	}
+	out := make([]qOut, 0, len(list))
+	for _, q := range list {
+		row := qOut{
+			ID: q.ID, MailboxID: q.MailboxID, Subject: q.Subject,
+			FromAddr: q.FromAddr, VerdictJSON: q.VerdictJSON, CreatedAt: q.CreatedAt,
+		}
+		if m, err := h.Store.GetMailboxByID(r.Context(), q.MailboxID); err == nil && m != nil {
+			if name := domName[m.DomainID]; name != "" {
+				row.MailboxAddr = m.Address(name)
+			} else {
+				row.MailboxAddr = m.LocalPart
+			}
+		}
+		out = append(out, row)
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (h *Handler) releaseQuarantine(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	q, raw, err := h.Store.GetQuarantineRaw(r.Context(), id)
-	if err != nil || q == nil {
+	if err != nil || q == nil || q.Resolution != "" {
 		writeErr(w, http.StatusNotFound, "admin.not_found", "not found")
 		return
 	}
@@ -882,6 +1155,10 @@ func (h *Handler) releaseQuarantine(w http.ResponseWriter, r *http.Request) {
 		Subject: q.Subject, FromAddr: q.FromAddr, Date: time.Now().UTC(),
 	}
 	if err := h.Store.AppendMessage(r.Context(), msg, raw); err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if err := h.Store.LearnSpamSignals(r.Context(), antispam.SignalKeys(q.FromAddr, q.Subject), -0.5); err != nil {
 		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
 		return
 	}
@@ -895,12 +1172,108 @@ func (h *Handler) releaseQuarantine(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) deleteQuarantine(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	q, _, err := h.Store.GetQuarantineRaw(r.Context(), id)
+	if err != nil || q == nil || q.Resolution != "" {
+		writeErr(w, http.StatusNotFound, "admin.not_found", "not found")
+		return
+	}
+	if err := h.Store.LearnSpamSignals(r.Context(), antispam.SignalKeys(q.FromAddr, q.Subject), 0.5); err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
 	if err := h.Store.ResolveQuarantine(r.Context(), id, "delete"); err != nil {
 		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
 		return
 	}
 	_ = h.Store.AddAudit(r.Context(), &domain.AuditEntry{Actor: h.actor(r), Action: "quarantine.delete", Target: strconv.FormatInt(id, 10)})
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true})
+}
+
+func (h *Handler) listDMARCReports(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	list, err := h.Store.ListDMARCReports(r.Context(), limit)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if list == nil {
+		list = []domain.DMARCReport{}
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (h *Handler) listMailboxFilters(w http.ResponseWriter, r *http.Request) {
+	mailboxID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	mailbox, err := h.Store.GetMailboxByID(r.Context(), mailboxID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if mailbox == nil {
+		writeErr(w, http.StatusNotFound, "admin.not_found", "mailbox not found")
+		return
+	}
+	list, err := h.Store.ListMailFilters(r.Context(), mailboxID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if list == nil {
+		list = []domain.MailFilter{}
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (h *Handler) putMailboxFilters(w http.ResponseWriter, r *http.Request) {
+	mailboxID, _ := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	mailbox, err := h.Store.GetMailboxByID(r.Context(), mailboxID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if mailbox == nil {
+		writeErr(w, http.StatusNotFound, "admin.not_found", "mailbox not found")
+		return
+	}
+	var filters []domain.MailFilter
+	if err := json.NewDecoder(r.Body).Decode(&filters); err != nil {
+		writeErr(w, http.StatusBadRequest, "admin.bad_request", "expected a JSON array of filters")
+		return
+	}
+	if len(filters) > 100 {
+		writeErr(w, http.StatusBadRequest, "admin.bad_request", "at most 100 filters are allowed")
+		return
+	}
+	for i := range filters {
+		filters[i].ID = 0
+		filters[i].MailboxID = mailboxID
+		filters[i].MatchField = strings.ToLower(strings.TrimSpace(filters[i].MatchField))
+		filters[i].MatchOp = strings.ToLower(strings.TrimSpace(filters[i].MatchOp))
+		filters[i].MatchValue = strings.TrimSpace(filters[i].MatchValue)
+		filters[i].Action = strings.ToLower(strings.TrimSpace(filters[i].Action))
+		filters[i].ActionArg = strings.TrimSpace(filters[i].ActionArg)
+		if err := mailfilter.Validate(filters[i]); err != nil {
+			writeErr(w, http.StatusBadRequest, "admin.bad_request", "filter "+strconv.Itoa(i)+": "+err.Error())
+			return
+		}
+	}
+	if err := h.Store.ReplaceMailFilters(r.Context(), mailboxID, filters); err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	_ = h.Store.AddAudit(r.Context(), &domain.AuditEntry{
+		Actor: h.actor(r), Action: "mailbox.filters.update",
+		Target: strconv.FormatInt(mailboxID, 10), Detail: strconv.Itoa(len(filters)),
+	})
+	list, err := h.Store.ListMailFilters(r.Context(), mailboxID)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if list == nil {
+		list = []domain.MailFilter{}
+	}
+	writeJSON(w, http.StatusOK, list)
 }
 
 func (h *Handler) getSettings(w http.ResponseWriter, r *http.Request) {
@@ -929,6 +1302,9 @@ func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
 		return
+	}
+	if list == nil {
+		list = []domain.AuditEntry{}
 	}
 	writeJSON(w, http.StatusOK, list)
 }
@@ -966,6 +1342,14 @@ func (h *Handler) passwordPolicyError(password string) string {
 		}
 	}
 	return ""
+}
+
+func isUniqueConstraint(err error) bool {
+	if err == nil {
+		return false
+	}
+	s := strings.ToLower(err.Error())
+	return strings.Contains(s, "unique") || strings.Contains(s, "constraint failed")
 }
 
 func writeJSON(w http.ResponseWriter, code int, v any) {

@@ -3,6 +3,10 @@ package session
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
+	"os"
+	"path/filepath"
 	"sync"
 	"time"
 )
@@ -29,12 +33,13 @@ type Session struct {
 	ImpersonatedBy string
 }
 
-// Store is an in-memory session map with encrypted passwords.
+// Store keeps a small in-memory index and can atomically persist it to disk.
 type Store struct {
 	mu     sync.RWMutex
 	byID   map[string]*Session
 	ttl    time.Duration
 	secret string
+	path   string
 }
 
 func NewStore(ttl time.Duration) *Store {
@@ -50,6 +55,31 @@ func NewStoreWithSecret(ttl time.Duration, secret string) *Store {
 		ttl:    ttl,
 		secret: secret,
 	}
+}
+
+// NewFileStore opens a persistent session store. Credentials are encrypted
+// with secret before they are written; callers should use a stable secret.
+func NewFileStore(path string, ttl time.Duration, secret string) (*Store, error) {
+	s := NewStoreWithSecret(ttl, secret)
+	s.path = filepath.Clean(path)
+	b, err := os.ReadFile(s.path)
+	if errors.Is(err, os.ErrNotExist) {
+		return s, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var sessions []*Session
+	if err := json.Unmarshal(b, &sessions); err != nil {
+		return nil, err
+	}
+	now := time.Now().UTC()
+	for _, sess := range sessions {
+		if sess != nil && sess.ID != "" && sess.ExpiresAt.After(now) {
+			s.byID[sess.ID] = sess
+		}
+	}
+	return s, nil
 }
 
 type CreateOpts struct {
@@ -83,6 +113,11 @@ func (s *Store) CreateWith(creds Credentials, opts CreateOpts) (*Session, error)
 	}
 	s.mu.Lock()
 	s.byID[id] = sess
+	if err := s.persistLocked(); err != nil {
+		delete(s.byID, id)
+		s.mu.Unlock()
+		return nil, err
+	}
 	s.mu.Unlock()
 	// Return a copy with plaintext password for immediate use by caller if needed.
 	out := *sess
@@ -114,7 +149,35 @@ func (s *Store) Get(id string) (*Session, bool) {
 func (s *Store) Delete(id string) {
 	s.mu.Lock()
 	delete(s.byID, id)
+	_ = s.persistLocked()
 	s.mu.Unlock()
+}
+
+func (s *Store) persistLocked() error {
+	if s.path == "" {
+		return nil
+	}
+	sessions := make([]*Session, 0, len(s.byID))
+	now := time.Now().UTC()
+	for id, sess := range s.byID {
+		if !sess.ExpiresAt.After(now) {
+			delete(s.byID, id)
+			continue
+		}
+		sessions = append(sessions, sess)
+	}
+	b, err := json.Marshal(sessions)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(s.path), 0o750); err != nil {
+		return err
+	}
+	tmp := s.path + ".tmp"
+	if err := os.WriteFile(tmp, b, 0o600); err != nil {
+		return err
+	}
+	return os.Rename(tmp, s.path)
 }
 
 func newID() (string, error) {

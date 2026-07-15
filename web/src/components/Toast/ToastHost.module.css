@@ -54,6 +54,22 @@
   line-height: 1;
 }
 
+.action {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.55rem;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.action:hover {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
 @media (hover: hover) and (pointer: fine) {
   .dismiss:hover {
     background: var(--bg-hover);

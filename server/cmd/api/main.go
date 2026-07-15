@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"context"
@@ -23,15 +23,22 @@ func main() {
 
 	cfg := config.Load()
 	if cfg.SessionSecret == "" {
-		log.Printf("api: WARNING SESSION_SECRET unset — session passwords stored without encryption")
+		log.Printf("api: WARNING SESSION_SECRET unset — persisted session passwords are not encrypted")
 	}
-	store := session.NewStoreWithSecret(time.Duration(cfg.SessionTTLHours)*time.Hour, cfg.SessionSecret)
-	h := &api.Handler{Cfg: cfg, Store: store}
-
 	dataDir := strings.TrimSpace(os.Getenv("DATA_DIR"))
 	if dataDir == "" {
 		dataDir = "./data"
 	}
+	sessionStore, err := session.NewFileStore(
+		dataDir+"/api-sessions.json",
+		time.Duration(cfg.SessionTTLHours)*time.Hour,
+		cfg.SessionSecret,
+	)
+	if err != nil {
+		log.Fatalf("api: open persistent session store: %v", err)
+	}
+	h := &api.Handler{Cfg: cfg, Store: sessionStore}
+
 	if st, err := sqlite.Open(dataDir); err != nil {
 		log.Printf("api: WARNING settings store unavailable (%v) — outbound templates disabled in webmail", err)
 	} else {

@@ -28,13 +28,14 @@ export type AdminCreds = {
 }
 
 export type Domain = {
-  id: string
+  id: string | number
   name: string
   enabled?: boolean
   catchAll?: string
   defaultQuotaBytes?: number
   dkimSelector?: string
   dkimPublic?: string
+  mailboxCount?: number
   // legacy JSON shapes from older admin API payloads
   Name?: string
   ID?: string
@@ -43,19 +44,32 @@ export type Domain = {
 }
 
 export type Mailbox = {
-  id: string
+  id: string | number
   localPart: string
   displayName?: string
   enabled?: boolean
   quotaBytes?: number
-  domainId?: string
+  usedBytes?: number
+  domainId?: string | number
   createdAt?: string
 }
 
+export type MailFilter = {
+  id?: string | number
+  mailboxId?: string | number
+  enabled: boolean
+  priority: number
+  matchField: 'from' | 'subject' | 'to'
+  matchOp: 'contains' | 'equals'
+  matchValue: string
+  action: 'fileinto' | 'reject' | 'flag_spam'
+  actionArg: string
+}
+
 export type Alias = {
-  id: string
+  id: string | number
   localPart: string
-  mailboxId: string
+  mailboxId: string | number
 }
 
 export type QueueJob = {
@@ -64,6 +78,16 @@ export type QueueJob = {
   attempts: number
   maxAttempts: number
   lastError?: string
+  nextAt?: string
+  createdAt?: string
+  updatedAt?: string
+  payloadJson?: string
+}
+
+export type SpamReason = {
+  code?: string
+  detail?: string
+  score?: number
 }
 
 export type QuarantineItem = {
@@ -75,6 +99,8 @@ export type QuarantineItem = {
   score?: number
   reason?: string
   createdAt?: string
+  mailboxId?: string | number
+  mailboxAddr?: string
 }
 
 export type AuditEntry = {
@@ -110,6 +136,16 @@ export type DnsStatus = {
   spf?: DnsCheck
   dkim?: DnsCheck
   dmarc?: DnsCheck
+}
+
+export type DmarcReport = {
+  id?: string | number
+  ip?: string
+  sourceIp?: string
+  count?: number
+  messageCount?: number
+  dkim?: string
+  spf?: string
 }
 
 export type HostProcess = {

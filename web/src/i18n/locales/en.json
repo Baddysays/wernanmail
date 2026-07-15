@@ -33,6 +33,7 @@
     "tagline": "Light mail that stays out of the way.",
     "server": "Server",
     "asAdmin": "Sign in as administrator",
+    "about": "About",
     "impersonating": "Signing in as mailbox user…"
   },
   "impersonate": {
@@ -77,6 +78,7 @@
     "to": "to",
     "attachments": "{{count}} attachment",
     "attachments_other": "{{count}} attachments",
+    "messageBody": "Message body",
     "reply": "Reply",
     "replyAll": "Reply all",
     "forward": "Forward",
@@ -91,9 +93,22 @@
     "trashed": "Moved to Trash",
     "newMail": "New message",
     "newMailCount": "{{count}} new messages",
+    "emptySent": "No sent mail yet",
+    "emptySentHint": "Messages you send will show up here",
+    "emptyDrafts": "No drafts",
+    "emptyDraftsHint": "Save a draft from compose to continue later",
+    "emptyTrash": "Trash is empty",
+    "emptyTrashHint": "Deleted messages land here",
     "emptySpam": "Spam is empty",
     "emptySpamHint": "Messages filtered as junk appear here. Check this folder if a reply seems missing.",
-    "searchPlaceholder": "Search (/)…"
+    "searchPlaceholder": "Search (/)…",
+    "offline": "No connection — showing last loaded mail",
+    "downloadFailed": "Could not download the attachment",
+    "backToList": "Back to list",
+    "undo": "Undo",
+    "restored": "Message restored",
+    "imagesBlocked": "Remote images are blocked to protect privacy",
+    "showImages": "Show images"
   },
   "errors": {
     "generic": "Something went wrong",
@@ -133,7 +148,24 @@
     "send": "Send",
     "sending": "Sending…",
     "toRequired": "Add at least one recipient",
-    "sendFailed": "Could not send the message"
+    "sendFailed": "Could not send the message",
+    "formatting": "Formatting",
+    "bold": "Bold",
+    "italic": "Italic",
+    "underline": "Underline",
+    "list": "Bullet list",
+    "link": "Insert link",
+    "linkPrompt": "Link URL",
+    "attach": "Attach",
+    "removeFile": "Remove {{name}}",
+    "fileTooLarge": "File {{name}} is too large (max 15 MB)",
+    "filesTooLarge": "Attachments exceed the 25 MB total limit",
+    "saveDraft": "Save draft",
+    "saving": "Saving…",
+    "draftFailed": "Could not save the draft",
+    "draftSaved": "Draft saved",
+    "viewDraft": "Open Drafts",
+    "discardConfirm": "Discard this message?"
   },
   "mailport": {
     "title": "Embed mail into your product",
@@ -141,5 +173,50 @@
     "step1": "Point an iframe at /mailport (this page).",
     "step2": "Pass theme/compact query params to match the host UI.",
     "step3": "Later: scoped API tokens so the iframe can open a real mailbox without a full login form."
+  },
+  "landing": {
+    "navLabel": "Site",
+    "nav": {
+      "why": "Why light",
+      "moods": "Moods",
+      "install": "Install"
+    },
+    "headline": "Mail that stays out of the way.",
+    "lede": "Self-hosted SMTP, IMAP, webmail, and admin — built to live in under half a gigabyte of RAM.",
+    "cta": {
+      "open": "Open webmail",
+      "install": "Install on a VPS",
+      "github": "GitHub",
+      "admin": "Admin"
+    },
+    "why": {
+      "kicker": "For small servers",
+      "title": "A whole mail stack that still leaves room to breathe.",
+      "body": "No Mailcow-class footprint. Pure Go daemons, SQLite, Maildir, antispam, and a quiet UI — made for 1–2 GB hosts that still deserve real corporate mail.",
+      "meter": "Target: under 500 MB while the stack is running."
+    },
+    "peek": {
+      "label": "Webmail preview",
+      "inbox": "Inbox",
+      "sent": "Sent",
+      "drafts": "Drafts",
+      "subject": "Quiet by design",
+      "message": "Folders, compose, and moods that tint the whole workspace — without turning your inbox into a dashboard."
+    },
+    "moods": {
+      "kicker": "Atmosphere",
+      "title": "Five moods. One calm inbox.",
+      "body": "Harbor at dawn, reef through the afternoon, ember after dark. Pick a mood — the brand site and the mail client shift together."
+    },
+    "install": {
+      "kicker": "Go live",
+      "title": "One command on a clean Linux host.",
+      "body": "Docker builds the stack, bootstraps secrets, and brings up SMTP, IMAP, API, webmail, and admin. Then point DNS and TLS at wernanmail.ru.",
+      "copy": "Copy",
+      "copied": "Copied"
+    },
+    "footer": {
+      "line": "lightweight self-hosted mail"
+    }
   }
 }

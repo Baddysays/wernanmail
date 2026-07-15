@@ -37,10 +37,12 @@
     "add": "Add",
     "release": "Release",
     "delete": "Delete",
-    "download": "Download JSON"
+    "download": "Download JSON",
+    "confirmDelete": "Delete? This cannot be undone."
   },
   "health": {
     "ready": "ok",
+    "ok": "OK",
     "addDomain": "add domain",
     "publishTxt": "publish TXT",
     "keyReady": "key ready",
@@ -53,7 +55,10 @@
     "mismatch": "mismatch",
     "checking": "checking…",
     "noKey": "no local key",
-    "notInDns": "not in DNS"
+    "notInDns": "not in DNS",
+    "tlsWarn": "check",
+    "allOk": "All systems operational",
+    "attention": "Needs attention"
   },
   "resources": {
     "title": "Wernanmail resources",
@@ -68,17 +73,30 @@
     "services": "Services",
     "noProcs": "No mail processes detected"
   },
+  "deliverability": {
+    "title": "Deliverability",
+    "ready": "published",
+    "missing": "needs attention",
+    "postmaster": "Google Postmaster Tools ↗",
+    "recipientHint": "Ask early recipients to mark messages Not spam and add the sender to contacts.",
+    "reports": "Recent DMARC reports",
+    "noReports": "No aggregate reports yet"
+  },
   "overview": {
     "healthyTitle": "Mail is healthy",
+    "healthyTitleBefore": "Mail is ",
+    "healthyTitleEm": "healthy",
     "attentionTitle": "Mail needs attention",
     "healthyBody": "Services look fine. Publish DKIM in DNS if it is still missing.",
-    "healthyBodyOk": "Services and DNS look good. Keep an eye on queue and quarantine.",
+    "healthyBodyOk": "All systems are operating normally. Your mail server is receiving and delivering email as expected.",
     "attentionBody": "Queue or failed jobs are elevated — check Queue or Quarantine, then DNS.",
-    "queueTitle": "Queue",
+    "queueTitle": "Queue depth",
+    "queueWindow": "Last ~8 minutes",
     "pendingNow": "Pending",
     "deadShort": "dead {{n}}",
     "quarantineTitle": "Quarantine",
-    "viewQuarantine": "Open quarantine →",
+    "quarantineTotal": "Total messages",
+    "viewQuarantine": "View quarantine →",
     "dnsTitle": "DNS",
     "dnsBody": "SPF, DKIM, and DMARC for the domain. MX should point to this host.",
     "domainsCount": "Domains",
@@ -101,16 +119,20 @@
   },
   "domains": {
     "title": "Domains",
-    "subtitle": "DKIM, catch-all, default quota, and quick mailbox creation.",
+    "subtitle": "Manage your mail domains, authentication, and storage quotas.",
     "placeholder": "example.com",
     "catchAll": "Catch-all",
     "catchAllPh": "local part, optional",
     "add": "Add domain",
     "colDomain": "Domain",
+    "colMailboxes": "Mailboxes",
     "colDkim": "DKIM",
     "colStatus": "Status",
     "enabled": "Enabled",
-    "dkimReady": "key ready",
+    "dkimReady": "DKIM ready",
+    "confirmRotateDkim": "Rotate DKIM? DNS must be updated to the new public key or mail signing will fail.",
+    "delete": "Delete domain",
+    "confirmDelete": "Delete domain {{name}} and all {{n}} mailbox(es)? This cannot be undone.",
     "active": "Active",
     "off": "Off",
     "empty": "No domains yet.",
@@ -120,6 +142,8 @@
     "dnsRecords": "DNS records",
     "mailboxes": "Mailboxes",
     "selector": "DKIM selector",
+    "selectorHint": "Publish this selector’s TXT record from DNS helper after generating a key.",
+    "selectHint": "Pick a domain on the left to edit settings, DKIM, and quick-add mailboxes.",
     "quickAdd": "New mailbox",
     "localPart": "Local part",
     "password": "Password",
@@ -131,6 +155,8 @@
     "aliasTarget": "Target mailbox",
     "addAlias": "Add alias",
     "noAliases": "No aliases yet",
+    "aliasNeedTarget": "Enter a local part and target mailbox",
+    "aliasConflictsMailbox": "Alias conflicts with an existing mailbox",
     "settings": "Domain settings",
     "defaultQuotaMb": "Default quota for new mailboxes (MB)",
     "quotaInherit": "use global default",
@@ -142,12 +168,23 @@
     "subtitle": "Quotas, passwords, aliases, and open-as-user into webmail.",
     "selectDomain": "Domain…",
     "chooseDomain": "Choose a domain to list mailboxes.",
+    "search": "Search mailboxes…",
+    "filter": "Filter",
+    "filterAll": "All mailboxes",
+    "filterActive": "Active",
+    "filterDisabled": "Disabled",
+    "count": "{{n}} shown · {{total}} total",
     "colMailbox": "Mailbox",
-    "colQuota": "Quota",
+    "colQuota": "Quota used",
     "colStatus": "Status",
     "empty": "No mailboxes",
     "select": "Select a mailbox",
+    "selectHint": "Choose a mailbox to manage quotas, aliases, filters, and open webmail as that user.",
     "details": "Mailbox settings",
+    "tabGeneral": "General",
+    "tabAliases": "Aliases ({{n}})",
+    "tabFilters": "Filters",
+    "saved": "Saved",
     "quota": "Quota",
     "quotaMb": "Quota (MB)",
     "quotaDefault": "domain default",
@@ -159,21 +196,68 @@
     "newPassword": "New password",
     "passwordOptional": "leave blank to keep current",
     "openAsUser": "Open webmail as user",
+    "delete": "Delete mailbox",
+    "confirmDelete": "Delete mailbox {{addr}} and all its mail? This cannot be undone.",
+    "popupBlocked": "Popup blocked — allow popups for this site",
     "superuserOff": "Enable superuser mode in Settings first",
     "webmailUrlMissing": "Set the webmail URL in Settings",
     "invalidQuota": "Invalid quota (non-negative MB)"
+  },
+  "filters": {
+    "title": "Filters",
+    "hint": "Rules run from top to bottom. The first enabled match wins.",
+    "loading": "Loading filters…",
+    "empty": "No filters. Mail is delivered normally.",
+    "add": "Add rule",
+    "rule": "Rule {{n}}",
+    "enabled": "Enabled",
+    "moveUp": "Move rule up",
+    "moveDown": "Move rule down",
+    "field": "Message field",
+    "operator": "Match",
+    "value": "Value",
+    "action": "Action",
+    "folder": "Folder",
+    "folderHint": "Use a simple folder name without slashes.",
+    "save": "Save filters",
+    "saving": "Saving…",
+    "saved": "Filters saved",
+    "fields": {
+      "from": "From",
+      "to": "To",
+      "subject": "Subject"
+    },
+    "operators": {
+      "contains": "contains",
+      "equals": "equals"
+    },
+    "actions": {
+      "fileinto": "Move to folder",
+      "reject": "Reject message",
+      "flagSpam": "Move to Spam"
+    }
   },
   "queue": {
     "title": "Queue",
     "subtitle": "Local and outbound delivery. Retry or delete failed jobs.",
     "colId": "ID",
     "colKind": "Kind",
+    "colStatus": "Status",
     "colAttempts": "Attempts",
     "colError": "Error",
+    "colWhen": "Updated",
     "colActions": "Actions",
     "retry": "Retry",
-    "dead": "dead",
-    "empty": "Queue empty"
+    "dead": "Dead",
+    "pending": "Pending",
+    "empty": "Queue empty — nothing waiting to send or deliver.",
+    "count": "{{n}} jobs · {{dead}} dead",
+    "confirmDelete": "Delete this queue job?",
+    "kinds": {
+      "inbound_deliver": "Inbound delivery",
+      "outbound_send": "Outbound send",
+      "bounce": "Bounce"
+    }
   },
   "quarantine": {
     "title": "Quarantine",
@@ -181,12 +265,20 @@
     "colFrom": "From",
     "colSubject": "Subject",
     "colVerdict": "Verdict",
-    "empty": "Nothing quarantined"
+    "colScore": "Score",
+    "colReasons": "Reasons",
+    "colWhen": "Held",
+    "colMailbox": "Mailbox",
+    "noSubject": "(no subject)",
+    "empty": "Quarantine empty — no held messages.",
+    "count": "{{n}} held",
+    "confirmDelete": "Delete this quarantined message?"
   },
   "settings": {
     "title": "Settings",
     "subtitle": "Mail, delivery, rate limits, antispam, security, and UI — grouped by category.",
     "save": "Save settings",
+    "saved": "Saved",
     "empty": "No settings keys",
     "langHint": "Admin language is stored in this browser.",
     "groups": {
@@ -229,7 +321,7 @@
       "antispam.quarantine_at": "Quarantine score ≥",
       "antispam.rbls": "RBL hosts (comma-separated)",
       "antispam.reject_message": "SMTP reject message",
-      "antivirus.enabled": "Antivirus enabled",
+      "antivirus.enabled": "Attachment policy (block dangerous files)",
       "quarantine.retention_days": "Keep quarantine (days)",
       "security.password_min_length": "Min mailbox password length",
       "security.password_require_digit": "Password must contain a digit",
@@ -240,13 +332,16 @@
   },
   "backup": {
     "title": "Backup & restore",
-    "subtitle": "Export / import domains and settings (no passwords / private keys).",
+    "subtitle": "Export / import domains, mailboxes, aliases, and settings (no passwords / private keys).",
     "hint": "Store this JSON offline. Maildir bodies are not included — back up the data volume separately.",
     "download": "Download backup JSON",
     "restore": "Restore from JSON…",
-    "restoreHint": "Restore merges settings and creates missing domains. Mailbox passwords and DKIM private keys are never in the export.",
-    "restored": "Restored {{s}} settings and {{d}} domains.",
+    "restoreHint": "Restore merges settings/domains, creates missing mailboxes (disabled, password must be set), and remaps aliases. DKIM private keys and Maildir messages are not restored.",
+    "restored": "Restored {{s}} settings, {{d}} domains, {{m}} mailboxes, {{a}} aliases.",
     "loading": "Preparing…"
+  },
+  "list": {
+    "capped": "showing first {{n}}"
   },
   "audit": {
     "title": "Audit",
@@ -255,6 +350,8 @@
     "colActor": "Actor",
     "colAction": "Action",
     "colTarget": "Target",
+    "colDetail": "Detail",
+    "count": "{{n}} entries",
     "empty": "No audit entries"
   },
   "dns": {
@@ -263,7 +360,7 @@
     "genFirst": "generate key first",
     "host": "Host",
     "type": "Type",
-    "footer": "Also set MX → mail.{{name}} and PTR on the outbound IP."
+    "footer": "Also set PTR on the outbound IP."
   },
   "lang": {
     "label": "Language"

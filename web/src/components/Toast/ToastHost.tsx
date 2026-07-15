@@ -9,6 +9,8 @@ export type ToastItem = {
   title: string
   detail?: string
   durationMs: number
+  actionLabel?: string
+  onAction?: () => void
 }
 
 type ToastHostProps = {
@@ -44,6 +46,18 @@ function ToastCard({
         <p className={styles.title}>{toast.title}</p>
         {toast.detail ? <p className={styles.detail}>{toast.detail}</p> : null}
       </div>
+      {toast.actionLabel && toast.onAction ? (
+        <button
+          type="button"
+          className={styles.action}
+          onClick={() => {
+            toast.onAction?.()
+            onDismiss(toast.id)
+          }}
+        >
+          {toast.actionLabel}
+        </button>
+      ) : null}
       <button
         type="button"
         className={styles.dismiss}

@@ -33,6 +33,13 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
+	if h.loginGuard == nil {
+		h.loginGuard = newLoginGuard()
+	}
+	if !h.loginGuard.allow(r) {
+		writeError(w, http.StatusTooManyRequests, CodeAuthFailed)
+		return
+	}
 	var req loginRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, CodeInvalidRequest)
@@ -67,9 +74,13 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := mail.VerifyLogin(creds); err != nil {
+		if h.loginGuard != nil {
+			h.loginGuard.fail(r)
+		}
 		writeError(w, http.StatusUnauthorized, CodeAuthFailed)
 		return
 	}
+	h.loginGuard.succeed(r)
 
 	sess, err := h.Store.Create(creds)
 	if err != nil {

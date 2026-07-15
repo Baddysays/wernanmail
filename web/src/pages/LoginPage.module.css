@@ -6,11 +6,16 @@
   background: var(--bg-page);
 }
 
-.modeSwitch {
+.topLinks {
   position: fixed;
   top: 0.85rem;
   right: 1.15rem;
   z-index: 20;
+  display: flex;
+  gap: 0.45rem;
+}
+
+.modeSwitch {
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.01em;

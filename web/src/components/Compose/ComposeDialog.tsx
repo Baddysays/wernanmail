@@ -1,13 +1,24 @@
 import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ApiError, sendMessage } from '../../api/client'
+import { ApiError, saveDraft, sendMessage } from '../../api/client'
+import { formatBytes } from '../../utils/format'
 import styles from './ComposeDialog.module.css'
+
+export type ComposeAttachment = {
+  filename: string
+  contentType: string
+  content: string
+}
 
 export type ComposeDraft = {
   to?: string
   cc?: string
   subject?: string
   body?: string
+  html?: string
+  inReplyTo?: string
+  references?: string
+  attachments?: ComposeAttachment[]
 }
 
 type ComposeDialogProps = {
@@ -15,7 +26,15 @@ type ComposeDialogProps = {
   draft?: ComposeDraft | null
   onClose: () => void
   onSent?: (info: { to: string[] }) => void
+  onDraftSaved?: () => void
 }
+
+type PendingFile =
+  | { id: string; kind: 'file'; file: File }
+  | { id: string; kind: 'ready'; att: ComposeAttachment; size: number }
+
+const MAX_FILE_BYTES = 15 * 1024 * 1024
+const MAX_TOTAL_BYTES = 25 * 1024 * 1024
 
 function splitAddresses(raw: string): string[] {
   return raw
@@ -24,17 +43,56 @@ function splitAddresses(raw: string): string[] {
     .filter(Boolean)
 }
 
-export function ComposeDialog({ open, draft, onClose, onSent }: ComposeDialogProps) {
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function plainToHtml(text: string): string {
+  if (!text) return ''
+  return escapeHtml(text).replace(/\n/g, '<br>')
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return btoa(binary)
+}
+
+async function fileToAttachment(file: File) {
+  const buf = await file.arrayBuffer()
+  return {
+    filename: file.name,
+    contentType: file.type || 'application/octet-stream',
+    content: bytesToBase64(new Uint8Array(buf)),
+  }
+}
+
+function estimateB64Size(b64: string) {
+  return Math.floor((b64.length * 3) / 4)
+}
+
+export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: ComposeDialogProps) {
   const { t } = useTranslation()
   const titleId = useId()
   const toRef = useRef<HTMLInputElement>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [to, setTo] = useState('')
   const [cc, setCc] = useState('')
   const [showCc, setShowCc] = useState(false)
   const [subject, setSubject] = useState('')
-  const [body, setBody] = useState('')
-  const [sending, setSending] = useState(false)
+  const [files, setFiles] = useState<PendingFile[]>([])
+  const [status, setStatus] = useState<'idle' | 'sending' | 'saving'>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [dirty, setDirty] = useState(false)
+  const busy = status !== 'idle'
 
   useEffect(() => {
     if (!open) return
@@ -42,41 +100,128 @@ export function ComposeDialog({ open, draft, onClose, onSent }: ComposeDialogPro
     setCc(draft?.cc ?? '')
     setShowCc(Boolean(draft?.cc))
     setSubject(draft?.subject ?? '')
-    setBody(draft?.body ?? '')
+    setFiles(
+      (draft?.attachments ?? []).map((att, i) => ({
+        id: `ready-${i}-${att.filename}`,
+        kind: 'ready' as const,
+        att,
+        size: estimateB64Size(att.content),
+      })),
+    )
     setError(null)
-    setSending(false)
-    const timer = window.setTimeout(() => toRef.current?.focus(), 40)
+    setStatus('idle')
+    setDirty(false)
+    const timer = window.setTimeout(() => {
+      const el = editorRef.current
+      if (el) {
+        el.innerHTML = draft?.html?.trim()
+          ? draft.html
+          : plainToHtml(draft?.body ?? '')
+      }
+      toRef.current?.focus()
+    }, 40)
     return () => window.clearTimeout(timer)
   }, [open, draft])
+
+  function requestClose() {
+    if (busy) return
+    if (
+      dirty &&
+      !window.confirm(t('compose.discardConfirm'))
+    ) {
+      return
+    }
+    onClose()
+  }
 
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape' && !sending) onClose()
+      if (e.key === 'Escape') requestClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, sending, onClose])
+  }, [open, busy, dirty, onClose])
 
   if (!open) return null
+
+  function exec(cmd: string, value?: string) {
+    editorRef.current?.focus()
+    document.execCommand(cmd, false, value)
+  }
+
+  function addFiles(list: FileList | null) {
+    if (!list?.length) return
+    setError(null)
+    const next = [...files]
+    let total = next.reduce(
+      (sum, f) => sum + (f.kind === 'file' ? f.file.size : f.size),
+      0,
+    )
+    for (const file of Array.from(list)) {
+      if (file.size > MAX_FILE_BYTES) {
+        setError(t('compose.fileTooLarge', { name: file.name }))
+        continue
+      }
+      if (total + file.size > MAX_TOTAL_BYTES) {
+        setError(t('compose.filesTooLarge'))
+        break
+      }
+      total += file.size
+      next.push({
+        id: `${file.name}-${file.size}-${file.lastModified}-${Math.random()}`,
+        kind: 'file',
+        file,
+      })
+    }
+    setFiles(next)
+    setDirty(true)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function buildPayload(requireTo: boolean) {
+    const recipients = splitAddresses(to)
+    if (requireTo && recipients.length === 0) {
+      setError(t('compose.toRequired'))
+      return null
+    }
+    const editor = editorRef.current
+    const htmlRaw = (editor?.innerHTML ?? '').trim()
+    const text = (editor?.innerText ?? '').replace(/\u00a0/g, ' ').trim()
+    const html =
+      htmlRaw && htmlRaw !== '<br>' && htmlRaw !== '<div><br></div>'
+        ? htmlRaw
+        : undefined
+    const attachments: ComposeAttachment[] = []
+    for (const item of files) {
+      if (item.kind === 'ready') attachments.push(item.att)
+      else attachments.push(await fileToAttachment(item.file))
+    }
+    return {
+      to: recipients,
+      cc: showCc ? splitAddresses(cc) : [],
+      subject: subject.trim(),
+      text: text || '',
+      html,
+      attachments: attachments.length ? attachments : undefined,
+      inReplyTo: draft?.inReplyTo,
+      references: draft?.references,
+    }
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault()
     setError(null)
-    const recipients = splitAddresses(to)
-    if (recipients.length === 0) {
-      setError(t('compose.toRequired'))
-      return
-    }
-    setSending(true)
+    setStatus('sending')
     try {
-      await sendMessage({
-        to: recipients,
-        cc: showCc ? splitAddresses(cc) : [],
-        subject: subject.trim(),
-        text: body,
-      })
-      onSent?.({ to: recipients })
+      const payload = await buildPayload(true)
+      if (!payload) {
+        setStatus('idle')
+        return
+      }
+      await sendMessage(payload)
+      setDirty(false)
+      onSent?.({ to: payload.to })
       onClose()
     } catch (err) {
       if (err instanceof ApiError) {
@@ -89,12 +234,40 @@ export function ComposeDialog({ open, draft, onClose, onSent }: ComposeDialogPro
         setError(t('errors.network'))
       }
     } finally {
-      setSending(false)
+      setStatus('idle')
+    }
+  }
+
+  async function handleSaveDraft() {
+    setError(null)
+    setStatus('saving')
+    try {
+      const payload = await buildPayload(false)
+      if (!payload) {
+        setStatus('idle')
+        return
+      }
+      await saveDraft(payload)
+      setDirty(false)
+      onDraftSaved?.()
+      onClose()
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(
+          t(`errors.codes.${err.code}`, {
+            defaultValue: t('compose.draftFailed'),
+          }),
+        )
+      } else {
+        setError(t('errors.network'))
+      }
+    } finally {
+      setStatus('idle')
     }
   }
 
   return (
-    <div className={styles.backdrop} role="presentation" onClick={onClose}>
+    <div className={styles.backdrop} role="presentation" onClick={requestClose}>
       <div
         className={styles.dialog}
         role="dialog"
@@ -109,9 +282,9 @@ export function ComposeDialog({ open, draft, onClose, onSent }: ComposeDialogPro
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={onClose}
+            onClick={requestClose}
             aria-label={t('common.close')}
-            disabled={sending}
+            disabled={busy}
           >
             ×
           </button>
@@ -127,10 +300,12 @@ export function ComposeDialog({ open, draft, onClose, onSent }: ComposeDialogPro
               id="compose-to"
               className={styles.input}
               value={to}
-              onChange={(e) => setTo(e.target.value)}
+              onChange={(e) => {
+                setTo(e.target.value)
+                setDirty(true)
+              }}
               placeholder={t('compose.toPlaceholder')}
               autoComplete="email"
-              required
             />
             {!showCc ? (
               <button
@@ -152,7 +327,10 @@ export function ComposeDialog({ open, draft, onClose, onSent }: ComposeDialogPro
                 id="compose-cc"
                 className={styles.input}
                 value={cc}
-                onChange={(e) => setCc(e.target.value)}
+                onChange={(e) => {
+                  setCc(e.target.value)
+                  setDirty(true)
+                }}
                 placeholder={t('compose.ccPlaceholder')}
                 autoComplete="email"
               />
@@ -167,18 +345,104 @@ export function ComposeDialog({ open, draft, onClose, onSent }: ComposeDialogPro
               id="compose-subject"
               className={styles.input}
               value={subject}
-              onChange={(e) => setSubject(e.target.value)}
+              onChange={(e) => {
+                setSubject(e.target.value)
+                setDirty(true)
+              }}
               placeholder={t('compose.subjectPlaceholder')}
             />
           </div>
 
-          <textarea
-            className={styles.body}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder={t('compose.bodyPlaceholder')}
-            rows={12}
+          <div className={styles.toolbar} role="toolbar" aria-label={t('compose.formatting')}>
+            <button type="button" className={styles.toolBtn} onClick={() => exec('bold')} title={t('compose.bold')}>
+              <strong>B</strong>
+            </button>
+            <button type="button" className={styles.toolBtn} onClick={() => exec('italic')} title={t('compose.italic')}>
+              <em>I</em>
+            </button>
+            <button
+              type="button"
+              className={styles.toolBtn}
+              onClick={() => exec('underline')}
+              title={t('compose.underline')}
+            >
+              <span className={styles.underlineMark}>U</span>
+            </button>
+            <button
+              type="button"
+              className={styles.toolBtn}
+              onClick={() => exec('insertUnorderedList')}
+              title={t('compose.list')}
+            >
+              •
+            </button>
+            <button
+              type="button"
+              className={styles.toolBtn}
+              onClick={() => {
+                const url = window.prompt(t('compose.linkPrompt'))
+                if (url) exec('createLink', url)
+              }}
+              title={t('compose.link')}
+            >
+              🔗
+            </button>
+            <span className={styles.toolSpacer} />
+            <button
+              type="button"
+              className={styles.toolBtn}
+              onClick={() => fileInputRef.current?.click()}
+              title={t('compose.attach')}
+              disabled={busy}
+            >
+              📎 {t('compose.attach')}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className={styles.fileInput}
+              onChange={(e) => addFiles(e.target.files)}
+            />
+          </div>
+
+          <div
+            ref={editorRef}
+            className={styles.editor}
+            contentEditable={!busy}
+            role="textbox"
+            aria-multiline="true"
+            aria-label={t('compose.bodyPlaceholder')}
+            data-placeholder={t('compose.bodyPlaceholder')}
+            onInput={() => {
+              setError(null)
+              setDirty(true)
+            }}
           />
+
+          {files.length > 0 ? (
+            <ul className={styles.fileList}>
+              {files.map((item) => {
+                const name = item.kind === 'file' ? item.file.name : item.att.filename
+                const size = item.kind === 'file' ? item.file.size : item.size
+                return (
+                  <li key={item.id} className={styles.fileItem}>
+                    <span className={styles.fileName}>{name}</span>
+                    <span className={styles.fileSize}>{formatBytes(size)}</span>
+                    <button
+                      type="button"
+                      className={styles.fileRemove}
+                      onClick={() => setFiles((prev) => prev.filter((f) => f.id !== item.id))}
+                      aria-label={t('compose.removeFile', { name })}
+                      disabled={busy}
+                    >
+                      ×
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          ) : null}
 
           {error ? <p className={styles.error}>{error}</p> : null}
 
@@ -186,13 +450,21 @@ export function ComposeDialog({ open, draft, onClose, onSent }: ComposeDialogPro
             <button
               type="button"
               className={styles.secondary}
-              onClick={onClose}
-              disabled={sending}
+              onClick={requestClose}
+              disabled={busy}
             >
               {t('common.cancel')}
             </button>
-            <button type="submit" className={styles.primary} disabled={sending}>
-              {sending ? t('compose.sending') : t('compose.send')}
+            <button
+              type="button"
+              className={styles.secondary}
+              onClick={() => void handleSaveDraft()}
+              disabled={busy}
+            >
+              {status === 'saving' ? t('compose.saving') : t('compose.saveDraft')}
+            </button>
+            <button type="submit" className={styles.primary} disabled={busy}>
+              {status === 'sending' ? t('compose.sending') : t('compose.send')}
             </button>
           </footer>
         </form>

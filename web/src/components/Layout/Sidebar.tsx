@@ -8,13 +8,20 @@ type SidebarProps = {
   activeFolder: string
   onSelectFolder: (name: string) => void
   onCompose: () => void
+  className?: string
 }
 
-export function Sidebar({ folders, activeFolder, onSelectFolder, onCompose }: SidebarProps) {
+export function Sidebar({
+  folders,
+  activeFolder,
+  onSelectFolder,
+  onCompose,
+  className,
+}: SidebarProps) {
   const { t } = useTranslation()
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={[styles.sidebar, className].filter(Boolean).join(' ')}>
       <button type="button" className={styles.compose} onClick={onCompose}>
         <ComposeIcon />
         {t('nav.compose')}

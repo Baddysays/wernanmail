@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"log"
 	"net/mail"
 	"strings"
@@ -19,8 +18,6 @@ import (
 	"github.com/Baddysays/wernanmail/server/internal/settings"
 	"github.com/Baddysays/wernanmail/server/internal/store"
 )
-
-var errQuota = errors.New("mailbox quota exceeded")
 
 // Runner consumes queue jobs.
 type Runner struct {
@@ -212,16 +209,6 @@ func (r *Runner) handle(ctx context.Context, job *domain.QueueJob) error {
 				if t, err := mail.ParseDate(dh); err == nil {
 					msg.Date = t.UTC()
 				}
-			}
-		}
-		mb, err := r.Store.GetMailboxByID(ctx, p.MailboxID)
-		if err != nil {
-			return err
-		}
-		if mb != nil && mb.QuotaBytes > 0 {
-			used, _ := r.Store.UsageBytes(ctx, p.MailboxID)
-			if used+int64(len(raw)) > mb.QuotaBytes {
-				return errQuota
 			}
 		}
 		return r.Store.AppendMessage(ctx, msg, raw)

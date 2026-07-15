@@ -105,6 +105,11 @@ export function fetchMessages(folder: string, limit = 50) {
   return apiGet<import('./types').MessageSummary[]>(`/api/messages?${q}`)
 }
 
+export function searchMessages(folder: string, query: string, limit = 50) {
+  const q = new URLSearchParams({ folder, q: query, limit: String(limit) })
+  return apiGet<import('./types').MessageSummary[]>(`/api/messages/search?${q}`)
+}
+
 export function fetchMessage(id: string, folder: string) {
   const q = new URLSearchParams({ folder })
   return apiGet<import('./types').MessageDetail>(
@@ -119,10 +124,73 @@ export type SendPayload = {
   subject: string
   text: string
   html?: string
+  attachments?: {
+    filename: string
+    contentType: string
+    content: string
+  }[]
+  inReplyTo?: string
+  references?: string
 }
 
 export function sendMessage(payload: SendPayload) {
   return apiPost<{ status: string }>('/api/messages/send', payload)
+}
+
+export function saveDraft(payload: SendPayload) {
+  return apiPost<{ status: string }>('/api/messages/drafts', payload)
+}
+
+export function attachmentUrl(messageId: string, folder: string, partId: string) {
+  const q = new URLSearchParams({ folder })
+  return `/api/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(partId)}?${q}`
+}
+
+export async function downloadAttachment(
+  messageId: string,
+  folder: string,
+  partId: string,
+  filename: string,
+) {
+  const res = await fetch(attachmentUrl(messageId, folder, partId), {
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    throw new ApiError('mail.fetch_failed', res.status)
+  }
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename || 'attachment'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+export async function attachmentToBase64(
+  messageId: string,
+  folder: string,
+  partId: string,
+): Promise<{ content: string; contentType: string }> {
+  const res = await fetch(attachmentUrl(messageId, folder, partId), {
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    throw new ApiError('mail.fetch_failed', res.status)
+  }
+  const buf = await res.arrayBuffer()
+  const bytes = new Uint8Array(buf)
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk))
+  }
+  return {
+    content: btoa(binary),
+    contentType: res.headers.get('Content-Type') || 'application/octet-stream',
+  }
 }
 
 export function updateMessageFlags(
@@ -138,9 +206,16 @@ export function updateMessageFlags(
 }
 
 export function trashMessage(id: string, folder: string) {
-  return apiPost<{ status: string }>(
+  return apiPost<{ trashId: string; trashFolder: string; fromFolder: string }>(
     `/api/messages/${encodeURIComponent(id)}/trash?folder=${encodeURIComponent(folder)}`,
   )
+}
+
+export function moveMessage(id: string, folder: string, toFolder: string) {
+  return apiPost<{ status: string }>(`/api/messages/${encodeURIComponent(id)}/move`, {
+    folder,
+    toFolder,
+  })
 }
 
 async function apiPatch<T>(path: string, body?: unknown): Promise<T> {

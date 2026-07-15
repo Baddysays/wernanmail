@@ -21,7 +21,9 @@ data-test/
 
 # Local agent / one-off ops junk
 .playwright-mcp/
+tmp/
 deploy/mail-host/bin/
+deploy/mail-host/agent-*.sh
 deploy/mail-host/diag-*.sh
 deploy/mail-host/check-*.sh
 deploy/mail-host/smoke-*.sh

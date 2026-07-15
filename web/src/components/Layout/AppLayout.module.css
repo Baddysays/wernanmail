@@ -65,12 +65,11 @@
 .brandIcon {
   display: grid;
   place-items: center;
-  width: 1.75rem;
-  height: 1.75rem;
-  border-radius: var(--radius-sm);
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 6px;
   background: var(--accent);
   color: var(--text-inverse);
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--accent-900) 22%, transparent);
 }
 
 .brandName {
@@ -78,6 +77,11 @@
   font-size: var(--font-size-lg);
   font-weight: 500;
   letter-spacing: -0.03em;
+}
+
+.headerSpacer {
+  flex: 1;
+  min-width: 0.5rem;
 }
 
 .search {

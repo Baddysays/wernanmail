@@ -13,6 +13,7 @@ type Domain struct {
 	DKIMSelector      string    `json:"dkimSelector"`
 	DKIMPrivate       string    `json:"-"`
 	DKIMPublic        string    `json:"dkimPublic"`
+	MailboxCount      int       `json:"mailboxCount,omitempty"`
 	CreatedAt         time.Time `json:"createdAt"`
 }
 
@@ -24,6 +25,7 @@ type Mailbox struct {
 	PasswordHash string    `json:"-"`
 	DisplayName  string    `json:"displayName"`
 	QuotaBytes   int64     `json:"quotaBytes"`
+	UsedBytes    int64     `json:"usedBytes,omitempty"`
 	Enabled      bool      `json:"enabled"`
 	CreatedAt    time.Time `json:"createdAt"`
 }
@@ -44,11 +46,11 @@ type Alias struct {
 
 // Folder names used by the store.
 const (
-	FolderInbox   = "INBOX"
-	FolderSent    = "Sent"
-	FolderDrafts  = "Drafts"
-	FolderSpam    = "Spam"
-	FolderTrash   = "Trash"
+	FolderInbox      = "INBOX"
+	FolderSent       = "Sent"
+	FolderDrafts     = "Drafts"
+	FolderSpam       = "Spam"
+	FolderTrash      = "Trash"
 	FolderQuarantine = "Quarantine"
 )
 
@@ -145,4 +147,33 @@ type Setting struct {
 	Key       string
 	Value     string
 	UpdatedAt time.Time
+}
+
+// DMARCReport is one aggregate feedback record.
+type DMARCReport struct {
+	ID          int64     `json:"id"`
+	MailboxID   int64     `json:"mailboxId"`
+	OrgName     string    `json:"org"`
+	ReportID    string    `json:"reportId"`
+	DateBegin   time.Time `json:"dateBegin"`
+	DateEnd     time.Time `json:"dateEnd"`
+	SourceIP    string    `json:"sourceIp"`
+	Count       int       `json:"count"`
+	DKIMResult  string    `json:"dkimResult"`
+	SPFResult   string    `json:"spfResult"`
+	Disposition string    `json:"disposition"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
+
+// MailFilter is a small server-side delivery rule.
+type MailFilter struct {
+	ID         int64  `json:"id"`
+	MailboxID  int64  `json:"mailboxId"`
+	Enabled    bool   `json:"enabled"`
+	Priority   int    `json:"priority"`
+	MatchField string `json:"matchField"`
+	MatchOp    string `json:"matchOp"`
+	MatchValue string `json:"matchValue"`
+	Action     string `json:"action"`
+	ActionArg  string `json:"actionArg"`
 }

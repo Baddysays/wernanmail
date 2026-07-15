@@ -1,48 +1,185 @@
-# Wernanmail — light client + API (no mail server stack).
-# Target: keep RAM low (~hundreds of MB, not Mailcow-class).
-#
-# Usage:
-#   docker compose up --build -d
-#   open http://localhost:3080
-#   API health: http://localhost:3080/api/health
-#
-# Optional overrides: copy .env.example -> .env
+x-server: &server
+  image: wernanmail/server:local
+  build:
+    context: ./server
+  restart: unless-stopped
+  volumes:
+    - mail_data:/data
+    - mail_secrets:/run/secrets:ro
+    - mail_tls:/run/tls:ro
+  environment: &server-environment
+    DATA_DIR: /data
+    MAIL_HOSTNAME: "${MAIL_HOSTNAME:-localhost}"
+    MAIL_EHLO: "${MAIL_EHLO:-localhost}"
+    SESSION_SECRET_FILE: /run/secrets/session_secret
+    MAIL_MASTER_PASSWORD_FILE: /run/secrets/master_password
+    MAIL_TLS_CERT: /run/tls/fullchain.pem
+    MAIL_TLS_KEY: /run/tls/privkey.pem
+  depends_on:
+    init:
+      condition: service_completed_successfully
 
 services:
-  api:
-    build:
-      context: ./server
-    restart: unless-stopped
+  init:
+    <<: *server
+    restart: "no"
+    user: "0:0"
+    command: ["/app/docker-init"]
+    volumes:
+      - mail_secrets:/run/secrets
+      - mail_tls:/run/tls
     environment:
+      MAIL_HOSTNAME: "${MAIL_HOSTNAME:-localhost}"
+    depends_on: {}
+    mem_limit: 32m
+    memswap_limit: 32m
+
+  mta:
+    <<: *server
+    command: ["/app/mta"]
+    environment:
+      <<: *server-environment
+      SMTP_ADDR: ":25"
+      SUBMIT_ADDR: ":587"
+      RELAY_HOST: "${RELAY_HOST:-}"
+    ports:
+      - "${SMTP_PORT:-25}:25"
+      - "${SUBMISSION_PORT:-587}:587"
+    mem_limit: 96m
+    memswap_limit: 96m
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "25"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  imapd:
+    <<: *server
+    command: ["/app/imapd"]
+    environment:
+      <<: *server-environment
+      IMAP_ADDR: ":143"
+    ports:
+      - "${IMAP_PORT:-143}:143"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      mta:
+        condition: service_healthy
+    mem_limit: 64m
+    memswap_limit: 64m
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "143"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  worker:
+    <<: *server
+    command: ["/app/worker"]
+    environment:
+      <<: *server-environment
+      RELAY_HOST: "${RELAY_HOST:-}"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      mta:
+        condition: service_healthy
+    mem_limit: 64m
+    memswap_limit: 64m
+    healthcheck:
+      test: ["CMD-SHELL", "kill -0 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  admin:
+    <<: *server
+    command: ["/app/admin"]
+    environment:
+      <<: *server-environment
+      ADMIN_ADDR: ":8090"
+      ADMIN_USER: "${ADMIN_USER:-admin}"
+      ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+      ADMIN_CORS_ORIGINS: "${PUBLIC_URL:-https://localhost}"
+      WEBMAIL_URL: "${PUBLIC_URL:-https://localhost}"
+    expose:
+      - "8090"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      mta:
+        condition: service_healthy
+    mem_limit: 64m
+    memswap_limit: 64m
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8090/healthz"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  api:
+    <<: *server
+    command: ["/app/api"]
+    environment:
+      <<: *server-environment
       ADDR: ":8080"
-      CORS_ORIGINS: "${CORS_ORIGINS:-http://localhost:3080,http://127.0.0.1:3080}"
-      COOKIE_SECURE: "${COOKIE_SECURE:-false}"
+      IMAP_HOST: imapd
+      IMAP_PORT: "143"
+      SMTP_HOST: mta
+      SMTP_PORT: "587"
+      MAIL_TLS: "false"
+      CORS_ORIGINS: "${PUBLIC_URL:-https://localhost}"
+      COOKIE_SECURE: "${COOKIE_SECURE:-true}"
     expose:
       - "8080"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      mta:
+        condition: service_healthy
+      imapd:
+        condition: service_healthy
     mem_limit: 128m
     memswap_limit: 128m
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/healthz"]
       interval: 15s
       timeout: 3s
-      retries: 3
-      start_period: 8s
+      retries: 5
+      start_period: 10s
 
   web:
+    image: wernanmail/web:local
     build:
-      context: ./web
+      context: .
+      dockerfile: web/Dockerfile
     restart: unless-stopped
+    volumes:
+      - mail_tls:/run/tls:ro
     ports:
-      # Bind localhost only — public traffic goes through the host reverse proxy
-      - "127.0.0.1:${WERNANMAIL_HTTP_PORT:-3080}:80"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     depends_on:
+      init:
+        condition: service_completed_successfully
       api:
+        condition: service_healthy
+      admin:
         condition: service_healthy
     mem_limit: 64m
     memswap_limit: 64m
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://127.0.0.1/healthz"]
       interval: 15s
       timeout: 3s
-      retries: 3
-      start_period: 8s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  mail_data:
+  mail_secrets:
+  mail_tls:

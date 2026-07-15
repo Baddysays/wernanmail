@@ -231,7 +231,11 @@ func (s *Session) Data(r io.Reader) error {
 			Raw:        raw,
 		})
 		if res.Err != nil && res.Action == domain.SpamReject {
-			return &smtp.SMTPError{Code: 554, Message: res.Err.Error()}
+			msg := res.SMTPMessage
+			if msg == "" {
+				msg = res.Err.Error()
+			}
+			return &smtp.SMTPError{Code: 554, Message: msg}
 		}
 		if res.Err != nil {
 			log.Printf("pipeline warning: %v", res.Err)
