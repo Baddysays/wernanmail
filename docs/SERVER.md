@@ -82,32 +82,44 @@ Do **not** commit real hostnames/IPs into the public repo. On your DNS provider:
 | + calendar / contacts | install-time options (not always-on) |
 | Never co-locate our MTA ports with Mailcow on one public IP |
 
-## Compose / binary deploy
+## Install
 
-- Compose: [`docker-compose.mail.yml`](../docker-compose.mail.yml)
-- Light binary deploy: [`deploy/mail-host/run.sh`](../deploy/mail-host/run.sh)
-
-```bash
-docker compose -f docker-compose.mail.yml up --build -d
-# or: cross-compile linux amd64 binaries and use deploy/mail-host/run.sh
-```
-
-Optional antivirus:
+### Docker (recommended)
 
 ```bash
-docker compose -f docker-compose.mail.yml --profile av up -d
+cp .env.mail.example .env.mail
+docker compose -f docker-compose.mail.yml --env-file .env.mail up --build -d
 ```
+
+| What | Where |
+|------|-------|
+| Admin | http://127.0.0.1:3090 |
+| Webmail | point Phase 1 client at this IMAP/SMTP, or use Compose web |
+| SMTP submit | host `2587` → container `:587` |
+| IMAP | host `2143` → container `:143` |
+
+Antivirus (optional, ≥2 GiB RAM):
+
+```bash
+docker compose -f docker-compose.mail.yml --env-file .env.mail --profile av up -d
+```
+
+### Binaries (small VPS)
+
+1. Cross-compile `admin` `api` `imapd` `mta` `worker` for `linux/amd64`
+2. Copy into `/opt/wernanmail/bin/` with `www/` (webmail) and `www/admin/` (SPA)
+3. Configure `.env` (see `.env.mail.example`)
+4. Start: [`deploy/mail-host/run.sh`](../deploy/mail-host/run.sh) → `./run.sh start`
+
+Compose file: [`docker-compose.mail.yml`](../docker-compose.mail.yml)
 
 ## Admin UI
 
-SPA under [`admin/`](../admin/) — domains, mailboxes, queue, quarantine (spam score), settings, audit.
+SPA under [`admin/`](../admin/) — domains, mailboxes, queue, quarantine, settings, audit.
 
-**Target look (locked):** **C on Overview, B everywhere else**
-- **Overview (C):** calm “Mail is healthy”, queue sparkline, quarantine count, DNS helper slide-over with copyable SPF/DKIM/DMARC
-- **Working screens (B):** always-visible Operator health strip (MX/SPF/DKIM/DMARC/TLS/Queue); top nav; master–detail for Domains / Mailboxes / Queue / Quarantine / Settings (list + side panel for aliases, roles, quotas)
-- Paper Quiet palette (teal/ink), shared with the webmail client where practical
+**Look:** Overview = quiet console; other screens = operator health strip (MX/SPF/DKIM/DMARC/TLS/Queue). Paper Quiet palette.
 
-Visual direction: Paper Quiet — see `docs/mockups/wernanmail-style-02-paper-quiet.png` and `docs/DESIGN.md`.
+Mockups: [`docs/mockups/admin-variant-c-quiet-console.png`](mockups/admin-variant-c-quiet-console.png), [`docs/mockups/admin-variant-b-operator-strip.png`](mockups/admin-variant-b-operator-strip.png)
 
 ## Coding rules
 

@@ -1,131 +1,106 @@
 # Wernanmail
 
-Lightweight self-hosted **mail client** (web). Own mail server comes later.
+Self-hosted mail that stays light: **webmail + Go mail server + admin** — without Mailcow-class RAM.
+
+**Target:** ~700 MB running · **host:** 1 GB min / 2 GB recommended
 
 <p align="center">
-  <img src="docs/mockups/login-ru.png" alt="Wernanmail — вход (русский интерфейс)" width="720" />
+  <img src="docs/mockups/login-moods.png" alt="Wernanmail sign-in" width="780" />
 </p>
 
 <p align="center">
-  <img src="docs/mockups/login-moods.png" alt="Wernanmail sign-in — Paper Quiet with color moods" width="720" />
+  <img src="docs/mockups/admin-variant-c-quiet-console.png" alt="Wernanmail admin overview" width="780" />
 </p>
 
-Sign in connects to your IMAP/SMTP server. Color **moods** (Harbor, Reef, Grove, Ember, Mist, or Auto by time of day) tint the whole client — login, inbox, and settings.
+## What you get
 
-Toasts confirm send / trash / new mail; sidebar shows unread badges (including Spam).
+| Piece | Role |
+|-------|------|
+| **Webmail** | React inbox — folders, compose, moods, 12 languages |
+| **Mail server** | SMTP · IMAP · queue · antispam · quarantine |
+| **Admin** | Domains, mailboxes, DNS helper, settings, audit |
+| **Mailport** | Embed inbox/compose in other products (iframe / SDK) |
 
-## Product policy
+## Install (simple)
 
-| Principle | Meaning |
-|-----------|---------|
-| **Light** | Whole product target **~700MB RAM**, recommend **1GB** (not Mailcow-class 6GB+) |
-| **Fast** | Keyboard-first UI, snappy inbox, thin Go API |
-| **Reliable** | Mailcow-inspired containerization and ops discipline — without Mailcow weight |
-
-Phase 1 = **client** (IMAP/SMTP to existing servers).  
-Phase 2 = **server** (own Go MTA/IMAP/queue/antispam/admin — see [docs/SERVER.md](docs/SERVER.md)).
-
-## Unique feature: **Mailport**
-
-Embeddable mail for other products — iframe / web component / JS SDK.
-
-- Drop inbox or compose into other apps and admin panels
-- Same session / scoped API tokens
-- Themes match host product
-
-Self-hosted mail that **plugs into your stack**, not only a standalone webmail.
-
-## What’s working now
-
-- Login against real IMAP (session cookie → Go API)
-- Three-column inbox: folders · list · reading pane
-- **Compose / Reply / Forward** via SMTP (toast feedback + Sent folder)
-- Unread badges, Spam folder clarity, auto-refresh for new mail
-- Settings: language (12 locales), light/dark, fonts, **color moods**
-- Docker Compose for `api` + `web` (localhost bind for reverse-proxy deploys)
-
-## Design direction
-
-Default look: **Paper Quiet** — light, calm, readable, three-column mail UI.
-
-Craft details lean on [emil-design-eng](https://github.com/emilkowalski/skills) (press feedback, gated hover, shadows over heavy borders, intentional motion).
-
-In **Settings** (first-class):
-
-- **Font** — user-selectable typefaces for UI / reading
-- **Color mood** — full palette (not a single flat accent hex), including Auto
-- **Theme** — light / dark
-- **Language** — **12 locales** from day one (en, ru, de, fr, es, pt, zh, ja, ko, it, pl, tr)
-
-See [docs/DESIGN.md](docs/DESIGN.md), [docs/POLICY.md](docs/POLICY.md), and more mockups in `docs/mockups/`.
-
-## Stack (MVP client)
-
-| Layer | Choice |
-|-------|--------|
-| Frontend | React 19 + Vite + TypeScript |
-| i18n | `i18next` + `react-i18next` — 12 locale JSON files |
-| Dates | `Intl` (locale-aware) |
-| Styles | CSS Modules + CSS variables (fonts + mood scales) |
-| Backend | Go (chi) + go-imap + SMTP — **error codes**, UI translates |
-| Sessions | httpOnly cookies |
-| Deploy | Docker Compose, light containers |
-
-## Repo layout
-
-```
-web/       # React client
-server/    # Go API
-docs/      # design, policy, mockups
-```
-
-## Quick start (web)
+### 1) Webmail only (use an existing IMAP/SMTP server)
 
 ```bash
-pnpm --dir web install
-pnpm --dir web dev
-```
-
-`/api` is proxied to the Go backend on `localhost:8080`.
-
-## Quick start (API)
-
-```bash
-cd server
-cp .env.example .env   # optional
-go run .
-```
-
-See [server/README.md](server/README.md) for endpoints. Errors are codes only (e.g. `mail.auth_failed`); the UI translates.
-
-## Run with Docker Compose
-
-Light client + API only (no mail server containers):
-
-```bash
+cp .env.example .env
 docker compose up --build -d
 ```
 
-App: http://localhost:3080 (override with `WERNANMAIL_HTTP_PORT` in `.env`).
-Copy `.env.example` to `.env` for local port overrides. Keep mailbox credentials in `secrets/` (gitignored).
+Open **http://localhost:3080**
 
-### Phase 2 mail server stack
+### 2) Full stack (own mail server + webmail + admin)
 
 ```bash
 cp .env.mail.example .env.mail
 docker compose -f docker-compose.mail.yml --env-file .env.mail up --build -d
 ```
 
-- SMTP submission: host port `2587` → container `:587`
-- IMAP: `2143` → `:143`
-- Admin UI: http://127.0.0.1:3090
-- Architecture: [docs/SERVER.md](docs/SERVER.md)
+| Service | URL / port |
+|---------|------------|
+| Webmail | http://localhost:3080 |
+| Admin | http://localhost:3090 |
+| SMTP submit | `localhost:2587` → `:587` |
+| IMAP | `localhost:2143` → `:143` |
 
-Optional ClamAV: add `--profile av` (needs ≥2 GiB RAM).
+Optional antivirus (needs ≥2 GB RAM):
 
-## Status
+```bash
+docker compose -f docker-compose.mail.yml --env-file .env.mail --profile av up -d
+```
 
-Usable MVP client + Phase 2 Go mail server foundation (SMTP/IMAP/queue/antispam/admin). Next: denser keyboard shortcuts, Mailport embed, harden deliverability on a dedicated host.
+### 3) Bare metal (light binaries)
+
+```bash
+# build linux amd64 binaries, then on the host:
+cd /opt/wernanmail
+./run.sh start
+```
+
+See [docs/SERVER.md](docs/SERVER.md) for DNS (MX / SPF / DKIM / DMARC), TLS, and ops.
+
+## Dev (without Docker)
+
+```bash
+# API
+cd server && cp .env.example .env && go run ./cmd/api
+
+# Webmail
+pnpm --dir web install && pnpm --dir web dev
+
+# Admin
+npm --prefix admin install && npm --prefix admin run dev
+```
+
+## Design
+
+**Paper Quiet** — calm teal, three-column mail, soft motion.
+
+Admin direction: quiet overview console + operator health strip on working screens.
+
+More shots: [`docs/mockups/`](docs/mockups/) · notes: [docs/DESIGN.md](docs/DESIGN.md)
+
+<p align="center">
+  <img src="docs/mockups/admin-variant-b-operator-strip.png" alt="Admin with operator health strip" width="780" />
+</p>
+
+## Repo
+
+```
+web/                 webmail (React + TypeScript)
+admin/               operator console (React + TypeScript)
+server/              Go API + MTA + IMAP + worker + admin API
+deploy/mail-host/    binary host helpers
+docs/                design, policy, server, mockups
+```
+
+## Policy
+
+Light · fast · reliable. No secrets or private infra in git.  
+Details: [docs/POLICY.md](docs/POLICY.md)
 
 ---
 

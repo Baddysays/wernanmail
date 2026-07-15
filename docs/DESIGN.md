@@ -7,6 +7,11 @@
 - Three columns: folders · list · reading pane
 - Airy but usable density; thin icons; readable body text
 
+### Admin console
+- Overview: quiet console — `docs/mockups/admin-variant-c-quiet-console.png`
+- Working screens: operator health strip — `docs/mockups/admin-variant-b-operator-strip.png`
+- Alternate paper-quiet pass — `docs/mockups/admin-variant-a-paper-quiet.png`
+
 ## Motion & craft (emil-design-eng)
 Apply [emilkowalski/skills · emil-design-eng](https://github.com/emilkowalski/skills):
 
