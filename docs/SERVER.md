@@ -1,23 +1,26 @@
 # Wernanmail server (Phase 2)
 
-Own light mail stack in pure Go: SMTP (inbound + submission), IMAP, durable queue, antispam, antivirus adapter, and a graphical admin UI.
+Own **full corporate mail** stack in pure Go: SMTP (inbound + submission), IMAP, durable queue, antispam, antivirus adapter, and a graphical admin UI — without Mailcow-class RAM.
+
+Same day-to-day mail ops; calendar/contacts as **optional install profiles**, not mandatory core.
 
 The Phase 1 web client stays a thin IMAP/SMTP client. Point it at this stack when ready — no UI rewrite.
 
 ## Goals
 
-- Fit roughly **150–250 MiB** RAM for core services (no ClamAV)
+- Product aim **≤700 MiB** where practical; host **minimum 1 GiB**, **recommend 2 GiB**
+- Core daemons alone typically **~40–150 MiB** (no ClamAV)
 - Readable package layout: domain types + interfaces + composition
 - Stable API **error codes** for UI translation
-- Containerized with healthchecks and hard `mem_limit`s
+- Deployable as light binaries (+ optional Compose) with healthchecks
 
 ## Architecture
 
 ```
 Internet MX:25 ──► smtpd ──► pipeline (antispam → antivirus) ──► queue ──► worker ──► store
-Users :587 ────► submission ──────────────────────────────────────┘              │
-Users :993 ────► imapd ◄──────────────────────────────────────────────────────────┘
-Admin UI ──────► admin API ──► store / queue / settings / quarantine
+Users :587/465 ► submission ───────────────────────────────────────┘              │
+Users :143/993 ► imapd ◄──────────────────────────────────────────────────────────┘
+Admin UI HTTPS ► admin API ──► store / queue / settings / quarantine
 Web client ────► existing BFF (Phase 1) ──► this IMAP/SMTP
 ```
 
@@ -26,9 +29,9 @@ Web client ────► existing BFF (Phase 1) ──► this IMAP/SMTP
 | Binary | Role |
 |--------|------|
 | `cmd/mta` | SMTP inbound (:25) + authenticated submission (:587) |
-| `cmd/imapd` | IMAP (:143 / :993) over the message store |
+| `cmd/imapd` | IMAP (:143; wrap :993 via TLS terminator or native TLS) |
 | `cmd/worker` | Queue consumer: local deliver, outbound SMTP, bounce |
-| `cmd/admin` | Admin HTTP API |
+| `cmd/admin` | Admin HTTP API (+ optional static admin UI) |
 | `cmd/api` | Existing client BFF (Phase 1) |
 
 ### Storage
@@ -45,7 +48,7 @@ Web client ────► existing BFF (Phase 1) ──► this IMAP/SMTP
 | `queue` | Durable jobs, lease, backoff, DLQ |
 | `pipeline` | Inbound: spam → AV → enqueue / quarantine |
 | `antispam` | Scoring engine (SPF/DKIM/DMARC hooks, RBL, heuristics) |
-| `antivirus` | `Scanner` interface; `noop` default; optional ClamAV |
+| `antivirus` | `Scanner` interface; `light`/`noop`; optional ClamAV on larger hosts |
 | `dnsauth` | SPF verify, DKIM sign/verify, DMARC |
 | `outbound` | MX resolve + SMTP client |
 | `smtpd` / `imapd` | Protocol daemons |
@@ -56,28 +59,37 @@ Web client ────► existing BFF (Phase 1) ──► this IMAP/SMTP
 
 Do **not** commit real hostnames/IPs into the public repo. On your DNS provider:
 
-1. **A/AAAA** — mail host
-2. **MX** — domain → mail host (priority 10)
-3. **SPF** — `v=spf1 mx -all` (adjust for relays)
-4. **DKIM** — publish public key from admin → Domains → DKIM
-5. **DMARC** — start with `v=DMARC1; p=none; rua=mailto:postmaster@…`
-6. **PTR** — reverse DNS for the outbound IP (ask the VPS provider)
-7. Open firewall: **25, 465, 587, 993** (and admin HTTPS via reverse proxy)
+1. Wait until the domain is **delegated** at the TLD (public resolvers must answer)
+2. **A/AAAA** — apex (site) + `mail` host
+3. **MX** — domain → `mail.…` (priority 10)
+4. **SPF** — `v=spf1 mx a:mail.… -all`
+5. **DKIM** — publish public key from admin → Domains → DKIM
+6. **DMARC** — start with `v=DMARC1; p=none; rua=mailto:postmaster@…`
+7. **PTR** — reverse DNS for the outbound IP (VPS provider)
+8. Firewall: **25, 465, 587, 993** + admin **443**
+9. Prefer TLS cert covering **apex + `*.domain`** (DNS-01) once delegation works
 
 ## RAM budget
 
-| Mode | Approx |
-|------|--------|
-| Core (mta + imapd + worker + admin + web) | 150–250 MiB |
-| + ClamAV profile `av` | +200–400 MiB — use only on ≥2 GiB hosts |
-| Never co-locate with Mailcow-class stacks in one compose profile |
+| | |
+|--|--|
+| **Host minimum** | **1 GiB** |
+| **Host recommended** | **2 GiB** |
+| **Product aim** | stay near **≤700 MiB** total when possible |
+| Core daemons (mta + imapd + worker + admin) | ~40–150 MiB observed |
+| + webmail | same host or separate |
+| + ClamAV / heavy AV | +200–400 MiB — prefer ≥2 GiB hosts |
+| + calendar / contacts | install-time options (not always-on) |
+| Never co-locate our MTA ports with Mailcow on one public IP |
 
-## Compose
+## Compose / binary deploy
 
-See [`docker-compose.mail.yml`](../docker-compose.mail.yml). Default data dir: `./data` (gitignored).
+- Compose: [`docker-compose.mail.yml`](../docker-compose.mail.yml)
+- Light binary deploy: [`deploy/mail-host/run.sh`](../deploy/mail-host/run.sh)
 
 ```bash
 docker compose -f docker-compose.mail.yml up --build -d
+# or: cross-compile linux amd64 binaries and use deploy/mail-host/run.sh
 ```
 
 Optional antivirus:
@@ -88,9 +100,14 @@ docker compose -f docker-compose.mail.yml --profile av up -d
 
 ## Admin UI
 
-SPA under [`admin/`](../admin/) — domains, mailboxes, queue, quarantine (spam score breakdown), settings (limits, relay, TLS paths, antispam thresholds), audit log.
+SPA under [`admin/`](../admin/) — domains, mailboxes, queue, quarantine (spam score), settings, audit.
 
-Default admin bootstrap: set `ADMIN_USER` / `ADMIN_PASSWORD` in env (see `.env.mail.example`).
+**Target look (locked):** **C on Overview, B everywhere else**
+- **Overview (C):** calm “Mail is healthy”, queue sparkline, quarantine count, DNS helper slide-over with copyable SPF/DKIM/DMARC
+- **Working screens (B):** always-visible Operator health strip (MX/SPF/DKIM/DMARC/TLS/Queue); top nav; master–detail for Domains / Mailboxes / Queue / Quarantine / Settings (list + side panel for aliases, roles, quotas)
+- Paper Quiet palette (teal/ink), shared with the webmail client where practical
+
+Mockups: start → `docs/mockups/admin-variant-c-quiet-console.png`; work → `docs/mockups/admin-variant-b-operator-strip.png`
 
 ## Coding rules
 

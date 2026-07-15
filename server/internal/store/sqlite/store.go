@@ -152,7 +152,13 @@ CREATE TABLE IF NOT EXISTS audit_log (
   created_at TEXT NOT NULL
 );
 `)
-	return err
+	if err != nil {
+		return err
+	}
+	// uid_validity / domain default quota added later; ignore error if column already exists.
+	_, _ = s.db.Exec(`ALTER TABLE folder_uid ADD COLUMN uid_validity INTEGER NOT NULL DEFAULT 1`)
+	_, _ = s.db.Exec(`ALTER TABLE domains ADD COLUMN default_quota_bytes INTEGER NOT NULL DEFAULT 0`)
+	return nil
 }
 
 func now() string { return time.Now().UTC().Format(time.RFC3339Nano) }
@@ -166,7 +172,7 @@ func parseTime(s string) time.Time {
 }
 
 func (s *Store) ListDomains(ctx context.Context) ([]domain.Domain, error) {
-	rows, err := s.db.QueryContext(ctx, `SELECT id,name,enabled,catch_all,dkim_selector,dkim_private,dkim_public,created_at FROM domains ORDER BY name`)
+	rows, err := s.db.QueryContext(ctx, `SELECT id,name,enabled,catch_all,COALESCE(default_quota_bytes,0),dkim_selector,dkim_private,dkim_public,created_at FROM domains ORDER BY name`)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +182,7 @@ func (s *Store) ListDomains(ctx context.Context) ([]domain.Domain, error) {
 		var d domain.Domain
 		var en int
 		var created string
-		if err := rows.Scan(&d.ID, &d.Name, &en, &d.CatchAll, &d.DKIMSelector, &d.DKIMPrivate, &d.DKIMPublic, &created); err != nil {
+		if err := rows.Scan(&d.ID, &d.Name, &en, &d.CatchAll, &d.DefaultQuotaBytes, &d.DKIMSelector, &d.DKIMPrivate, &d.DKIMPublic, &created); err != nil {
 			return nil, err
 		}
 		d.Enabled = en == 1
@@ -187,11 +193,11 @@ func (s *Store) ListDomains(ctx context.Context) ([]domain.Domain, error) {
 }
 
 func (s *Store) GetDomainByName(ctx context.Context, name string) (*domain.Domain, error) {
-	row := s.db.QueryRowContext(ctx, `SELECT id,name,enabled,catch_all,dkim_selector,dkim_private,dkim_public,created_at FROM domains WHERE name = ? COLLATE NOCASE`, name)
+	row := s.db.QueryRowContext(ctx, `SELECT id,name,enabled,catch_all,COALESCE(default_quota_bytes,0),dkim_selector,dkim_private,dkim_public,created_at FROM domains WHERE name = ? COLLATE NOCASE`, name)
 	var d domain.Domain
 	var en int
 	var created string
-	if err := row.Scan(&d.ID, &d.Name, &en, &d.CatchAll, &d.DKIMSelector, &d.DKIMPrivate, &d.DKIMPublic, &created); err != nil {
+	if err := row.Scan(&d.ID, &d.Name, &en, &d.CatchAll, &d.DefaultQuotaBytes, &d.DKIMSelector, &d.DKIMPrivate, &d.DKIMPublic, &created); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -212,8 +218,8 @@ func (s *Store) UpsertDomain(ctx context.Context, d *domain.Domain) error {
 	}
 	if d.ID == 0 {
 		d.CreatedAt = time.Now().UTC()
-		res, err := s.db.ExecContext(ctx, `INSERT INTO domains(name,enabled,catch_all,dkim_selector,dkim_private,dkim_public,created_at) VALUES(?,?,?,?,?,?,?)`,
-			d.Name, en, d.CatchAll, d.DKIMSelector, d.DKIMPrivate, d.DKIMPublic, now())
+		res, err := s.db.ExecContext(ctx, `INSERT INTO domains(name,enabled,catch_all,default_quota_bytes,dkim_selector,dkim_private,dkim_public,created_at) VALUES(?,?,?,?,?,?,?,?)`,
+			d.Name, en, d.CatchAll, d.DefaultQuotaBytes, d.DKIMSelector, d.DKIMPrivate, d.DKIMPublic, now())
 		if err != nil {
 			return err
 		}
@@ -221,8 +227,8 @@ func (s *Store) UpsertDomain(ctx context.Context, d *domain.Domain) error {
 		d.ID = id
 		return nil
 	}
-	_, err := s.db.ExecContext(ctx, `UPDATE domains SET name=?, enabled=?, catch_all=?, dkim_selector=?, dkim_private=?, dkim_public=? WHERE id=?`,
-		d.Name, en, d.CatchAll, d.DKIMSelector, d.DKIMPrivate, d.DKIMPublic, d.ID)
+	_, err := s.db.ExecContext(ctx, `UPDATE domains SET name=?, enabled=?, catch_all=?, default_quota_bytes=?, dkim_selector=?, dkim_private=?, dkim_public=? WHERE id=?`,
+		d.Name, en, d.CatchAll, d.DefaultQuotaBytes, d.DKIMSelector, d.DKIMPrivate, d.DKIMPublic, d.ID)
 	return err
 }
 
@@ -410,7 +416,11 @@ func (s *Store) NextUID(ctx context.Context, mailboxID int64, folder string) (ui
 	err = tx.QueryRowContext(ctx, `SELECT next_uid FROM folder_uid WHERE mailbox_id=? AND folder=?`, mailboxID, folder).Scan(&next)
 	if errors.Is(err, sql.ErrNoRows) {
 		next = 1
-		if _, err := tx.ExecContext(ctx, `INSERT INTO folder_uid(mailbox_id,folder,next_uid) VALUES(?,?,2)`, mailboxID, folder); err != nil {
+		uidVal := time.Now().Unix()
+		if uidVal < 1 {
+			uidVal = 1
+		}
+		if _, err := tx.ExecContext(ctx, `INSERT INTO folder_uid(mailbox_id,folder,next_uid,uid_validity) VALUES(?,?,2,?)`, mailboxID, folder, uidVal); err != nil {
 			return 0, err
 		}
 	} else if err != nil {
@@ -424,6 +434,48 @@ func (s *Store) NextUID(ctx context.Context, mailboxID int64, folder string) (ui
 		return 0, err
 	}
 	return uint32(next), nil
+}
+
+func (s *Store) FolderStats(ctx context.Context, mailboxID int64, folder string) (messages, unseen, uidNext, uidValidity uint32, err error) {
+	var total, unseenN int64
+	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM messages WHERE mailbox_id=? AND folder=?`, mailboxID, folder).Scan(&total)
+	if err != nil {
+		return
+	}
+	err = s.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM messages WHERE mailbox_id=? AND folder=? AND flags_json NOT LIKE '%Seen%'`, mailboxID, folder).Scan(&unseenN)
+	if err != nil {
+		return
+	}
+	messages = uint32(total)
+	unseen = uint32(unseenN)
+
+	var next, uv int64
+	err = s.db.QueryRowContext(ctx, `SELECT next_uid, COALESCE(uid_validity,1) FROM folder_uid WHERE mailbox_id=? AND folder=?`, mailboxID, folder).Scan(&next, &uv)
+	if errors.Is(err, sql.ErrNoRows) {
+		uidNext, uidValidity, err = 1, 1, nil
+		return
+	}
+	if err != nil {
+		err2 := s.db.QueryRowContext(ctx, `SELECT next_uid FROM folder_uid WHERE mailbox_id=? AND folder=?`, mailboxID, folder).Scan(&next)
+		if errors.Is(err2, sql.ErrNoRows) {
+			uidNext, uidValidity, err = 1, 1, nil
+			return
+		}
+		if err2 != nil {
+			err = err2
+			return
+		}
+		uidNext, uidValidity, err = uint32(next), 1, nil
+		return
+	}
+	if next < 1 {
+		next = 1
+	}
+	if uv < 1 {
+		uv = 1
+	}
+	uidNext, uidValidity = uint32(next), uint32(uv)
+	return
 }
 
 func (s *Store) AppendMessage(ctx context.Context, msg *domain.Message, raw []byte) error {
@@ -490,9 +542,9 @@ func scanMessage(row scannable) (*domain.Message, error) {
 	return &m, nil
 }
 
-func (s *Store) GetMessage(ctx context.Context, mailboxID int64, uid uint32) (*domain.Message, []byte, error) {
+func (s *Store) GetMessage(ctx context.Context, mailboxID int64, folder string, uid uint32) (*domain.Message, []byte, error) {
 	row := s.db.QueryRowContext(ctx, `SELECT id,mailbox_id,folder,uid,message_id,subject,from_addr,to_addrs,date,size,flags_json,maildir_rel,spam_score,created_at
-FROM messages WHERE mailbox_id=? AND uid=?`, mailboxID, uid)
+FROM messages WHERE mailbox_id=? AND folder=? AND uid=?`, mailboxID, folder, uid)
 	m, err := scanMessage(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, nil
@@ -504,8 +556,8 @@ FROM messages WHERE mailbox_id=? AND uid=?`, mailboxID, uid)
 	return m, raw, err
 }
 
-func (s *Store) UpdateFlags(ctx context.Context, mailboxID int64, uid uint32, add, remove []string) error {
-	row := s.db.QueryRowContext(ctx, `SELECT flags_json FROM messages WHERE mailbox_id=? AND uid=?`, mailboxID, uid)
+func (s *Store) UpdateFlags(ctx context.Context, mailboxID int64, folder string, uid uint32, add, remove []string) error {
+	row := s.db.QueryRowContext(ctx, `SELECT flags_json FROM messages WHERE mailbox_id=? AND folder=? AND uid=?`, mailboxID, folder, uid)
 	var flagsJSON string
 	if err := row.Scan(&flagsJSON); err != nil {
 		return err
@@ -527,12 +579,12 @@ func (s *Store) UpdateFlags(ctx context.Context, mailboxID int64, uid uint32, ad
 		flags = append(flags, f)
 	}
 	b, _ := json.Marshal(flags)
-	_, err := s.db.ExecContext(ctx, `UPDATE messages SET flags_json=? WHERE mailbox_id=? AND uid=?`, string(b), mailboxID, uid)
+	_, err := s.db.ExecContext(ctx, `UPDATE messages SET flags_json=? WHERE mailbox_id=? AND folder=? AND uid=?`, string(b), mailboxID, folder, uid)
 	return err
 }
 
-func (s *Store) MoveMessage(ctx context.Context, mailboxID int64, uid uint32, toFolder string) error {
-	m, raw, err := s.GetMessage(ctx, mailboxID, uid)
+func (s *Store) MoveMessage(ctx context.Context, mailboxID int64, folder string, uid uint32, toFolder string) error {
+	m, raw, err := s.GetMessage(ctx, mailboxID, folder, uid)
 	if err != nil || m == nil {
 		return err
 	}
@@ -550,6 +602,65 @@ func (s *Store) MoveMessage(ctx context.Context, mailboxID int64, uid uint32, to
 	}
 	_ = s.md.Remove(m.MaildirRel)
 	return nil
+}
+
+func (s *Store) CopyMessage(ctx context.Context, mailboxID int64, folder string, uid uint32, toFolder string) (uint32, error) {
+	m, raw, err := s.GetMessage(ctx, mailboxID, folder, uid)
+	if err != nil || m == nil {
+		return 0, err
+	}
+	msg := &domain.Message{
+		MailboxID: mailboxID,
+		Folder:    toFolder,
+		Subject:   m.Subject,
+		FromAddr:  m.FromAddr,
+		ToAddrs:   m.ToAddrs,
+		Date:      m.Date,
+		MessageID: m.MessageID,
+		Flags:     append([]string{}, m.Flags...),
+		SpamScore: m.SpamScore,
+	}
+	if err := s.AppendMessage(ctx, msg, raw); err != nil {
+		return 0, err
+	}
+	return msg.UID, nil
+}
+
+func (s *Store) DeleteMessage(ctx context.Context, mailboxID int64, folder string, uid uint32) error {
+	m, _, err := s.GetMessage(ctx, mailboxID, folder, uid)
+	if err != nil || m == nil {
+		return err
+	}
+	if _, err := s.db.ExecContext(ctx, `DELETE FROM messages WHERE mailbox_id=? AND folder=? AND uid=?`, mailboxID, folder, uid); err != nil {
+		return err
+	}
+	_ = s.md.Remove(m.MaildirRel)
+	return nil
+}
+
+func (s *Store) ExpungeDeleted(ctx context.Context, mailboxID int64, folder string) (int, error) {
+	msgs, err := s.ListMessages(ctx, mailboxID, folder, 10000)
+	if err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, m := range msgs {
+		deleted := false
+		for _, f := range m.Flags {
+			if strings.EqualFold(f, `\Deleted`) || strings.EqualFold(f, "\\Deleted") {
+				deleted = true
+				break
+			}
+		}
+		if !deleted {
+			continue
+		}
+		if err := s.DeleteMessage(ctx, mailboxID, folder, m.UID); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
 }
 
 func (s *Store) UsageBytes(ctx context.Context, mailboxID int64) (int64, error) {
@@ -621,6 +732,79 @@ func (s *Store) GetQuarantineRaw(ctx context.Context, id int64) (*domain.Quarant
 	q.CreatedAt = parseTime(created)
 	raw, err := s.md.Read(q.MaildirRel)
 	return &q, raw, err
+}
+
+func (s *Store) PurgeQuarantineOlderThan(ctx context.Context, olderThan time.Time, limit int) (int, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	cutoff := olderThan.UTC().Format(time.RFC3339Nano)
+	rows, err := s.db.QueryContext(ctx, `SELECT id, maildir_rel FROM quarantine WHERE created_at < ? ORDER BY id ASC LIMIT ?`, cutoff, limit)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	type row struct {
+		id  int64
+		rel string
+	}
+	var batch []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.id, &r.rel); err != nil {
+			return 0, err
+		}
+		batch = append(batch, r)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, r := range batch {
+		if _, err := s.db.ExecContext(ctx, `DELETE FROM quarantine WHERE id=?`, r.id); err != nil {
+			return n, err
+		}
+		_ = s.md.Remove(r.rel)
+		n++
+	}
+	return n, nil
+}
+
+func (s *Store) DeleteMessagesOlderThan(ctx context.Context, olderThan time.Time, limit int) (int, error) {
+	if limit <= 0 {
+		limit = 200
+	}
+	cutoff := olderThan.UTC().Format(time.RFC3339Nano)
+	rows, err := s.db.QueryContext(ctx, `SELECT mailbox_id, uid, maildir_rel FROM messages WHERE created_at < ? ORDER BY id ASC LIMIT ?`, cutoff, limit)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	type row struct {
+		mailboxID int64
+		uid       uint32
+		rel       string
+	}
+	var batch []row
+	for rows.Next() {
+		var r row
+		if err := rows.Scan(&r.mailboxID, &r.uid, &r.rel); err != nil {
+			return 0, err
+		}
+		batch = append(batch, r)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
+	n := 0
+	for _, r := range batch {
+		if _, err := s.db.ExecContext(ctx, `DELETE FROM messages WHERE mailbox_id=? AND uid=?`, r.mailboxID, r.uid); err != nil {
+			return n, err
+		}
+		_ = s.md.Remove(r.rel)
+		n++
+	}
+	return n, nil
 }
 
 func (s *Store) GetSetting(ctx context.Context, key string) (string, error) {
@@ -770,6 +954,17 @@ func (s *Store) Fail(ctx context.Context, id int64, errMsg string, retryAt time.
 	}
 	_, err := s.db.ExecContext(ctx, `UPDATE queue_jobs SET last_error=?, next_at=?, locked_until=NULL, updated_at=? WHERE id=?`,
 		errMsg, retryAt.UTC().Format(time.RFC3339Nano), now(), id)
+	return err
+}
+
+func (s *Store) Retry(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `UPDATE queue_jobs SET attempts=0, next_at=?, locked_until=NULL, last_error='', updated_at=? WHERE id=?`,
+		time.Now().UTC().Format(time.RFC3339Nano), now(), id)
+	return err
+}
+
+func (s *Store) DeleteJob(ctx context.Context, id int64) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM queue_jobs WHERE id=?`, id)
 	return err
 }
 

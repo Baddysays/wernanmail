@@ -1,6 +1,8 @@
 package maildir
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -49,7 +51,7 @@ func (r *Root) WriteNew(mailboxID int64, folder string, raw []byte) (rel string,
 	if err := r.EnsureMailbox(mailboxID, folder); err != nil {
 		return "", err
 	}
-	name := fmt.Sprintf("%d.%d.wernan", time.Now().UnixNano(), mailboxID)
+	name := uniqueName(mailboxID)
 	abs := filepath.Join(r.path(mailboxID, folder), "new", name)
 	if err := os.WriteFile(abs, raw, 0o640); err != nil {
 		return "", err
@@ -67,7 +69,7 @@ func (r *Root) WriteQuarantine(idHint int64, raw []byte) (rel string, err error)
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		return "", err
 	}
-	name := fmt.Sprintf("%d.%d.eml", time.Now().UnixNano(), idHint)
+	name := uniqueName(idHint) + ".eml"
 	abs := filepath.Join(dir, name)
 	if err := os.WriteFile(abs, raw, 0o640); err != nil {
 		return "", err
@@ -77,6 +79,12 @@ func (r *Root) WriteQuarantine(idHint int64, raw []byte) (rel string, err error)
 		return "", err
 	}
 	return filepath.ToSlash(rel), nil
+}
+
+func uniqueName(idHint int64) string {
+	var b [6]byte
+	_, _ = rand.Read(b[:])
+	return fmt.Sprintf("%d.%d.%d.%s.wernan", time.Now().UnixNano(), os.Getpid(), idHint, hex.EncodeToString(b[:]))
 }
 
 // Read reads a relative maildir path.

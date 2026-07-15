@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "Hafif self-hosted posta istemcisi"
@@ -31,7 +31,8 @@
     "submitting": "Oturum açılıyor…",
     "hint": "Kimlik bilgileri güvenli bir oturumla self-hosted API'nize gönderilir.",
     "tagline": "Yoluna çıkmayan hafif posta.",
-    "server": "Sunucu"
+    "server": "Sunucu",
+    "asAdmin": "Yönetici olarak giriş"
   },
   "settings": {
     "title": "Ayarlar",

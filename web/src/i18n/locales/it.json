@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "Client di posta self-hosted leggero"
@@ -31,7 +31,8 @@
     "submitting": "Accesso…",
     "hint": "Le credenziali vengono inviate alla tua API self-hosted in una sessione sicura.",
     "tagline": "Posta leggera che non intralcia.",
-    "server": "Server"
+    "server": "Server",
+    "asAdmin": "Accedi come amministratore"
   },
   "settings": {
     "title": "Impostazioni",

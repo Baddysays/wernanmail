@@ -13,13 +13,14 @@ import (
 	"net"
 	"strings"
 
+	"blitiri.com.ar/go/spf"
 	"github.com/emersion/go-msgauth/dkim"
 )
 
-// Checker performs SPF/DKIM checks (best-effort).
+// Checker performs SPF/DKIM checks.
 type Checker struct{}
 
-// CheckSPF returns pass|fail|softfail|none|error.
+// CheckSPF returns pass|fail|softfail|none|temperror|permerror.
 func (c *Checker) CheckSPF(ctx context.Context, from, ip string) string {
 	_ = ctx
 	at := strings.LastIndex(from, "@")
@@ -27,35 +28,30 @@ func (c *Checker) CheckSPF(ctx context.Context, from, ip string) string {
 		return "none"
 	}
 	domain := from[at+1:]
-	txts, err := net.LookupTXT(domain)
-	if err != nil {
-		return "error"
-	}
-	var spf string
-	for _, t := range txts {
-		if strings.HasPrefix(strings.ToLower(t), "v=spf1") {
-			spf = t
-			break
-		}
-	}
-	if spf == "" {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
 		return "none"
 	}
-	lower := strings.ToLower(spf)
-	if strings.Contains(lower, "-all") && ip != "" {
-		// Minimal: if explicit ip4: matches, pass; else softfail/fail heuristic
-		if strings.Contains(lower, "ip4:"+ip) {
-			return "pass"
-		}
-		if strings.Contains(lower, " +mx") || strings.Contains(lower, " mx") {
-			return "softfail"
-		}
+	res, err := spf.CheckHostWithSender(parsed, domain, from)
+	if err != nil && res == spf.None {
+		return "error"
+	}
+	switch res {
+	case spf.Pass:
+		return "pass"
+	case spf.Fail:
 		return "fail"
-	}
-	if strings.Contains(lower, "~all") {
+	case spf.SoftFail:
 		return "softfail"
+	case spf.Neutral, spf.None:
+		return "none"
+	case spf.TempError:
+		return "temperror"
+	case spf.PermError:
+		return "permerror"
+	default:
+		return "none"
 	}
-	return "none"
 }
 
 // CheckDKIM verifies DKIM signatures on raw message.
@@ -112,10 +108,16 @@ func SignDKIM(raw []byte, domain, selector, privatePEM string) ([]byte, error) {
 		return nil, err
 	}
 	opts := &dkim.SignOptions{
-		Domain:   domain,
-		Selector: selector,
-		Signer:   key,
-		Hash:     crypto.SHA256,
+		Domain:                 domain,
+		Selector:               selector,
+		Signer:                 key,
+		Hash:                   crypto.SHA256,
+		HeaderCanonicalization: dkim.CanonicalizationRelaxed,
+		BodyCanonicalization:   dkim.CanonicalizationRelaxed,
+		HeaderKeys: []string{
+			"From", "To", "Cc", "Subject", "Date", "Message-ID",
+			"MIME-Version", "Content-Type", "Reply-To",
+		},
 	}
 	var buf bytes.Buffer
 	if err := dkim.Sign(&buf, bytes.NewReader(raw), opts); err != nil {

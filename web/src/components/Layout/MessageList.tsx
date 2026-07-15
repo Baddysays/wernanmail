@@ -9,6 +9,8 @@ type MessageListProps = {
   selectedId: string | null
   loading?: boolean
   folderRole?: FolderRole
+  searchQuery?: string
+  onSearchChange?: (q: string) => void
   onSelect: (id: string) => void
   onRefresh?: () => void
   onToggleStar?: (id: string) => void
@@ -20,6 +22,8 @@ export function MessageList({
   selectedId,
   loading,
   folderRole = 'other',
+  searchQuery = '',
+  onSearchChange,
   onSelect,
   onRefresh,
   onToggleStar,
@@ -66,6 +70,16 @@ export function MessageList({
         >
           ⌫
         </button>
+        {onSearchChange ? (
+          <input
+            className={styles.search}
+            type="search"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder={t('mail.searchPlaceholder')}
+            aria-label={t('mail.searchPlaceholder')}
+          />
+        ) : null}
         {messages.length > 0 ? (
           <span className={styles.toolbarMeta}>
             {unreadCount > 0

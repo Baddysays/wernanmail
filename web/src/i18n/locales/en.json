@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "Lightweight self-hosted mail"
@@ -31,7 +31,14 @@
     "submitting": "Signing in…",
     "hint": "Credentials are sent to your self-hosted API over a secure session.",
     "tagline": "Light mail that stays out of the way.",
-    "server": "Server"
+    "server": "Server",
+    "asAdmin": "Sign in as administrator",
+    "impersonating": "Signing in as mailbox user…"
+  },
+  "impersonate": {
+    "banner": "Admin session: viewing {{user}} (as {{admin}})",
+    "admin": "admin",
+    "exit": "End admin session"
   },
   "settings": {
     "title": "Settings",
@@ -85,7 +92,8 @@
     "newMail": "New message",
     "newMailCount": "{{count}} new messages",
     "emptySpam": "Spam is empty",
-    "emptySpamHint": "Messages filtered as junk appear here. Check this folder if a reply seems missing."
+    "emptySpamHint": "Messages filtered as junk appear here. Check this folder if a reply seems missing.",
+    "searchPlaceholder": "Search (/)…"
   },
   "errors": {
     "generic": "Something went wrong",
@@ -102,7 +110,9 @@
       "mail.session_invalid": "Session expired — please sign in again",
       "mail.send_failed": "Could not send the message",
       "mail.flag_failed": "Could not update flags",
-      "mail.trash_failed": "Could not delete message"
+      "mail.trash_failed": "Could not delete message",
+      "mail.impersonate_invalid": "Admin login link expired or invalid",
+      "mail.impersonate_unavailable": "Superuser login is not configured on the server"
     }
   },
   "common": {
@@ -124,5 +134,12 @@
     "sending": "Sending…",
     "toRequired": "Add at least one recipient",
     "sendFailed": "Could not send the message"
+  },
+  "mailport": {
+    "title": "Embed mail into your product",
+    "body": "Mailport is the lightweight embed surface for Wernanmail — same stack, scoped for host apps.",
+    "step1": "Point an iframe at /mailport (this page).",
+    "step2": "Pass theme/compact query params to match the host UI.",
+    "step3": "Later: scoped API tokens so the iframe can open a real mailbox without a full login form."
   }
 }

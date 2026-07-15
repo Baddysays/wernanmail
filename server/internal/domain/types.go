@@ -5,14 +5,15 @@ import "time"
 
 // Domain is a hosted mail domain.
 type Domain struct {
-	ID           int64     `json:"id"`
-	Name         string    `json:"name"`
-	Enabled      bool      `json:"enabled"`
-	CatchAll     string    `json:"catchAll"`
-	DKIMSelector string    `json:"dkimSelector"`
-	DKIMPrivate  string    `json:"-"`
-	DKIMPublic   string    `json:"dkimPublic"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID                int64     `json:"id"`
+	Name              string    `json:"name"`
+	Enabled           bool      `json:"enabled"`
+	CatchAll          string    `json:"catchAll"`
+	DefaultQuotaBytes int64     `json:"defaultQuotaBytes"`
+	DKIMSelector      string    `json:"dkimSelector"`
+	DKIMPrivate       string    `json:"-"`
+	DKIMPublic        string    `json:"dkimPublic"`
+	CreatedAt         time.Time `json:"createdAt"`
 }
 
 // Mailbox is a user mailbox under a domain.

@@ -2,14 +2,14 @@ export class ApiError extends Error {
   code: string
   status: number
 
-  constructor(code: string, status: number) {
-    super(code)
+  constructor(code: string, status: number, message?: string) {
+    super(message || code)
     this.code = code
     this.status = status
   }
 }
 
-type ErrorBody = { code?: string }
+type ErrorBody = { code?: string; message?: string; error?: { code?: string; message?: string } }
 type DataBody<T> = { data: T }
 
 async function parse<T>(res: Response): Promise<T> {
@@ -23,11 +23,17 @@ async function parse<T>(res: Response): Promise<T> {
     }
   }
   if (!res.ok) {
-    const code =
-      json && typeof json === 'object' && 'code' in json
-        ? String((json as ErrorBody).code ?? 'mail.internal_error')
-        : 'mail.internal_error'
-    throw new ApiError(code, res.status)
+    let code = 'mail.internal_error'
+    let message = res.statusText || code
+    if (json && typeof json === 'object') {
+      const body = json as ErrorBody
+      if (body.error?.code) code = String(body.error.code)
+      else if (body.code) code = String(body.code)
+      if (body.error?.message) message = String(body.error.message)
+      else if (body.message) message = String(body.message)
+      else message = code
+    }
+    throw new ApiError(code, res.status, message)
   }
   if (json && typeof json === 'object' && 'data' in json) {
     return (json as DataBody<T>).data
@@ -61,7 +67,29 @@ export type LoginPayload = {
 }
 
 export function login(payload: LoginPayload) {
-  return apiPost<{ username: string }>('/api/auth/login', payload)
+  return apiPost<{ username: string; impersonated?: boolean }>('/api/auth/login', payload)
+}
+
+export const IMPERSONATE_KEY = 'wernanmail.impersonate'
+
+export type ImpersonatePayload = {
+  token: string
+  imapHost?: string
+  imapPort?: number
+  smtpHost?: string
+  smtpPort?: number
+  tls?: boolean
+}
+
+export function impersonateLogin(payload: ImpersonatePayload) {
+  return apiPost<{ username: string; impersonated: boolean; impersonatedBy?: string }>(
+    '/api/auth/impersonate',
+    payload,
+  )
+}
+
+export function fetchMe() {
+  return apiGet<{ username: string; impersonated: boolean; impersonatedBy?: string }>('/api/auth/me')
 }
 
 export function logout() {

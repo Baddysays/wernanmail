@@ -2,6 +2,7 @@ package antispam
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"strings"
 
@@ -11,10 +12,26 @@ import (
 
 // Engine scores inbound mail.
 type Engine struct {
-	DNS       *dnsauth.Checker
-	RejectAt  float64
+	DNS          *dnsauth.Checker
+	RejectAt     float64
 	QuarantineAt float64
-	RBLs      []string
+	RBLs         []string
+}
+
+// New constructs an Engine with thresholds applied once (no concurrent mutation).
+func New(dns *dnsauth.Checker, rejectAt, quarantineAt float64, rbls []string) *Engine {
+	if rejectAt == 0 {
+		rejectAt = 10
+	}
+	if quarantineAt == 0 {
+		quarantineAt = 5
+	}
+	return &Engine{
+		DNS:          dns,
+		RejectAt:     rejectAt,
+		QuarantineAt: quarantineAt,
+		RBLs:         rbls,
+	}
 }
 
 // Input is one message under evaluation.
@@ -29,11 +46,13 @@ type Input struct {
 
 // Check returns a verdict.
 func (e *Engine) Check(ctx context.Context, in Input) domain.SpamVerdict {
-	if e.RejectAt == 0 {
-		e.RejectAt = 10
+	rejectAt := e.RejectAt
+	quarantineAt := e.QuarantineAt
+	if rejectAt == 0 {
+		rejectAt = 10
 	}
-	if e.QuarantineAt == 0 {
-		e.QuarantineAt = 5
+	if quarantineAt == 0 {
+		quarantineAt = 5
 	}
 	var v domain.SpamVerdict
 	add := func(code, detail string, score float64) {
@@ -54,7 +73,7 @@ func (e *Engine) Check(ctx context.Context, in Input) domain.SpamVerdict {
 	}
 	if len(in.Raw) > 0 {
 		body := string(in.Raw)
-		if strings.Count(body, "http://") + strings.Count(body, "https://") > 15 {
+		if strings.Count(body, "http://")+strings.Count(body, "https://") > 15 {
 			add("url_density", "many URLs in body", 2)
 		}
 		if strings.Contains(body, "Content-Transfer-Encoding: base64") && len(in.Raw) > 200_000 {
@@ -86,9 +105,9 @@ func (e *Engine) Check(ctx context.Context, in Input) domain.SpamVerdict {
 	}
 
 	switch {
-	case v.Score >= e.RejectAt:
+	case v.Score >= rejectAt:
 		v.Action = domain.SpamReject
-	case v.Score >= e.QuarantineAt:
+	case v.Score >= quarantineAt:
 		v.Action = domain.SpamQuarantine
 	case v.Score >= 2:
 		v.Action = domain.SpamFlag
@@ -100,11 +119,14 @@ func (e *Engine) Check(ctx context.Context, in Input) domain.SpamVerdict {
 
 func checkRBL(ip string, zones []string) string {
 	parsed := net.ParseIP(ip)
-	if parsed == nil || parsed.To4() == nil {
+	if parsed == nil {
 		return ""
 	}
 	b := parsed.To4()
-	rev := net.IPv4(b[3], b[2], b[1], b[0]).String()
+	if b == nil {
+		return "" // IPv6 RBLs not wired yet
+	}
+	rev := fmt.Sprintf("%d.%d.%d.%d", b[3], b[2], b[1], b[0])
 	for _, zone := range zones {
 		name := rev + "." + zone
 		if _, err := net.LookupHost(name); err == nil {

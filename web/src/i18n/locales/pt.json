@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "Cliente de e-mail auto-hospedado leve"
@@ -31,7 +31,8 @@
     "submitting": "A entrar…",
     "hint": "As credenciais são enviadas para a sua API auto-hospedada numa sessão segura.",
     "tagline": "Email leve que não atrapalha.",
-    "server": "Servidor"
+    "server": "Servidor",
+    "asAdmin": "Entrar como administrador"
   },
   "settings": {
     "title": "Definições",

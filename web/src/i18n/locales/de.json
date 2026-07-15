@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "Leichter selbst gehosteter Mail-Client"
@@ -31,7 +31,8 @@
     "submitting": "Anmeldung…",
     "hint": "Zugangsdaten werden über eine sichere Sitzung an Ihre selbst gehostete API gesendet.",
     "tagline": "Leichte Mail, die nicht im Weg steht.",
-    "server": "Server"
+    "server": "Server",
+    "asAdmin": "Als Administrator anmelden"
   },
   "settings": {
     "title": "Einstellungen",

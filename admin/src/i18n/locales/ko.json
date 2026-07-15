@@ -1,0 +1,192 @@
+{
+  "app": {
+    "name": "Wernanmail",
+    "adminSubtitle": "Mail server",
+    "tagline": "Full corporate mail that stays light — operators welcome."
+  },
+  "mode": {
+    "asUser": "Sign in as user"
+  },
+  "login": {
+    "title": "Admin sign in",
+    "subtitle": "Operator console for domains, queue, DNS, and delivery.",
+    "username": "Username",
+    "password": "Password",
+    "submit": "Continue"
+  },
+  "nav": {
+    "overview": "Overview",
+    "domains": "Domains",
+    "mailboxes": "Mailboxes",
+    "queue": "Queue",
+    "quarantine": "Quarantine",
+    "settings": "Settings",
+    "backup": "Backup",
+    "audit": "Audit"
+  },
+  "actions": {
+    "dnsHelper": "DNS helper",
+    "logout": "Log out",
+    "menu": "Menu",
+    "closeMenu": "Close menu",
+    "refresh": "Refresh",
+    "save": "Save",
+    "close": "Close",
+    "copy": "Copy",
+    "copied": "Copied",
+    "add": "Add",
+    "release": "Release",
+    "delete": "Delete",
+    "download": "Download JSON"
+  },
+  "health": {
+    "ready": "ready",
+    "addDomain": "add domain",
+    "publishTxt": "publish TXT",
+    "keyReady": "key ready",
+    "generate": "generate",
+    "updated": "updated {{s}}s ago",
+    "dead": "{{n}} dead"
+  },
+  "overview": {
+    "healthyTitle": "Mail is healthy",
+    "attentionTitle": "Mail needs attention",
+    "healthyBody": "Core services look fine. Publish DKIM if missing, then watch quarantine.",
+    "attentionBody": "Queue or dead letters are elevated — check Queue / Quarantine, then DNS.",
+    "queueTitle": "Queue depth · recent samples",
+    "pendingNow": "Pending now",
+    "deadShort": "dead {{n}}",
+    "quarantineTitle": "Quarantine",
+    "viewQuarantine": "View quarantine →",
+    "dnsTitle": "DNS & deliverability",
+    "dnsBody": "Copy SPF, DKIM and DMARC for the selected domain. MX should point to this host.",
+    "domainsCount": "Domains on this host",
+    "openDns": "Open DNS helper",
+    "quickTitle": "Quick actions",
+    "snapTitle": "Policy snapshot",
+    "quota": "Default quota",
+    "spamQ": "Quarantine score ≥",
+    "spamR": "Reject score ≥",
+    "av": "Antivirus",
+    "relay": "Relay host",
+    "on": "on",
+    "off": "off",
+    "none": "direct MX"
+  },
+  "domains": {
+    "title": "Domains",
+    "subtitle": "Domains, DKIM keys, catch-all, and mailbox shortcuts.",
+    "placeholder": "example.com",
+    "catchAll": "Catch-all local part (optional)",
+    "add": "Add domain",
+    "colDomain": "Domain",
+    "colDkim": "DKIM",
+    "colStatus": "Status",
+    "enabled": "Enabled",
+    "active": "Active",
+    "off": "Off",
+    "empty": "No domains yet.",
+    "select": "Select a domain",
+    "genDkim": "Generate DKIM",
+    "rotateDkim": "Rotate DKIM",
+    "dnsRecords": "DNS records",
+    "mailboxes": "Mailboxes",
+    "selector": "Selector",
+    "quickAdd": "Quick add mailbox",
+    "localPart": "Local part",
+    "password": "Password",
+    "displayName": "Display name",
+    "addMailbox": "Add mailbox",
+    "mailboxCount": "{{n}} mailbox(es) on this domain",
+    "aliases": "Aliases",
+    "aliasLocal": "Alias local part",
+    "aliasTarget": "Target mailbox",
+    "addAlias": "Add alias",
+    "noAliases": "No aliases yet"
+  },
+  "mailboxes": {
+    "title": "Mailboxes",
+    "subtitle": "Pick a domain, then a mailbox. Manage aliases on the right.",
+    "selectDomain": "Select domain…",
+    "chooseDomain": "Choose a domain to list mailboxes.",
+    "colMailbox": "Mailbox",
+    "colQuota": "Quota",
+    "colStatus": "Status",
+    "empty": "No mailboxes",
+    "select": "Select a mailbox",
+    "details": "Mailbox details",
+    "quota": "Quota",
+    "unlimited": "unlimited",
+    "created": "Created",
+    "noDisplay": "No display name",
+    "addAnother": "Add another mailbox"
+  },
+  "queue": {
+    "title": "Queue",
+    "subtitle": "Outbound and local delivery jobs.",
+    "colId": "ID",
+    "colKind": "Kind",
+    "colAttempts": "Attempts",
+    "colError": "Error",
+    "empty": "Queue empty"
+  },
+  "quarantine": {
+    "title": "Quarantine",
+    "subtitle": "Held messages — release to inbox or delete.",
+    "colFrom": "From",
+    "colSubject": "Subject",
+    "colVerdict": "Verdict",
+    "empty": "Nothing quarantined"
+  },
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Delivery, antispam, antivirus, and quotas.",
+    "save": "Save settings",
+    "empty": "No settings keys",
+    "groups": {
+      "mail": "Mail",
+      "antispam": "Antispam",
+      "antivirus": "Antivirus"
+    },
+    "keys": {
+      "mail.max_message_bytes": "Max message size (bytes)",
+      "mail.rate_submit_per_min": "Submission rate / min",
+      "mail.rate_smtp_conn_per_min": "SMTP connections / min",
+      "mail.default_quota_bytes": "Default mailbox quota (bytes)",
+      "mail.retention_days": "Retention days (0 = keep)",
+      "mail.relay_host": "Outbound relay host",
+      "mail.greylist_seconds": "Greylist seconds (0 = off)",
+      "antispam.reject_at": "Reject score ≥",
+      "antispam.quarantine_at": "Quarantine score ≥",
+      "antispam.rbls": "RBL hosts (comma-separated)",
+      "antivirus.enabled": "Antivirus enabled (true/false)"
+    }
+  },
+  "backup": {
+    "title": "Backup",
+    "subtitle": "Export domains, mailboxes, aliases, and settings (no passwords / private keys).",
+    "hint": "Store this JSON offline. Maildir bodies are not included — back up the data volume separately.",
+    "download": "Download backup JSON",
+    "loading": "Preparing…"
+  },
+  "audit": {
+    "title": "Audit",
+    "subtitle": "Recent admin actions.",
+    "colWhen": "When",
+    "colActor": "Actor",
+    "colAction": "Action",
+    "colTarget": "Target",
+    "empty": "No audit entries"
+  },
+  "dns": {
+    "title": "DNS setup helper",
+    "body": "Publish these for {{name}} so delivery and spoofing checks work.",
+    "genFirst": "generate key first",
+    "host": "Host",
+    "type": "Type",
+    "footer": "Also set MX → mail.{{name}} and PTR on the outbound IP."
+  },
+  "lang": {
+    "label": "Language"
+  }
+}

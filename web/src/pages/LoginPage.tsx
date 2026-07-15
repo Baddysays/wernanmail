@@ -1,7 +1,7 @@
-import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ApiError, login } from '../api/client'
+import { ApiError, IMPERSONATE_KEY, impersonateLogin, login } from '../api/client'
 import {
   MOOD_IDS,
   resolveMood,
@@ -17,22 +17,74 @@ type LoginForm = {
   password: string
 }
 
+function defaultImapHost() {
+  if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost') {
+    return window.location.hostname
+  }
+  return 'mail.wernanmail.ru'
+}
+
 export function LoginPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const settings = useSettings()
   const effectiveMood = resolveMood(settings.mood)
-  const [form, setForm] = useState<LoginForm>({
-    imapHost: 'mail.baddysays.ru',
+  const [form, setForm] = useState<LoginForm>(() => ({
+    imapHost: defaultImapHost(),
     username: '',
     password: '',
-  })
+  }))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [impersonating, setImpersonating] = useState(() => Boolean(searchParams.get('impersonate')))
 
   function selectMood(id: MoodId) {
     updateSettings({ mood: id })
   }
+
+  useEffect(() => {
+    const token = searchParams.get('impersonate')
+    if (!token) return
+    let cancelled = false
+    setImpersonating(true)
+    setError(null)
+    const host = defaultImapHost()
+    void (async () => {
+      try {
+        const data = await impersonateLogin({
+          token,
+          imapHost: host,
+          imapPort: 993,
+          smtpHost: host,
+          smtpPort: 465,
+          tls: true,
+        })
+        if (cancelled) return
+        sessionStorage.removeItem('wernanmail.demo')
+        sessionStorage.setItem(
+          IMPERSONATE_KEY,
+          JSON.stringify({
+            username: data.username,
+            impersonatedBy: data.impersonatedBy || '',
+          }),
+        )
+        navigate('/mail', { replace: true })
+      } catch (err) {
+        if (cancelled) return
+        sessionStorage.removeItem(IMPERSONATE_KEY)
+        if (err instanceof ApiError) {
+          setError(t(`errors.codes.${err.code}`, { defaultValue: t('errors.generic') }))
+        } else {
+          setError(t('errors.network'))
+        }
+        setImpersonating(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [searchParams, navigate, t])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -50,12 +102,13 @@ export function LoginPage() {
         imapHost: host,
         imapPort: 993,
         smtpHost: host,
-        smtpPort: 587,
+        smtpPort: 465,
         username: form.username.trim(),
         password: form.password,
         tls: true,
       })
       sessionStorage.removeItem('wernanmail.demo')
+      sessionStorage.removeItem(IMPERSONATE_KEY)
       navigate('/mail')
     } catch (err) {
       if (err instanceof ApiError) {
@@ -74,8 +127,24 @@ export function LoginPage() {
     }
   }
 
+  if (impersonating && !error) {
+    return (
+      <div className={styles.page}>
+        <main className={styles.panel}>
+          <div className={styles.panelInner}>
+            <h1 className={styles.title}>{t('app.name')}</h1>
+            <p className={styles.subtitle}>{t('login.impersonating')}</p>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className={styles.page}>
+      <a className={styles.modeSwitch} href="/admin/">
+        {t('login.asAdmin')}
+      </a>
       <aside className={styles.hero} aria-label={t('app.name')}>
         <div className={styles.aurora} aria-hidden>
           <span className={styles.blobA} />

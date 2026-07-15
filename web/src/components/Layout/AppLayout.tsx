@@ -1,11 +1,53 @@
+import { useEffect, useState } from 'react'
 import { Link, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { logout } from '../../api/client'
+import { fetchMe, logout, IMPERSONATE_KEY } from '../../api/client'
 import styles from './AppLayout.module.css'
+
+type ImpersonateInfo = { username: string; impersonatedBy: string }
+
+function readImpersonate(): ImpersonateInfo | null {
+  try {
+    const raw = sessionStorage.getItem(IMPERSONATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as ImpersonateInfo
+    if (!parsed?.username) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
 
 export function AppLayout() {
   const { t } = useTranslation()
   const navigate = useNavigate()
+  const [impersonate, setImpersonate] = useState<ImpersonateInfo | null>(() => readImpersonate())
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const me = await fetchMe()
+        if (cancelled) return
+        if (me.impersonated) {
+          const info = {
+            username: me.username,
+            impersonatedBy: me.impersonatedBy || '',
+          }
+          sessionStorage.setItem(IMPERSONATE_KEY, JSON.stringify(info))
+          setImpersonate(info)
+        } else {
+          sessionStorage.removeItem(IMPERSONATE_KEY)
+          setImpersonate(null)
+        }
+      } catch {
+        /* not signed in yet — route guards handle it */
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   async function handleLogout() {
     try {
@@ -13,11 +55,25 @@ export function AppLayout() {
     } catch {
       /* session may already be gone */
     }
+    sessionStorage.removeItem(IMPERSONATE_KEY)
     navigate('/login')
   }
 
   return (
     <div className={styles.shell}>
+      {impersonate ? (
+        <div className={styles.suBanner} role="status">
+          <span>
+            {t('impersonate.banner', {
+              user: impersonate.username,
+              admin: impersonate.impersonatedBy || t('impersonate.admin'),
+            })}
+          </span>
+          <button type="button" className={styles.suExit} onClick={() => void handleLogout()}>
+            {t('impersonate.exit')}
+          </button>
+        </div>
+      ) : null}
       <header className={styles.header}>
         <Link to="/mail" className={styles.brand}>
           <span className={styles.brandIcon} aria-hidden>

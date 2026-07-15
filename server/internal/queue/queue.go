@@ -16,6 +16,19 @@ type Service struct {
 	Store store.QueueStore
 }
 
+func maxAttemptsFor(kind domain.QueueJobKind) int {
+	switch kind {
+	case domain.JobBounce:
+		return 1
+	case domain.JobInboundDeliver:
+		return 5
+	case domain.JobOutboundSend:
+		return 8
+	default:
+		return 3
+	}
+}
+
 func (s *Service) EnqueueJSON(ctx context.Context, kind domain.QueueJobKind, payload any) error {
 	b, err := json.Marshal(payload)
 	if err != nil {
@@ -24,7 +37,7 @@ func (s *Service) EnqueueJSON(ctx context.Context, kind domain.QueueJobKind, pay
 	return s.Store.Enqueue(ctx, &domain.QueueJob{
 		Kind:        kind,
 		PayloadJSON: string(b),
-		MaxAttempts: 8,
+		MaxAttempts: maxAttemptsFor(kind),
 		NextAt:      time.Now().UTC(),
 	})
 }
@@ -63,4 +76,12 @@ type OutboundPayload struct {
 	To       []string `json:"to"`
 	RawB64   string   `json:"rawB64"`
 	DomainID int64    `json:"domainId"`
+}
+
+// BouncePayload asks the worker to generate a DSN to the original sender.
+type BouncePayload struct {
+	OriginalFrom string `json:"originalFrom"`
+	FailedTo     string `json:"failedTo"`
+	Reason       string `json:"reason"`
+	RawB64       string `json:"rawB64"`
 }

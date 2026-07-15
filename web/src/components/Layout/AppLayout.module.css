@@ -5,6 +5,34 @@
   background: var(--bg-page);
 }
 
+.suBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 1rem;
+  font-size: var(--font-size-sm);
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-panel));
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border-subtle));
+  flex-shrink: 0;
+}
+
+.suExit {
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.65rem;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.suExit:hover {
+  background: var(--bg-hover);
+}
+
 .header {
   display: flex;
   align-items: center;

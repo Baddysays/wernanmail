@@ -16,28 +16,62 @@ const (
 	KeyRateSMTPConnPerMin  = "mail.rate_smtp_conn_per_min"
 	KeySpamRejectAt        = "antispam.reject_at"
 	KeySpamQuarantineAt    = "antispam.quarantine_at"
+	KeySpamFlagAt          = "antispam.flag_at"
 	KeySpamRBLs            = "antispam.rbls"
+	KeySpamRejectMessage   = "antispam.reject_message"
 	KeyAVEnabled           = "antivirus.enabled"
 	KeyDefaultQuotaBytes   = "mail.default_quota_bytes"
 	KeyRetentionDays       = "mail.retention_days"
 	KeyRelayHost           = "mail.relay_host"
 	KeyGreylistSeconds     = "mail.greylist_seconds"
+	KeyRateSendPerHour     = "mail.rate_send_per_hour"
+	KeyRateAuthFailPerMin  = "mail.rate_auth_fail_per_min"
+	KeyBounceEnabled       = "mail.bounce_enabled"
+	KeyFooterPlain         = "mail.footer_plain"
+	KeyFooterHTML          = "mail.footer_html"
+	KeyFooterSkipReplies   = "mail.footer_skip_replies"
+	KeyBodyTemplatePlain   = "mail.body_template_plain"
+	KeyBodyTemplateHTML    = "mail.body_template_html"
+	KeyRequireTLSOutbound  = "mail.require_tls_outbound"
+	KeyQuarantineRetention = "quarantine.retention_days"
+	KeyPasswordMinLength   = "security.password_min_length"
+	KeyPasswordRequireDigit = "security.password_require_digit"
+	KeyPasswordRequireUpper = "security.password_require_upper"
+	KeySuperuserEnabled    = "admin.superuser_enabled"
+	KeyWebmailURL          = "admin.webmail_url"
 )
 
 // Defaults returns built-in defaults.
 func Defaults() map[string]string {
 	return map[string]string{
-		KeyMaxMessageBytes:    strconv.Itoa(25 << 20),
-		KeyRateSubmitPerMin:   "60",
-		KeyRateSMTPConnPerMin: "120",
-		KeySpamRejectAt:       "10",
-		KeySpamQuarantineAt:   "5",
-		KeySpamRBLs:           "zen.spamhaus.org",
-		KeyAVEnabled:          "true",
-		KeyDefaultQuotaBytes:  strconv.FormatInt(200<<20, 10),
-		KeyRetentionDays:      "0",
-		KeyRelayHost:          "",
-		KeyGreylistSeconds:    "0",
+		KeyMaxMessageBytes:      strconv.Itoa(25 << 20),
+		KeyRateSubmitPerMin:     "60",
+		KeyRateSMTPConnPerMin:   "120",
+		KeySpamRejectAt:         "10",
+		KeySpamQuarantineAt:     "5",
+		KeySpamFlagAt:           "3",
+		KeySpamRBLs:             "zen.spamhaus.org",
+		KeySpamRejectMessage:    "Message rejected as spam",
+		KeyAVEnabled:            "true",
+		KeyDefaultQuotaBytes:    strconv.FormatInt(200<<20, 10),
+		KeyRetentionDays:        "0",
+		KeyRelayHost:            "",
+		KeyGreylistSeconds:      "0",
+		KeyRateSendPerHour:      "200",
+		KeyRateAuthFailPerMin:   "20",
+		KeyBounceEnabled:        "true",
+		KeyFooterPlain:          "",
+		KeyFooterHTML:           "",
+		KeyFooterSkipReplies:    "true",
+		KeyBodyTemplatePlain:    "",
+		KeyBodyTemplateHTML:     "",
+		KeyRequireTLSOutbound:   "false",
+		KeyQuarantineRetention:  "14",
+		KeyPasswordMinLength:    "8",
+		KeyPasswordRequireDigit: "false",
+		KeyPasswordRequireUpper: "false",
+		KeySuperuserEnabled:     "false",
+		KeyWebmailURL:           "",
 	}
 }
 
@@ -127,9 +161,19 @@ func NewLimiter(perMin int) *Limiter {
 	if perMin <= 0 {
 		perMin = 60
 	}
+	return NewLimiterWindow(perMin, time.Minute)
+}
+
+func NewLimiterWindow(limit int, window time.Duration) *Limiter {
+	if limit <= 0 {
+		limit = 60
+	}
+	if window <= 0 {
+		window = time.Minute
+	}
 	return &Limiter{
-		window: time.Minute,
-		limit:  perMin,
+		window: window,
+		limit:  limit,
 		hits:   map[string][]time.Time{},
 	}
 }
