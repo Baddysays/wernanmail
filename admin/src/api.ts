@@ -1,14 +1,29 @@
-export function authHeader(user, pass) {
+import type { AdminCreds, DnsRecord, Domain } from './types'
+
+export function authHeader(user: string, pass: string): string {
   // UTF-8 safe Basic auth (btoa alone breaks on non-Latin1).
   const raw = `${user}:${pass}`
   const bytes = new TextEncoder().encode(raw)
   let bin = ''
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!)
   return 'Basic ' + btoa(bin)
 }
 
-export async function api(path, { token, user, pass, method = 'GET', body } = {}) {
-  const headers = {
+export type ApiOptions = {
+  token?: string
+  user?: string
+  pass?: string
+  method?: string
+  body?: unknown
+}
+
+type ApiErrorBody = {
+  error?: { message?: string; code?: string }
+}
+
+export async function api<T = unknown>(path: string, opts: ApiOptions | AdminCreds = {}): Promise<T> {
+  const { token, user, pass, method = 'GET', body } = opts as ApiOptions & AdminCreds
+  const headers: Record<string, string> = {
     ...(body ? { 'Content-Type': 'application/json' } : {}),
   }
   if (token) {
@@ -21,22 +36,22 @@ export async function api(path, { token, user, pass, method = 'GET', body } = {}
     headers,
     body: body ? JSON.stringify(body) : undefined,
   })
-  const json = await res.json().catch(() => ({}))
+  const json = (await res.json().catch(() => ({}))) as ApiErrorBody & { data?: T }
   if (!res.ok) {
     throw new Error(json?.error?.message || json?.error?.code || res.statusText)
   }
-  return json.data
+  return json.data as T
 }
 
-export function domainName(d) {
+export function domainName(d: Domain | null | undefined): string {
   return d?.name || d?.Name || ''
 }
 
-export function domainId(d) {
+export function domainId(d: Domain | null | undefined): string | undefined {
   return d?.id ?? d?.ID
 }
 
-export function dnsRecordsFor(domain) {
+export function dnsRecordsFor(domain: Domain | null | undefined): DnsRecord[] {
   const name = domainName(domain) || 'example.com'
   const selector = domain?.dkimSelector || domain?.DKIMSelector || 'wernan'
   const dkim = domain?.dkimPublic || domain?.DKIMPublic || ''

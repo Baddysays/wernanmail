@@ -1,9 +1,32 @@
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 
-export function Select({ value, onChange, options, placeholder, disabled, className = '', 'aria-label': ariaLabel }) {
+export type SelectOption<T extends string | number = string> = {
+  value: T
+  label: string
+}
+
+type SelectProps<T extends string | number = string> = {
+  value: T | ''
+  onChange: (value: T) => void
+  options: SelectOption<T>[]
+  placeholder?: string
+  disabled?: boolean
+  className?: string
+  'aria-label'?: string
+}
+
+export function Select<T extends string | number = string>({
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+  className = '',
+  'aria-label': ariaLabel,
+}: SelectProps<T>) {
   const [open, setOpen] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
-  const rootRef = useRef(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   const listId = useId()
   const selected = options.find((o) => String(o.value) === String(value))
   const label = selected?.label ?? placeholder ?? ''
@@ -12,21 +35,21 @@ export function Select({ value, onChange, options, placeholder, disabled, classN
   useEffect(() => {
     if (!open) return
     setActiveIdx(selectedIdx >= 0 ? selectedIdx : 0)
-    function onDoc(e) {
-      if (!rootRef.current?.contains(e.target)) setOpen(false)
+    function onDoc(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', onDoc)
     return () => document.removeEventListener('mousedown', onDoc)
   }, [open, selectedIdx])
 
-  function commit(idx) {
+  function commit(idx: number) {
     const opt = options[idx]
     if (!opt) return
     onChange(opt.value)
     setOpen(false)
   }
 
-  function onTriggerKey(e) {
+  function onTriggerKey(e: KeyboardEvent<HTMLButtonElement>) {
     if (disabled) return
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === ' ') {
       e.preventDefault()
@@ -43,7 +66,7 @@ export function Select({ value, onChange, options, placeholder, disabled, classN
     }
   }
 
-  function onListKey(e) {
+  function onListKey(e: KeyboardEvent<HTMLUListElement>) {
     if (e.key === 'Escape') {
       e.preventDefault()
       setOpen(false)
@@ -91,13 +114,7 @@ export function Select({ value, onChange, options, placeholder, disabled, classN
         <span className="wm-select-chevron" aria-hidden />
       </button>
       {open ? (
-        <ul
-          className="wm-select-menu"
-          role="listbox"
-          id={listId}
-          tabIndex={-1}
-          onKeyDown={onListKey}
-        >
+        <ul className="wm-select-menu" role="listbox" id={listId} tabIndex={-1} onKeyDown={onListKey}>
           {options.map((o, idx) => {
             const active = String(o.value) === String(value)
             const focused = idx === activeIdx

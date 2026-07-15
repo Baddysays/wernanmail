@@ -1,14 +1,30 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LOCALES, setAdminLang } from './i18n'
 import { api, dnsRecordsFor, domainId, domainName } from './api'
 import { Select } from './Select'
+import type {
+  AdminCreds,
+  Alias,
+  AuditEntry,
+  Dashboard,
+  DnsCheck,
+  DnsStatus,
+  Domain,
+  HostStats,
+  Mailbox,
+  NavTab,
+  OpsStatus,
+  QuarantineItem,
+  QueueJob,
+  SettingGroup,
+  SparkSample,
+} from './types'
 
-const NAV = ['overview', 'domains', 'mailboxes', 'queue', 'quarantine', 'settings', 'backup', 'audit']
+const NAV: NavTab[] = ['overview', 'domains', 'mailboxes', 'queue', 'quarantine', 'settings', 'backup', 'audit']
 
-/** @typedef {'text' | 'number' | 'bool' | 'textarea'} SettingType */
-/** @type {{ id: string, fields: { key: string, type: SettingType, hint?: string }[] }[]} */
-const SETTING_GROUPS = [
+const SETTING_GROUPS: SettingGroup[] = [
   {
     id: 'mail',
     fields: [
@@ -72,22 +88,22 @@ const SETTING_GROUPS = [
 const SPARK_KEY = 'wm_queue_spark'
 const SPARK_MAX = 24
 
-function loadSpark() {
+function loadSpark(): SparkSample[] {
   try {
-    const raw = JSON.parse(sessionStorage.getItem(SPARK_KEY) || '[]')
+    const raw: unknown = JSON.parse(sessionStorage.getItem(SPARK_KEY) || '[]')
     return Array.isArray(raw) ? raw.slice(-SPARK_MAX) : []
   } catch {
     return []
   }
 }
 
-function pushSpark(n) {
+function pushSpark(n: number): SparkSample[] {
   const next = [...loadSpark(), { t: Date.now(), n: Number(n) || 0 }].slice(-SPARK_MAX)
   sessionStorage.setItem(SPARK_KEY, JSON.stringify(next))
   return next
 }
 
-function formatBytes(n) {
+function formatBytes(n: unknown): string {
   const v = Number(n) || 0
   if (v >= 1 << 30) return `${(v / (1 << 30)).toFixed(1)} GB`
   if (v >= 1 << 20) return `${Math.round(v / (1 << 20))} MB`
@@ -95,13 +111,13 @@ function formatBytes(n) {
   return `${v} B`
 }
 
-function bytesToMbInput(bytes) {
+function bytesToMbInput(bytes: number | undefined): string {
   const v = Number(bytes) || 0
   if (!v) return ''
   return String(Math.round(v / (1 << 20)))
 }
 
-function mbInputToBytes(raw) {
+function mbInputToBytes(raw: string): number {
   const s = String(raw ?? '').trim()
   if (s === '') return 0
   const n = Number(s)
@@ -109,7 +125,7 @@ function mbInputToBytes(raw) {
   return Math.round(n * (1 << 20))
 }
 
-function Sparkline({ samples }) {
+function Sparkline({ samples }: { samples: SparkSample[] }) {
   const vals = samples.length ? samples.map((s) => s.n) : [0, 0]
   const max = Math.max(1, ...vals)
   const w = 280
@@ -143,7 +159,7 @@ function LangSelect() {
   )
 }
 
-function Meter({ pct }) {
+function Meter({ pct }: { pct: number }) {
   const p = Math.max(0, Math.min(100, Number(pct) || 0))
   const cls = p >= 85 ? 'hot' : p >= 70 ? 'warn' : ''
   return (
@@ -153,7 +169,7 @@ function Meter({ pct }) {
   )
 }
 
-function ResourcesPanel({ host }) {
+function ResourcesPanel({ host }: { host: HostStats | null }) {
   const { t } = useTranslation()
   if (!host) {
     return (
@@ -231,7 +247,7 @@ function ResourcesPanel({ host }) {
   )
 }
 
-function CopyBtn({ text }) {
+function CopyBtn({ text }: { text: string }) {
   const { t } = useTranslation()
   const [done, setDone] = useState(false)
   return (
@@ -254,7 +270,15 @@ function CopyBtn({ text }) {
   )
 }
 
-function DNSDrawer({ open, onClose, domain }) {
+function DNSDrawer({
+  open,
+  onClose,
+  domain,
+}: {
+  open: boolean
+  onClose: () => void
+  domain: Domain | null
+}) {
   const { t } = useTranslation()
   if (!open) return null
   const records = dnsRecordsFor(domain)
@@ -298,7 +322,14 @@ function DNSDrawer({ open, onClose, domain }) {
   )
 }
 
-function dnsChip(check, labels) {
+type DnsChipLabels = {
+  checking: string
+  missing: string
+  ok: string
+  warn?: string
+}
+
+function dnsChip(check: DnsCheck | undefined, labels: DnsChipLabels) {
   if (!check) return { state: 'warn', text: labels.checking }
   switch (check.state) {
     case 'ok':
@@ -312,7 +343,15 @@ function dnsChip(check, labels) {
   }
 }
 
-function HealthStrip({ dash, dns, updatedAt }) {
+function HealthStrip({
+  dash,
+  dns,
+  updatedAt,
+}: {
+  dash: Dashboard | null
+  dns: DnsStatus | null
+  updatedAt: number | null
+}) {
   const { t } = useTranslation()
   const queueN = dash?.queuePending ?? 0
   const dead = dash?.queueDead ?? 0
@@ -344,10 +383,10 @@ function HealthStrip({ dash, dns, updatedAt }) {
   })
 
   const chips = [
-    { id: 'mx', label: 'MX', ...mx },
-    { id: 'spf', label: 'SPF', ...spf },
-    { id: 'dkim', label: 'DKIM', ...dkim },
-    { id: 'dmarc', label: 'DMARC', ...dmarc },
+    { id: 'mx', label: 'MX', title: dns?.mx?.detail, ...mx },
+    { id: 'spf', label: 'SPF', title: dns?.spf?.detail, ...spf },
+    { id: 'dkim', label: 'DKIM', title: dns?.dkim?.detail, ...dkim },
+    { id: 'dmarc', label: 'DMARC', title: dns?.dmarc?.detail, ...dmarc },
     { id: 'tls', label: 'TLS', state: tlsOk ? 'ok' : 'warn', text: tlsOk ? 'https' : 'http' },
     { id: 'queue', label: 'QUEUE', state: dead > 0 ? 'bad' : queueN > 20 ? 'warn' : 'ok', text: String(queueN) },
   ]
@@ -355,7 +394,7 @@ function HealthStrip({ dash, dns, updatedAt }) {
   return (
     <div className="health-strip" title={dns?.domain ? `DNS: ${dns.domain}` : undefined}>
       {chips.map((c) => (
-        <span key={c.id} className={`health-chip ${c.state}`} title={dns?.[c.id]?.detail || undefined}>
+        <span key={c.id} className={`health-chip ${c.state}`} title={'title' in c ? c.title : undefined}>
           <span className="dot" />
           <strong>{c.label}</strong> {c.text}
         </span>
@@ -370,26 +409,26 @@ function HealthStrip({ dash, dns, updatedAt }) {
 
 export function App() {
   const { t } = useTranslation()
-  const [creds, setCreds] = useState(() => {
+  const [creds, setCreds] = useState<AdminCreds | null>(() => {
     try {
-      return JSON.parse(sessionStorage.getItem('wm_admin') || 'null')
+      return JSON.parse(sessionStorage.getItem('wm_admin') || 'null') as AdminCreds | null
     } catch {
       return null
     }
   })
-  const [tab, setTab] = useState('overview')
+  const [tab, setTab] = useState<NavTab>('overview')
   const [error, setError] = useState('')
-  const [dash, setDash] = useState(null)
-  const [spark, setSpark] = useState(loadSpark)
-  const [domains, setDomains] = useState([])
-  const [mailboxes, setMailboxes] = useState([])
-  const [aliases, setAliases] = useState([])
-  const [selectedDomain, setSelectedDomain] = useState(null)
-  const [selectedMailbox, setSelectedMailbox] = useState(null)
-  const [queue, setQueue] = useState([])
-  const [quarantine, setQuarantine] = useState([])
-  const [settings, setSettings] = useState({})
-  const [audit, setAudit] = useState([])
+  const [dash, setDash] = useState<Dashboard | null>(null)
+  const [spark, setSpark] = useState<SparkSample[]>(loadSpark)
+  const [domains, setDomains] = useState<Domain[]>([])
+  const [mailboxes, setMailboxes] = useState<Mailbox[]>([])
+  const [aliases, setAliases] = useState<Alias[]>([])
+  const [selectedDomain, setSelectedDomain] = useState<Domain | null>(null)
+  const [selectedMailbox, setSelectedMailbox] = useState<Mailbox | null>(null)
+  const [queue, setQueue] = useState<QueueJob[]>([])
+  const [quarantine, setQuarantine] = useState<QuarantineItem[]>([])
+  const [settings, setSettings] = useState<Record<string, unknown>>({})
+  const [audit, setAudit] = useState<AuditEntry[]>([])
   const [form, setForm] = useState({
     domain: '',
     catchAll: '',
@@ -414,26 +453,26 @@ export function App() {
   const [login, setLogin] = useState({ username: 'admin', password: '' })
   const [dnsOpen, setDnsOpen] = useState(false)
   const [navOpen, setNavOpen] = useState(false)
-  const [dnsStatus, setDnsStatus] = useState(null)
-  const [hostStats, setHostStats] = useState(null)
-  const [ops, setOps] = useState(null)
-  const [updatedAt, setUpdatedAt] = useState(null)
+  const [dnsStatus, setDnsStatus] = useState<DnsStatus | null>(null)
+  const [hostStats, setHostStats] = useState<HostStats | null>(null)
+  const [ops, setOps] = useState<OpsStatus | null>(null)
+  const [updatedAt, setUpdatedAt] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
 
   const authed = Boolean(creds?.token)
   const dnsDomain = selectedDomain || domains[0] || null
 
   const refreshDash = useCallback(async () => {
-    const d = await api('/api/admin/dashboard', creds)
+    const d = await api<Dashboard>('/api/admin/dashboard', creds!)
     setDash(d)
-    setSpark(pushSpark(d.queuePending))
+    setSpark(pushSpark(d.queuePending ?? 0))
     setUpdatedAt(Date.now())
     try {
       const q = dnsDomain?.name ? `?domain=${encodeURIComponent(dnsDomain.name)}` : ''
       const [dns, host, opsData] = await Promise.all([
-        api(`/api/admin/dns-status${q}`, creds),
-        api('/api/admin/host-stats', creds),
-        api('/api/admin/ops', creds),
+        api<DnsStatus>(`/api/admin/dns-status${q}`, creds!),
+        api<HostStats>('/api/admin/host-stats', creds!),
+        api<OpsStatus>('/api/admin/ops', creds!),
       ])
       setDnsStatus(dns)
       setHostStats(host)
@@ -445,11 +484,11 @@ export function App() {
   }, [creds, dnsDomain?.name])
 
   const loadDomainExtras = useCallback(
-    async (domain) => {
+    async (domain: Domain) => {
       if (!domain?.id) return
       const [mbs, als] = await Promise.all([
-        api(`/api/admin/domains/${domain.id}/mailboxes`, creds),
-        api(`/api/admin/domains/${domain.id}/aliases`, creds),
+        api<Mailbox[]>(`/api/admin/domains/${domain.id}/mailboxes`, creds!),
+        api<Alias[]>(`/api/admin/domains/${domain.id}/aliases`, creds!),
       ])
       setMailboxes(mbs)
       setAliases(als)
@@ -461,19 +500,19 @@ export function App() {
     if (!authed) return
     setError('')
     try {
-      const list = await api('/api/admin/domains', creds)
+      const list = await api<Domain[]>('/api/admin/domains', creds!)
       setDomains(list)
       await refreshDash()
-      const settingsData = await api('/api/admin/settings', creds)
+      const settingsData = await api<Record<string, unknown>>('/api/admin/settings', creds!)
       setSettings(settingsData)
-      if (tab === 'queue') setQueue(await api('/api/admin/queue', creds))
-      if (tab === 'quarantine') setQuarantine(await api('/api/admin/quarantine', creds))
-      if (tab === 'audit') setAudit(await api('/api/admin/audit', creds))
+      if (tab === 'queue') setQueue(await api<QueueJob[]>('/api/admin/queue', creds!))
+      if (tab === 'quarantine') setQuarantine(await api<QuarantineItem[]>('/api/admin/quarantine', creds!))
+      if (tab === 'audit') setAudit(await api<AuditEntry[]>('/api/admin/audit', creds!))
       if ((tab === 'mailboxes' || tab === 'domains') && selectedDomain) {
         await loadDomainExtras(selectedDomain)
       }
     } catch (e) {
-      setError(e.message)
+      setError(e instanceof Error ? e.message : String(e))
     }
   }, [authed, creds, tab, selectedDomain, refreshDash, loadDomainExtras])
 
@@ -500,7 +539,7 @@ export function App() {
     if (!navOpen) return
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-    const onKey = (e) => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') setNavOpen(false)
     }
     window.addEventListener('keydown', onKey)
@@ -510,24 +549,26 @@ export function App() {
     }
   }, [navOpen])
 
-  async function doLogin(e) {
+  async function doLogin(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setError('')
     try {
-      const data = await api('/api/admin/login', {
+      const data = await api<{ token: string; username?: string }>('/api/admin/login', {
         method: 'POST',
         body: login,
       })
-      const next = { token: data.token, user: data.username || login.username }
+      const next: AdminCreds = { token: data.token, user: data.username || login.username }
       sessionStorage.setItem('wm_admin', JSON.stringify(next))
       setCreds(next)
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     }
   }
 
-  async function selectDomain(d) {
-    const sel = { ...d, id: domainId(d), name: domainName(d) }
+  async function selectDomain(d: Domain) {
+    const id = domainId(d)
+    if (!id) return
+    const sel: Domain = { ...d, id, name: domainName(d) }
     setSelectedDomain(sel)
     setSelectedMailbox(null)
     setDomainEdit({
@@ -538,7 +579,7 @@ export function App() {
     await loadDomainExtras(sel)
   }
 
-  function selectMailbox(m) {
+  function selectMailbox(m: Mailbox) {
     setSelectedMailbox(m)
     setMbEdit({
       displayName: m.displayName || '',
@@ -549,7 +590,7 @@ export function App() {
     setForm((f) => ({ ...f, aliasMailboxId: String(m.id) }))
   }
 
-  async function createDomain(e) {
+  async function createDomain(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setBusy(true)
     try {
@@ -559,15 +600,15 @@ export function App() {
         body: { name: form.domain, catchAll: form.catchAll || '' },
       })
       setForm((f) => ({ ...f, domain: '', catchAll: '' }))
-      setDomains(await api('/api/admin/domains', creds))
+      setDomains(await api<Domain[]>('/api/admin/domains', creds!))
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
   }
 
-  async function saveDomainSettings(e) {
+  async function saveDomainSettings(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!selectedDomain) return
     setBusy(true)
@@ -579,7 +620,7 @@ export function App() {
         setError(t('domains.invalidQuota'))
         return
       }
-      const updated = await api(`/api/admin/domains/${selectedDomain.id}`, {
+      const updated = await api<Domain>(`/api/admin/domains/${selectedDomain.id}`, {
         ...creds,
         method: 'PATCH',
         body: {
@@ -588,28 +629,37 @@ export function App() {
           defaultQuotaBytes,
         },
       })
-      const list = await api('/api/admin/domains', creds)
+      const list = await api<Domain[]>('/api/admin/domains', creds!)
       setDomains(list)
       const refreshed = list.find((d) => domainId(d) === selectedDomain.id) || updated
-      setSelectedDomain({ ...refreshed, id: domainId(refreshed), name: domainName(refreshed) })
+      setSelectedDomain({
+        ...refreshed,
+        id: domainId(refreshed) ?? selectedDomain.id,
+        name: domainName(refreshed),
+      })
       setDomainEdit({
         enabled: refreshed.enabled !== false,
         catchAll: refreshed.catchAll || '',
         defaultQuotaMb: bytesToMbInput(refreshed.defaultQuotaBytes),
       })
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
   }
 
-  async function createMailbox(e) {
+  async function createMailbox(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!selectedDomain) return
     setBusy(true)
     try {
-      const body = {
+      const body: {
+        localPart: string
+        password: string
+        displayName: string
+        quotaBytes?: number
+      } = {
         localPart: form.localPart,
         password: form.password,
         displayName: form.displayName,
@@ -630,13 +680,13 @@ export function App() {
       setForm((f) => ({ ...f, localPart: '', password: '', displayName: '', quotaMb: '' }))
       await loadDomainExtras(selectedDomain)
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
   }
 
-  async function saveMailboxSettings(e) {
+  async function saveMailboxSettings(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!selectedDomain || !selectedMailbox) return
     setBusy(true)
@@ -648,13 +698,18 @@ export function App() {
         setError(t('mailboxes.invalidQuota'))
         return
       }
-      const body = {
+      const body: {
+        displayName: string
+        quotaBytes: number
+        enabled: boolean
+        password?: string
+      } = {
         displayName: mbEdit.displayName,
         quotaBytes,
         enabled: mbEdit.enabled,
       }
       if (mbEdit.password) body.password = mbEdit.password
-      const updated = await api(`/api/admin/domains/${selectedDomain.id}/mailboxes/${selectedMailbox.id}`, {
+      const updated = await api<Mailbox>(`/api/admin/domains/${selectedDomain.id}/mailboxes/${selectedMailbox.id}`, {
         ...creds,
         method: 'PATCH',
         body,
@@ -668,7 +723,7 @@ export function App() {
         password: '',
       })
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
@@ -679,14 +734,17 @@ export function App() {
     setBusy(true)
     setError('')
     try {
-      const data = await api(`/api/admin/domains/${selectedDomain.id}/mailboxes/${selectedMailbox.id}/impersonate`, {
+      const data = await api<{ url?: string; token?: string }>(
+        `/api/admin/domains/${selectedDomain.id}/mailboxes/${selectedMailbox.id}/impersonate`,
+        {
         ...creds,
         method: 'POST',
-      })
+        },
+      )
       if (data.url) {
         window.open(data.url, '_blank', 'noopener,noreferrer')
       } else if (data.token) {
-        const base = (settings['admin.webmail_url'] || '').replace(/\/$/, '')
+        const base = String(settings['admin.webmail_url'] || '').replace(/\/$/, '')
         if (!base) {
           setError(t('mailboxes.webmailUrlMissing'))
           return
@@ -694,13 +752,13 @@ export function App() {
         window.open(`${base}/login?impersonate=${encodeURIComponent(data.token)}`, '_blank', 'noopener,noreferrer')
       }
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
   }
 
-  async function createAlias(e) {
+  async function createAlias(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (!selectedDomain || !form.aliasLocal || !form.aliasMailboxId) return
     setBusy(true)
@@ -713,7 +771,7 @@ export function App() {
       setForm((f) => ({ ...f, aliasLocal: '', aliasMailboxId: form.aliasMailboxId }))
       await loadDomainExtras(selectedDomain)
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
@@ -724,25 +782,33 @@ export function App() {
     setBusy(true)
     try {
       await api(`/api/admin/domains/${selectedDomain.id}/dkim`, { ...creds, method: 'POST' })
-      const list = await api('/api/admin/domains', creds)
+      const list = await api<Domain[]>('/api/admin/domains', creds!)
       setDomains(list)
       const refreshed = list.find((d) => domainId(d) === selectedDomain.id)
-      if (refreshed) setSelectedDomain({ ...refreshed, id: domainId(refreshed), name: domainName(refreshed) })
+      if (refreshed) {
+        setSelectedDomain({
+          ...refreshed,
+          id: domainId(refreshed) ?? selectedDomain.id,
+          name: domainName(refreshed),
+        })
+      }
       setDnsOpen(true)
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
   }
 
-  async function saveSettings(e) {
+  async function saveSettings(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     setBusy(true)
     try {
-      setSettings(await api('/api/admin/settings', { ...creds, method: 'PUT', body: settings }))
+      setSettings(
+        await api<Record<string, unknown>>('/api/admin/settings', { ...creds, method: 'PUT', body: settings }),
+      )
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
@@ -751,7 +817,7 @@ export function App() {
   async function downloadBackup() {
     setBusy(true)
     try {
-      const data = await api('/api/admin/backup', creds)
+      const data = await api<unknown>('/api/admin/backup', creds!)
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
@@ -760,21 +826,25 @@ export function App() {
       a.click()
       URL.revokeObjectURL(url)
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
   }
 
-  async function restoreBackupFile(file) {
+  async function restoreBackupFile(file: File | undefined) {
     if (!file) return
     setBusy(true)
     setError('')
     try {
       const text = await file.text()
-      const parsed = JSON.parse(text)
+      const parsed = JSON.parse(text) as {
+        data?: { settings?: Record<string, unknown>; domains?: Domain[] }
+        settings?: Record<string, unknown>
+        domains?: Domain[]
+      }
       const payload = parsed?.data && typeof parsed.data === 'object' ? parsed.data : parsed
-      const result = await api('/api/admin/backup/restore', {
+      const result = await api<{ settings?: number; domains?: number }>('/api/admin/backup/restore', {
         ...creds,
         method: 'POST',
         body: {
@@ -786,7 +856,7 @@ export function App() {
       setError('')
       alert(t('backup.restored', { s: result.settings ?? 0, d: result.domains ?? 0 }))
     } catch (err) {
-      setError(err.message)
+      setError(err instanceof Error ? err.message : String(err))
     } finally {
       setBusy(false)
     }
@@ -798,7 +868,7 @@ export function App() {
     return dead === 0 && pending < 50
   }, [dash])
 
-  const mailboxLabel = (id) => {
+  const mailboxLabel = (id: string) => {
     const m = mailboxes.find((x) => x.id === id)
     return m ? `${m.localPart}@${selectedDomain?.name || ''}` : `#${id}`
   }
@@ -984,11 +1054,11 @@ export function App() {
                   </div>
                   <div>
                     <span className="muted">{t('overview.spamQ')}</span>
-                    <strong>{settings['antispam.quarantine_at'] ?? '—'}</strong>
+                    <strong>{String(settings['antispam.quarantine_at'] ?? '—')}</strong>
                   </div>
                   <div>
                     <span className="muted">{t('overview.spamR')}</span>
-                    <strong>{settings['antispam.reject_at'] ?? '—'}</strong>
+                    <strong>{String(settings['antispam.reject_at'] ?? '—')}</strong>
                   </div>
                   <div>
                     <span className="muted">{t('overview.av')}</span>
@@ -998,7 +1068,7 @@ export function App() {
                   </div>
                   <div>
                     <span className="muted">{t('overview.relay')}</span>
-                    <strong>{settings['mail.relay_host'] || t('overview.none')}</strong>
+                    <strong>{String(settings['mail.relay_host'] || t('overview.none'))}</strong>
                   </div>
                   <div>
                     <span className="muted">{t('overview.greylist')}</span>
@@ -1022,7 +1092,7 @@ export function App() {
                   </div>
                   <div>
                     <span className="muted">{t('overview.sendRate')}</span>
-                    <strong>{ops?.rateSendPerHour ?? settings['mail.rate_send_per_hour'] ?? '—'}/h</strong>
+                    <strong>{String(ops?.rateSendPerHour ?? settings['mail.rate_send_per_hour'] ?? '—')}/h</strong>
                   </div>
                 </div>
               </div>
@@ -1493,7 +1563,7 @@ export function App() {
                             className="ghost"
                             onClick={async () => {
                               await api(`/api/admin/queue/${j.id}/retry`, { ...creds, method: 'POST' })
-                              setQueue(await api('/api/admin/queue', creds))
+                              setQueue(await api<QueueJob[]>('/api/admin/queue', creds!))
                               await refreshDash()
                             }}
                           >
@@ -1504,7 +1574,7 @@ export function App() {
                             className="ghost"
                             onClick={async () => {
                               await api(`/api/admin/queue/${j.id}/delete`, { ...creds, method: 'POST' })
-                              setQueue(await api('/api/admin/queue', creds))
+                              setQueue(await api<QueueJob[]>('/api/admin/queue', creds!))
                               await refreshDash()
                             }}
                           >
@@ -1553,7 +1623,7 @@ export function App() {
                           className="ghost"
                           onClick={async () => {
                             await api(`/api/admin/quarantine/${q.id}/release`, { ...creds, method: 'POST' })
-                            setQuarantine(await api('/api/admin/quarantine', creds))
+                            setQuarantine(await api<QuarantineItem[]>('/api/admin/quarantine', creds!))
                             await refreshDash()
                           }}
                         >
@@ -1564,7 +1634,7 @@ export function App() {
                           className="ghost"
                           onClick={async () => {
                             await api(`/api/admin/quarantine/${q.id}/delete`, { ...creds, method: 'POST' })
-                            setQuarantine(await api('/api/admin/quarantine', creds))
+                            setQuarantine(await api<QuarantineItem[]>('/api/admin/quarantine', creds!))
                             await refreshDash()
                           }}
                         >
@@ -1612,7 +1682,7 @@ export function App() {
                   <div className="settings-fields">
                     {g.fields.map((field) => {
                       const label = t(`settings.keys.${field.key}`, { defaultValue: field.key })
-                      const value = settings[field.key] ?? ''
+                      const value = String(settings[field.key] ?? '')
                       const boolOn = String(value).toLowerCase() === 'true'
                       return (
                         <div className="settings-field" key={field.key}>

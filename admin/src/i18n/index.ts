@@ -26,7 +26,9 @@ export const LOCALES = [
   { code: 'it', label: 'Italiano' },
   { code: 'pl', label: 'Polski' },
   { code: 'tr', label: 'Türkçe' },
-]
+] as const
+
+export type LocaleCode = (typeof LOCALES)[number]['code']
 
 const resources = {
   en: { translation: en },
@@ -45,8 +47,12 @@ const resources = {
 
 const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('wm_admin_lang') : null
 const browser = typeof navigator !== 'undefined' ? navigator.language?.slice(0, 2) : 'en'
-const supported = LOCALES.map((l) => l.code)
-const initial = supported.includes(saved) ? saved : supported.includes(browser) ? browser : 'en'
+const supported = LOCALES.map((l) => l.code) as string[]
+const initial = supported.includes(saved ?? '')
+  ? (saved as string)
+  : supported.includes(browser ?? '')
+    ? (browser as string)
+    : 'en'
 
 void i18n.use(initReactI18next).init({
   resources,
@@ -55,7 +61,7 @@ void i18n.use(initReactI18next).init({
   interpolation: { escapeValue: false },
 })
 
-export function setAdminLang(code) {
+export function setAdminLang(code: string) {
   localStorage.setItem('wm_admin_lang', code)
   void i18n.changeLanguage(code)
 }
