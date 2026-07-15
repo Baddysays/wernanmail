@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "軽量セルフホスト型メールクライアント"
@@ -31,7 +31,8 @@
     "submitting": "サインイン中…",
     "hint": "認証情報は安全なセッションでセルフホスト API に送信されます。",
     "tagline": "邪魔にならない、軽やかなメール。",
-    "server": "サーバー"
+    "server": "サーバー",
+    "asAdmin": "管理者としてログイン"
   },
   "settings": {
     "title": "設定",

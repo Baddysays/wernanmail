@@ -52,6 +52,7 @@ export function MailPage() {
   const [loadingMsg, setLoadingMsg] = useState(false)
   const [composeOpen, setComposeOpen] = useState(false)
   const [composeDraft, setComposeDraft] = useState<ComposeDraft | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const messagesRef = useRef(messages)
   const folderNameRef = useRef(folderName)
@@ -261,6 +262,15 @@ export function MailPage() {
     }
   }, [loadFolders, loadMessages])
 
+  const filteredMessages = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return messages
+    return messages.filter((m) => {
+      const hay = `${m.subject} ${m.from.name} ${m.from.email} ${m.to.email} ${m.body || ''}`.toLowerCase()
+      return hay.includes(q)
+    })
+  }, [messages, searchQuery])
+
   function handleReply(message: UiMessage) {
     openCompose({
       to: message.from.email,
@@ -300,6 +310,56 @@ export function MailPage() {
     }
   }
 
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null
+      const typing =
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.isContentEditable)
+      if (composeOpen) return
+      if (typing && e.key !== 'Escape') {
+        if (e.key === 'Escape') (target as HTMLElement).blur()
+        return
+      }
+
+      if (e.key === '/' && !typing) {
+        e.preventDefault()
+        document.querySelector<HTMLInputElement>('input[type="search"]')?.focus()
+        return
+      }
+      if (e.key === 'c' && !e.metaKey && !e.ctrlKey && !typing) {
+        e.preventDefault()
+        openCompose()
+        return
+      }
+      if (e.key === 'r' && selected && !typing) {
+        e.preventDefault()
+        handleReply(selected)
+        return
+      }
+      if ((e.key === 'j' || e.key === 'k') && !typing) {
+        e.preventDefault()
+        const list = filteredMessages
+        if (!list.length) return
+        const idx = list.findIndex((m) => m.id === selectedId)
+        const next =
+          e.key === 'j'
+            ? list[Math.min(list.length - 1, Math.max(0, idx) + 1)]
+            : list[Math.max(0, (idx < 0 ? 0 : idx) - 1)]
+        if (next) setSelectedId(next.id)
+        return
+      }
+      if ((e.key === 'Delete' || e.key === '#') && selected && !typing) {
+        e.preventDefault()
+        void handleTrash(selected)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [composeOpen, filteredMessages, openCompose, selected, selectedId, folderName])
+
   async function handleToggleStar(message: UiMessage) {
     const next = !message.starred
     try {
@@ -326,10 +386,12 @@ export function MailPage() {
         onCompose={() => openCompose()}
       />
       <MessageList
-        messages={messages}
+        messages={filteredMessages}
         selectedId={selectedId}
         loading={loadingList}
         folderRole={activeRole}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
         onSelect={setSelectedId}
         onRefresh={() => {
           void loadMessages(folderName)

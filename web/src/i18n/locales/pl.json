@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "Lekki self-hosted klient poczty"
@@ -31,7 +31,8 @@
     "submitting": "Logowanie…",
     "hint": "Dane logowania są wysyłane do Twojego self-hosted API w bezpiecznej sesji.",
     "tagline": "Lekka poczta, która nie przeszkadza.",
-    "server": "Serwer"
+    "server": "Serwer",
+    "asAdmin": "Zaloguj jako administrator"
   },
   "settings": {
     "title": "Ustawienia",

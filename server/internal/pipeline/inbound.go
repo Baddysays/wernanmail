@@ -13,16 +13,28 @@ import (
 	"github.com/Baddysays/wernanmail/server/internal/antivirus"
 	"github.com/Baddysays/wernanmail/server/internal/domain"
 	"github.com/Baddysays/wernanmail/server/internal/queue"
+	"github.com/Baddysays/wernanmail/server/internal/received"
 	"github.com/Baddysays/wernanmail/server/internal/store"
 )
 
 // Inbound processes accepted SMTP DATA.
 type Inbound struct {
-	Store   store.MessageStore
-	Queue   *queue.Service
-	Spam    *antispam.Engine
-	AV      antivirus.Scanner
+	Store    store.MessageStore
+	Queue    *queue.Service
+	Spam     *antispam.Engine
+	AV       antivirus.Scanner
 	MaxBytes int
+}
+
+// ProcessInput is one inbound SMTP DATA.
+type ProcessInput struct {
+	From       string
+	Recipients []string
+	RemoteIP   string
+	Helo       string
+	Hostname   string
+	AuthUser   string
+	Raw        []byte
 }
 
 // Result of processing one inbound message.
@@ -33,15 +45,18 @@ type Result struct {
 }
 
 // Process runs spam → AV → enqueue or quarantine.
-func (p *Inbound) Process(ctx context.Context, from string, recipients []string, remoteIP, helo string, raw []byte) Result {
+func (p *Inbound) Process(ctx context.Context, in ProcessInput) Result {
+	raw := in.Raw
 	if p.MaxBytes > 0 && len(raw) > p.MaxBytes {
 		return Result{Action: domain.SpamReject, Err: fmt.Errorf("message too large")}
 	}
+	raw = received.Prepend(raw, in.Helo, in.RemoteIP, in.Hostname, in.AuthUser)
+
 	headers := parseHeaders(raw)
 	verdict := domain.SpamVerdict{Action: domain.SpamDeliver}
 	if p.Spam != nil {
 		verdict = p.Spam.Check(ctx, antispam.Input{
-			From: from, Helo: helo, RemoteIP: remoteIP, Recipients: recipients, Raw: raw, Headers: headers,
+			From: in.From, Helo: in.Helo, RemoteIP: in.RemoteIP, Recipients: in.Recipients, Raw: raw, Headers: headers,
 		})
 	}
 	if verdict.Action == domain.SpamReject {
@@ -62,19 +77,21 @@ func (p *Inbound) Process(ctx context.Context, from string, recipients []string,
 		subj = decoded
 	}
 
-	for _, rcpt := range recipients {
+	for _, rcpt := range in.Recipients {
 		mid, err := p.Store.ResolveRecipient(ctx, rcpt)
 		if err != nil {
 			continue
 		}
 		if verdict.Action == domain.SpamQuarantine {
 			vj, _ := json.Marshal(verdict)
-			_ = p.Store.AddQuarantine(ctx, &domain.QuarantineItem{
+			if err := p.Store.AddQuarantine(ctx, &domain.QuarantineItem{
 				MailboxID:   mid,
 				Subject:     subj,
-				FromAddr:    from,
+				FromAddr:    in.From,
 				VerdictJSON: string(vj),
-			}, raw)
+			}, raw); err != nil {
+				return Result{Action: verdict.Action, Verdict: verdict, Err: fmt.Errorf("quarantine: %w", err)}
+			}
 			continue
 		}
 		folder := domain.FolderInbox
@@ -86,7 +103,7 @@ func (p *Inbound) Process(ctx context.Context, from string, recipients []string,
 			Folder:    folder,
 			RawB64:    base64.StdEncoding.EncodeToString(raw),
 			Subject:   subj,
-			From:      from,
+			From:      in.From,
 			To:        rcpt,
 			SpamScore: verdict.Score,
 		}

@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "Client mail auto-hébergé léger"
@@ -31,7 +31,8 @@
     "submitting": "Connexion…",
     "hint": "Les identifiants sont envoyés à votre API auto-hébergée via une session sécurisée.",
     "tagline": "Un mail léger qui reste discret.",
-    "server": "Serveur"
+    "server": "Serveur",
+    "asAdmin": "Connexion administrateur"
   },
   "settings": {
     "title": "Paramètres",

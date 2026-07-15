@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "轻量自托管邮件客户端"
@@ -31,7 +31,8 @@
     "submitting": "正在登录…",
     "hint": "凭据通过安全会话发送到您的自托管 API。",
     "tagline": "轻量邮件，不打扰工作。",
-    "server": "服务器"
+    "server": "服务器",
+    "asAdmin": "管理员登录"
   },
   "settings": {
     "title": "设置",

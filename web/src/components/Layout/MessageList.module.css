@@ -22,6 +22,26 @@
   font-variant-numeric: tabular-nums;
 }
 
+.search {
+  flex: 1;
+  min-width: 0;
+  max-width: 14rem;
+  margin-left: 0.35rem;
+  height: 1.85rem;
+  padding: 0 0.55rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.search:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: 1px;
+}
+
 .iconBtn {
   display: grid;
   place-items: center;

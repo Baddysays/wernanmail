@@ -18,3 +18,23 @@ data-test/
 
 .cursor/
 
+
+# Local agent / one-off ops junk
+.playwright-mcp/
+deploy/mail-host/bin/
+deploy/mail-host/diag-*.sh
+deploy/mail-host/check-*.sh
+deploy/mail-host/smoke-*.sh
+deploy/mail-host/kill-*.sh
+deploy/mail-host/fix-*.sh
+deploy/mail-host/qa-*.sh
+deploy/mail-host/clear-*.sh
+deploy/mail-host/ensure-*.sh
+deploy/mail-host/final-*.sh
+deploy/mail-host/one-worker.sh
+deploy/mail-host/list-mailboxes.sh
+deploy/mail-host/repair-*.sh
+deploy/mail-host/reset-*.sh
+deploy/mail-host/restore-*.sh
+deploy/mail-host/ehlo-sink-test.py
+deploy/mail-host/redeploy-*.sh

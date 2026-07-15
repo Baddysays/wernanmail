@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "Cliente de correo autoalojado ligero"
@@ -31,7 +31,8 @@
     "submitting": "Entrando…",
     "hint": "Las credenciales se envían a su API autoalojada en una sesión segura.",
     "tagline": "Correo ligero que no estorba.",
-    "server": "Servidor"
+    "server": "Servidor",
+    "asAdmin": "Entrar como administrador"
   },
   "settings": {
     "title": "Ajustes",

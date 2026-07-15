@@ -19,6 +19,8 @@ const (
 	CodeFlagFailed       = "mail.flag_failed"
 	CodeTrashFailed      = "mail.trash_failed"
 	CodeInternal         = "mail.internal_error"
+	CodeImpersonateInvalid     = "mail.impersonate_invalid"
+	CodeImpersonateUnavailable = "mail.impersonate_unavailable"
 )
 
 type errorBody struct {

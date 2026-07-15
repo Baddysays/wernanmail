@@ -15,10 +15,16 @@ import (
 	"time"
 
 	"github.com/Baddysays/wernanmail/server/internal/session"
+	"github.com/Baddysays/wernanmail/server/internal/mailtmpl"
 )
 
 // SendMessage sends mail via SMTP and best-effort saves a copy to Sent.
 func SendMessage(creds session.Credentials, req SendRequest) error {
+	return SendMessageWithPolicy(creds, req, mailtmpl.Policy{})
+}
+
+// SendMessageWithPolicy applies body templates/footers before MIME build so Sent matches outbound.
+func SendMessageWithPolicy(creds session.Credentials, req SendRequest, policy mailtmpl.Policy) error {
 	if len(req.To) == 0 {
 		return fmt.Errorf("missing recipients")
 	}
@@ -27,7 +33,13 @@ func SendMessage(creds session.Credentials, req SendRequest) error {
 	recipients = append(recipients, req.CC...)
 	recipients = append(recipients, req.BCC...)
 
-	msg := buildMIME(from, req, creds.SMTPHost)
+	applied := false
+	if !policy.Empty() {
+		req.Text, req.HTML = policy.TransformBodies(from, req.Subject, req.Text, req.HTML)
+		applied = true
+	}
+
+	msg := buildMIME(from, req, creds.SMTPHost, applied)
 
 	addr := fmt.Sprintf("%s:%d", creds.SMTPHost, creds.SMTPPort)
 	auth := smtp.PlainAuth("", creds.Username, creds.Password, creds.SMTPHost)
@@ -37,6 +49,12 @@ func SendMessage(creds session.Credentials, req SendRequest) error {
 		err = sendSMTPS(addr, auth, from, recipients, msg, creds.SMTPHost)
 	} else {
 		err = sendSMTPStartTLS(addr, auth, from, recipients, msg, creds.SMTPHost, creds.TLS)
+		// Common self-hosted layout: submission :587 without STARTTLS, SMTPS on :465 (stunnel).
+		if err != nil && creds.TLS && creds.SMTPPort == 587 {
+			if err2 := sendSMTPS(fmt.Sprintf("%s:465", creds.SMTPHost), auth, from, recipients, msg, creds.SMTPHost); err2 == nil {
+				err = nil
+			}
+		}
 	}
 	if err != nil {
 		return err
@@ -85,7 +103,7 @@ func sendSMTPStartTLS(addr string, auth smtp.Auth, from string, to []string, msg
 			return err
 		}
 	} else if preferTLS {
-		return fmt.Errorf("smtp starttls unavailable")
+		return fmt.Errorf("smtp starttls unavailable on %s (use port 465 SMTPS)", addr)
 	}
 
 	if err := c.Auth(auth); err != nil {
@@ -120,7 +138,7 @@ func writeMail(c *smtp.Client, from string, to []string, msg []byte) error {
 	return c.Quit()
 }
 
-func buildMIME(from string, req SendRequest, smtpHost string) []byte {
+func buildMIME(from string, req SendRequest, smtpHost string, policyApplied bool) []byte {
 	var b strings.Builder
 	b.WriteString("From: " + from + "\r\n")
 	b.WriteString("To: " + strings.Join(req.To, ", ") + "\r\n")
@@ -131,6 +149,9 @@ func buildMIME(from string, req SendRequest, smtpHost string) []byte {
 	b.WriteString("Date: " + time.Now().Format(time.RFC1123Z) + "\r\n")
 	b.WriteString("Message-ID: <" + newMessageID(smtpHost) + ">\r\n")
 	b.WriteString("MIME-Version: 1.0\r\n")
+	if policyApplied {
+		b.WriteString("X-Wernanmail-Outbound: 1\r\n")
+	}
 
 	if req.HTML != "" {
 		b.WriteString("Content-Type: multipart/alternative; boundary=\"wernan-boundary\"\r\n\r\n")

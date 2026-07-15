@@ -1,0 +1,69 @@
+.root {
+  min-height: 100%;
+  padding: 1.25rem 1.5rem 2rem;
+  background:
+    radial-gradient(1200px 400px at 10% -10%, color-mix(in srgb, var(--accent, #2a6f6a) 18%, transparent), transparent),
+    linear-gradient(180deg, #f4f7f6 0%, #e8eeec 100%);
+  color: #1a2824;
+  font-family: "Segoe UI", "Iowan Old Style", Georgia, serif;
+}
+
+.compact {
+  padding: 0.85rem 1rem 1.25rem;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+}
+
+.brand {
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.badge {
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.15rem 0.45rem;
+  border: 1px solid #c5d2cd;
+  border-radius: 999px;
+  color: #3d5a52;
+}
+
+.body h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.65rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+}
+
+.body p {
+  margin: 0 0 1rem;
+  max-width: 36rem;
+  line-height: 1.5;
+  color: #3d534c;
+}
+
+.steps {
+  margin: 0 0 1.25rem;
+  padding-left: 1.2rem;
+  color: #2c4039;
+  line-height: 1.55;
+}
+
+.code {
+  margin: 0;
+  padding: 0.9rem 1rem;
+  overflow: auto;
+  border-radius: 10px;
+  background: #1a2824;
+  color: #d7e6e0;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}

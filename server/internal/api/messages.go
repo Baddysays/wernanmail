@@ -1,12 +1,14 @@
 package api
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
 	"github.com/Baddysays/wernanmail/server/internal/mail"
+	"github.com/Baddysays/wernanmail/server/internal/mailtmpl"
 )
 
 func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
@@ -64,7 +66,13 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, CodeInvalidRequest)
 		return
 	}
-	if err := mail.SendMessage(sess.Creds, req); err != nil {
+	var policy mailtmpl.Policy
+	if h.OutboundPolicy != nil {
+		policy = h.OutboundPolicy()
+	}
+	if err := mail.SendMessageWithPolicy(sess.Creds, req, policy); err != nil {
+		log.Printf("send failed user=%s smtp=%s:%d tls=%v: %v",
+			sess.Creds.Username, sess.Creds.SMTPHost, sess.Creds.SMTPPort, sess.Creds.TLS, err)
 		writeError(w, http.StatusBadGateway, CodeSendFailed)
 		return
 	}

@@ -1,4 +1,4 @@
-{
+﻿{
   "app": {
     "name": "Wernanmail",
     "tagline": "가벼운 셀프호스팅 메일 클라이언트"
@@ -31,7 +31,8 @@
     "submitting": "로그인 중…",
     "hint": "자격 증명은 보안 세션으로 셀프호스팅 API에 전송됩니다.",
     "tagline": "방해하지 않는 가벼운 메일.",
-    "server": "서버"
+    "server": "서버",
+    "asAdmin": "관리자로 로그인"
   },
   "settings": {
     "title": "설정",

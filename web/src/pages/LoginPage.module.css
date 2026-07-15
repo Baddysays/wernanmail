@@ -1,8 +1,42 @@
 .page {
+  position: relative;
   min-height: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(22rem, 28rem);
   background: var(--bg-page);
+}
+
+.modeSwitch {
+  position: fixed;
+  top: 0.85rem;
+  right: 1.15rem;
+  z-index: 20;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--text-primary);
+  text-decoration: none;
+  padding: 0.4rem 0.75rem;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.88);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 12%, transparent);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(10px);
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .modeSwitch:hover {
+    background: #fff;
+    color: var(--accent-700);
+  }
+}
+
+.modeSwitch:active {
+  transform: scale(0.97);
 }
 
 .hero {

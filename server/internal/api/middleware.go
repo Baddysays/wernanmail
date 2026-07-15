@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/Baddysays/wernanmail/server/internal/config"
+	"github.com/Baddysays/wernanmail/server/internal/mailtmpl"
 	"github.com/Baddysays/wernanmail/server/internal/session"
 )
 
@@ -13,8 +14,9 @@ type ctxKey int
 const sessionKey ctxKey = 1
 
 type Handler struct {
-	Cfg   config.Config
-	Store *session.Store
+	Cfg            config.Config
+	Store          *session.Store
+	OutboundPolicy func() mailtmpl.Policy
 }
 
 func (h *Handler) RequireSession(next http.Handler) http.Handler {

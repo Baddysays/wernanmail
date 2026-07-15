@@ -1,0 +1,42 @@
+# nginx snippets for mail.wernanmail.ru (HTTPS server block body)
+# Deployed by ops; LE certbot manages ssl lines.
+
+# User webmail SPA
+root /opt/wernanmail/www;
+index index.html;
+
+location = /admin {
+  return 301 /admin/;
+}
+
+# Admin SPA (built with base /admin/)
+location /admin/ {
+  try_files $uri $uri/ /admin/index.html;
+}
+
+# Admin API
+location /api/admin/ {
+  proxy_pass http://127.0.0.1:8090;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+  proxy_set_header Authorization $http_authorization;
+}
+
+location = /healthz {
+  proxy_pass http://127.0.0.1:8090/healthz;
+}
+
+# Webmail BFF API
+location /api/ {
+  proxy_pass http://127.0.0.1:8080;
+  proxy_set_header Host $host;
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+  proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location / {
+  try_files $uri $uri/ /index.html;
+}

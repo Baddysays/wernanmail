@@ -31,10 +31,12 @@ func NewRouter(h *Handler) http.Handler {
 		r.Get("/health", h.Health)
 
 		r.Post("/auth/login", h.Login)
+		r.Post("/auth/impersonate", h.Impersonate)
 		r.Post("/auth/logout", h.Logout)
 
 		r.Group(func(r chi.Router) {
 			r.Use(h.RequireSession)
+			r.Get("/auth/me", h.Me)
 			r.Get("/folders", h.ListFolders)
 			r.Get("/mailboxes", h.ListFolders) // alias
 			r.Get("/messages", h.ListMessages)
