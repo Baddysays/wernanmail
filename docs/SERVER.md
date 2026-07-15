@@ -107,7 +107,7 @@ SPA under [`admin/`](../admin/) — domains, mailboxes, queue, quarantine (spam 
 - **Working screens (B):** always-visible Operator health strip (MX/SPF/DKIM/DMARC/TLS/Queue); top nav; master–detail for Domains / Mailboxes / Queue / Quarantine / Settings (list + side panel for aliases, roles, quotas)
 - Paper Quiet palette (teal/ink), shared with the webmail client where practical
 
-Mockups: start → `docs/mockups/admin-variant-c-quiet-console.png`; work → `docs/mockups/admin-variant-b-operator-strip.png`
+Visual direction: Paper Quiet — see `docs/mockups/wernanmail-style-02-paper-quiet.png` and `docs/DESIGN.md`.
 
 ## Coding rules
 
