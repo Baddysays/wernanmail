@@ -12,6 +12,7 @@ import (
 	"github.com/Baddysays/wernanmail/server/internal/greylist"
 	"github.com/Baddysays/wernanmail/server/internal/mailcfg"
 	"github.com/Baddysays/wernanmail/server/internal/mailtmpl"
+	"github.com/Baddysays/wernanmail/server/internal/metrics"
 	"github.com/Baddysays/wernanmail/server/internal/pipeline"
 	"github.com/Baddysays/wernanmail/server/internal/queue"
 	"github.com/Baddysays/wernanmail/server/internal/settings"
@@ -114,6 +115,9 @@ func main() {
 		}
 	}
 
+	reg := metrics.New("mta")
+	metrics.ListenEnv(reg)
+
 	errCh := make(chan error, 2)
 	go func() {
 		be := &smtpd.Backend{
@@ -124,6 +128,7 @@ func main() {
 			GreylistSecs: glSecs,
 			RequireAuth:  false,
 			Hostname:     cfg.Hostname,
+			Metrics:      reg,
 		}
 		errCh <- smtpd.Listen(smtpd.ListenOpts{
 			Addr:              cfg.SMTPAddr,
@@ -144,6 +149,7 @@ func main() {
 			MasterPassword:   cfg.MasterPassword,
 			SuperuserEnabled: superuser,
 			OutboundPolicy:   outboundPolicy,
+			Metrics:          reg,
 		}
 		errCh <- smtpd.Listen(smtpd.ListenOpts{
 			Addr:      cfg.SubmitAddr,

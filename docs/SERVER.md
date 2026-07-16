@@ -105,6 +105,21 @@ WERNANMAIL_RESTORE_CONFIRM=yes ./scripts/restore-data.sh ./wernanmail-backup.tgz
 Admin UI also exports **directory metadata** (domains/mailboxes/settings) via
 `GET /api/admin/backup` — that path does **not** include message bodies.
 
+### Metrics
+
+Admin exposes Prometheus text metrics at `GET /metrics` (no auth — scrape only from
+a private network or localhost):
+
+- queue pending / dead
+- quarantine open count
+- domains / mailboxes
+- host mail RSS + data dir size
+
+Optional per-daemon scrape ports: set `METRICS_ADDR=:9101` on `mta` / `worker`
+(and any other process) for process-local counters (`jobs_ok`, `smtp_inbound_accepted`, …).
+
+Worker also emits structured `slog` lines for queue job ok/fail.
+
 ### Smoke after install
 
 1. `docker compose ps` — all services healthy  

@@ -15,6 +15,7 @@ import (
 	"github.com/Baddysays/wernanmail/server/internal/domain"
 	"github.com/Baddysays/wernanmail/server/internal/greylist"
 	"github.com/Baddysays/wernanmail/server/internal/mailtmpl"
+	"github.com/Baddysays/wernanmail/server/internal/metrics"
 	"github.com/Baddysays/wernanmail/server/internal/pipeline"
 	"github.com/Baddysays/wernanmail/server/internal/queue"
 	"github.com/Baddysays/wernanmail/server/internal/settings"
@@ -39,6 +40,7 @@ type Backend struct {
 	SuperuserEnabled func() bool
 	// OutboundPolicy returns templates/footers for authenticated outbound mail.
 	OutboundPolicy func() mailtmpl.Policy
+	Metrics        *metrics.Registry
 }
 
 func (b *Backend) NewSession(c *smtp.Conn) (smtp.Session, error) {
@@ -239,6 +241,8 @@ func (s *Session) Data(r io.Reader) error {
 		}
 		if res.Err != nil {
 			log.Printf("pipeline warning: %v", res.Err)
+		} else if s.backend.Metrics != nil {
+			s.backend.Metrics.Inc("smtp_inbound_accepted", 1)
 		}
 	}
 	if len(remote) > 0 {
@@ -260,6 +264,9 @@ func (s *Session) Data(r io.Reader) error {
 		}); err != nil {
 			log.Printf("outbound enqueue: %v", err)
 			return &smtp.SMTPError{Code: 451, Message: "failed to queue outbound mail"}
+		}
+		if s.backend.Metrics != nil {
+			s.backend.Metrics.Inc("smtp_outbound_queued", 1)
 		}
 	}
 	return nil

@@ -26,6 +26,7 @@ import (
 	"github.com/Baddysays/wernanmail/server/internal/impersonate"
 	"github.com/Baddysays/wernanmail/server/internal/mailcfg"
 	"github.com/Baddysays/wernanmail/server/internal/mailfilter"
+	"github.com/Baddysays/wernanmail/server/internal/metrics"
 	"github.com/Baddysays/wernanmail/server/internal/settings"
 	"github.com/Baddysays/wernanmail/server/internal/store"
 	"github.com/Baddysays/wernanmail/server/internal/store/sqlite"
@@ -59,6 +60,8 @@ func NewRouter(h *Handler) http.Handler {
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 	})
+	// Unauthenticated scrape target — keep admin bind private / firewalled.
+	r.Handle("/metrics", h.metricsHandler(metrics.New("admin")))
 	r.Post("/api/admin/login", h.login)
 	r.Post("/api/admin/logout", h.logout)
 	r.Group(func(r chi.Router) {

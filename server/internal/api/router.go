@@ -26,6 +26,7 @@ func NewRouter(h *Handler) http.Handler {
 
 	// Container / probe health (no /api prefix)
 	r.Get("/healthz", h.Health)
+	r.Get("/metrics", h.Metrics)
 	r.Get("/.well-known/mta-sts.txt", h.MTAStsPolicy)
 
 	r.Route("/api", func(r chi.Router) {

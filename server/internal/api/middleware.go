@@ -3,9 +3,11 @@ package api
 import (
 	"context"
 	"net/http"
+	"sync"
 
 	"github.com/Baddysays/wernanmail/server/internal/config"
 	"github.com/Baddysays/wernanmail/server/internal/mailtmpl"
+	"github.com/Baddysays/wernanmail/server/internal/metrics"
 	"github.com/Baddysays/wernanmail/server/internal/session"
 )
 
@@ -18,6 +20,14 @@ type Handler struct {
 	Store          *session.Store
 	OutboundPolicy func() mailtmpl.Policy
 	loginGuard     *loginGuard
+	metricsOnce    sync.Once
+	metricsReg     *metrics.Registry
+}
+
+func (h *Handler) Metrics(w http.ResponseWriter, _ *http.Request) {
+	h.metricsOnce.Do(func() { h.metricsReg = metrics.New("api") })
+	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+	h.metricsReg.WritePrometheus(w)
 }
 
 func (h *Handler) RequireSession(next http.Handler) http.Handler {

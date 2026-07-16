@@ -28,6 +28,11 @@ location = /healthz {
   proxy_pass http://127.0.0.1:8090/healthz;
 }
 
+# Prometheus scrape (admin process + store gauges). Keep private if exposing publicly.
+location = /metrics {
+  proxy_pass http://127.0.0.1:8090/metrics;
+}
+
 # Webmail BFF API
 location /api/ {
   proxy_pass http://127.0.0.1:8080;

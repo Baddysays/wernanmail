@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"log"
+	"log/slog"
 	"net/mail"
 	"strings"
 	"sync"
@@ -13,6 +14,7 @@ import (
 	"github.com/Baddysays/wernanmail/server/internal/bounce"
 	"github.com/Baddysays/wernanmail/server/internal/dnsauth"
 	"github.com/Baddysays/wernanmail/server/internal/domain"
+	"github.com/Baddysays/wernanmail/server/internal/metrics"
 	"github.com/Baddysays/wernanmail/server/internal/outbound"
 	"github.com/Baddysays/wernanmail/server/internal/queue"
 	"github.com/Baddysays/wernanmail/server/internal/settings"
@@ -31,6 +33,7 @@ type Runner struct {
 	Hostname      string
 	BounceEnabled bool
 	RequireTLS    bool
+	Metrics       *metrics.Registry
 
 	domMu    sync.RWMutex
 	domCache map[int64]domain.Domain
@@ -151,12 +154,33 @@ func (r *Runner) drain(ctx context.Context) {
 			if dead && job.Kind == domain.JobOutboundSend && r.BounceEnabled {
 				r.enqueueBounce(ctx, job, msg)
 			}
-			log.Printf("job %d failed: %v (dead=%v)", job.ID, err, dead)
+			if r.Metrics != nil {
+				r.Metrics.Inc("jobs_failed", 1)
+				if dead {
+					r.Metrics.Inc("jobs_dead", 1)
+				}
+			}
+			slog.Warn("queue job failed",
+				"job_id", job.ID, "kind", string(job.Kind),
+				"attempts", job.Attempts, "dead", dead, "err", msg)
 			continue
 		}
 		if err := r.Queue.Complete(ctx, job.ID); err != nil {
 			log.Printf("queue complete: %v (job %d)", err, job.ID)
+			continue
 		}
+		if r.Metrics != nil {
+			r.Metrics.Inc("jobs_ok", 1)
+			switch job.Kind {
+			case domain.JobInboundDeliver:
+				r.Metrics.Inc("jobs_inbound_ok", 1)
+			case domain.JobOutboundSend:
+				r.Metrics.Inc("jobs_outbound_ok", 1)
+			case domain.JobBounce:
+				r.Metrics.Inc("jobs_bounce_ok", 1)
+			}
+		}
+		slog.Info("queue job ok", "job_id", job.ID, "kind", string(job.Kind), "attempts", job.Attempts)
 	}
 }
 

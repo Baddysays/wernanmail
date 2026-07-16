@@ -32,5 +32,13 @@ All notable changes to Wernanmail will be documented in this file.
 
 ## Unreleased
 
+### Added
+
+- Prometheus `/metrics` on admin (store gauges) and api; optional `METRICS_ADDR` for mta/worker.
+- Structured `slog` lines for queue job ok/fail in the worker.
+
+### Still open
+
 - Mailport embed surface (preview only).
 - Built-in ACME inside the MTA (host Certbot helper remains the supported path).
+
