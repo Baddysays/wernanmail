@@ -71,7 +71,9 @@
     "diskBreakdown": "data {{data}} · binaries {{bin}}",
     "cpuHint": "Share of host CPU · {{n}} services",
     "services": "Services",
-    "noProcs": "No mail processes detected"
+    "noProcs": "No mail processes detected",
+    "schema": "DB schema v{{v}}",
+    "metrics": "Prometheus /metrics ↗"
   },
   "deliverability": {
     "title": "Deliverability",

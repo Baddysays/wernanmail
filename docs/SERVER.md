@@ -120,6 +120,9 @@ Optional per-daemon scrape ports: set `METRICS_ADDR=:9101` on `mta` / `worker`
 
 Worker also emits structured `slog` lines for queue job ok/fail.
 
+SQLite schema is versioned via `schema_migrations` (see `server/internal/store/sqlite/migrate.go`).
+Admin ops status exposes `schemaVersion`; Overview links to `/metrics`.
+
 ### Smoke after install
 
 1. `docker compose ps` — all services healthy  

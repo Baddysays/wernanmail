@@ -1093,6 +1093,12 @@ func (h *Handler) deleteQueue(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) opsStatus(w http.ResponseWriter, r *http.Request) {
 	_ = h.Settings.Reload(r.Context())
 	tlsOK := h.Cfg.TLSCertFile != "" && h.Cfg.TLSKeyFile != ""
+	schemaVer := 0
+	if h.Store != nil {
+		if v, err := h.Store.SchemaVersion(); err == nil {
+			schemaVer = v
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"hostname":         h.Cfg.Hostname,
 		"ehlo":             h.Cfg.EHLOHost,
@@ -1102,6 +1108,7 @@ func (h *Handler) opsStatus(w http.ResponseWriter, r *http.Request) {
 		"rateSendPerHour":  h.Settings.GetInt(settings.KeyRateSendPerHour, 200),
 		"rateSubmitPerMin": h.Settings.GetInt(settings.KeyRateSubmitPerMin, 60),
 		"relayHost":        h.Settings.Get(settings.KeyRelayHost),
+		"schemaVersion":    schemaVer,
 	})
 }
 

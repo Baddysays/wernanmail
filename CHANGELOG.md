@@ -36,6 +36,9 @@ All notable changes to Wernanmail will be documented in this file.
 
 - Prometheus `/metrics` on admin (store gauges) and api; optional `METRICS_ADDR` for mta/worker.
 - Structured `slog` lines for queue job ok/fail in the worker.
+- Versioned SQLite migrations (`schema_migrations`, current schema v2).
+- Admin Overview: DB schema version + link to `/metrics`.
+- Compose nginx + docker-smoke checks for Prometheus metrics.
 
 ### Still open
 

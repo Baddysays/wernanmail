@@ -71,7 +71,9 @@
     "diskBreakdown": "данные {{data}} · бинарники {{bin}}",
     "cpuHint": "Доля CPU хоста · {{n}} сервисов",
     "services": "Сервисы",
-    "noProcs": "Процессы почты не найдены"
+    "noProcs": "Процессы почты не найдены",
+    "schema": "Схема БД v{{v}}",
+    "metrics": "Prometheus /metrics ↗"
   },
   "deliverability": {
     "title": "Доставляемость",

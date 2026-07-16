@@ -1624,6 +1624,24 @@ tbody tr.selected {
   color: var(--muted);
 }
 
+.resources-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin: 0.85rem 0 0;
+  font-size: 0.8rem;
+}
+
+.resources-foot a {
+  color: var(--accent, #8b1e14);
+  text-decoration: none;
+}
+
+.resources-foot a:hover {
+  text-decoration: underline;
+}
+
 .proc-panel {
   margin-top: 0.75rem;
 }

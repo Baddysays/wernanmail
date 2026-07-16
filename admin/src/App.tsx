@@ -260,7 +260,7 @@ function Meter({ pct }: { pct: number }) {
   )
 }
 
-function ResourcesPanel({ host }: { host: HostStats | null }) {
+function ResourcesPanel({ host, ops }: { host: HostStats | null; ops?: OpsStatus | null }) {
   const { t } = useTranslation()
   if (!host) {
     return (
@@ -334,6 +334,14 @@ function ResourcesPanel({ host }: { host: HostStats | null }) {
           {!procs.length ? <span className="muted">{t('resources.noProcs')}</span> : null}
         </div>
       </div>
+      <p className="resources-foot muted">
+        {typeof ops?.schemaVersion === 'number' ? (
+          <span>{t('resources.schema', { v: ops.schemaVersion })}</span>
+        ) : null}
+        <a href="/metrics" target="_blank" rel="noreferrer">
+          {t('resources.metrics')}
+        </a>
+      </p>
     </section>
   )
 }
@@ -1457,7 +1465,7 @@ export function App() {
                 updatedAt={updatedAt}
                 onRefresh={() => void refreshDash().catch(() => {})}
               />
-              <ResourcesPanel host={hostStats} />
+              <ResourcesPanel host={hostStats} ops={ops} />
               <div className="overview-metrics">
                 <div className="metric">
                   <h3>{t('overview.queueTitle')}</h3>

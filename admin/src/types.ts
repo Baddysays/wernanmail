@@ -179,6 +179,7 @@ export type OpsStatus = {
   bounceEnabled?: boolean
   tlsConfigured?: boolean
   rateSendPerHour?: number | string
+  schemaVersion?: number
 }
 
 export type SparkSample = { t: number; n: number }

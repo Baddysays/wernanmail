@@ -54,6 +54,17 @@ docker compose ps
 echo "Checking HTTPS healthz..."
 curl -fsSk "https://127.0.0.1:${HTTPS_PORT}/healthz" >/dev/null
 
+echo "Checking Prometheus metrics..."
+metrics="$(curl -fsSk "https://127.0.0.1:${HTTPS_PORT}/metrics")"
+echo "$metrics" | grep -q 'wernanmail_up{process="admin"} 1' || {
+  echo "metrics missing wernanmail_up admin" >&2
+  exit 1
+}
+echo "$metrics" | grep -q 'wernanmail_queue_pending' || {
+  echo "metrics missing queue_pending" >&2
+  exit 1
+}
+
 echo "Checking admin SPA..."
 code="$(curl -fsSk -o /dev/null -w '%{http_code}' "https://127.0.0.1:${HTTPS_PORT}/admin/")"
 if [ "$code" != "200" ]; then
