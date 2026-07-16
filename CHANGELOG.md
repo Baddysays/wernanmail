@@ -2,6 +2,20 @@
 
 All notable changes to Wernanmail will be documented in this file.
 
+## [0.2.0] - 2026-07-17
+
+### Added
+
+- Integration smoke test: SMTP → queue → worker → IMAP → API (`server/internal/integration`).
+- Full data backup/restore scripts (`scripts/backup-data.sh`, `scripts/restore-data.sh`).
+- Certbot → Compose TLS helper (`scripts/issue-tls-certbot.sh`).
+- README “who this is for” honesty table.
+
+### Changed
+
+- IMAP IDLE: cross-process `content_rev` signal with ~500 ms poll (was fixed 5 s FolderStats).
+- Operator docs: TLS helper, backup path, default ports clarified.
+
 ## [0.1.0] - 2026-07-16
 
 ### Added
@@ -19,4 +33,4 @@ All notable changes to Wernanmail will be documented in this file.
 ## Unreleased
 
 - Mailport embed surface (preview only).
-- Built-in ACME inside the MTA (host-level Certbot/Caddy remains v1 path).
+- Built-in ACME inside the MTA (host Certbot helper remains the supported path).

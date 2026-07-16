@@ -39,6 +39,9 @@ type MessageStore interface {
 	// Messages
 	NextUID(ctx context.Context, mailboxID int64, folder string) (uint32, error)
 	FolderStats(ctx context.Context, mailboxID int64, folder string) (messages, unseen uint32, uidNext, uidValidity uint32, err error)
+	// MailboxContentRev is a cheap monotonic counter bumped on message mutations.
+	// IMAP IDLE polls it across process boundaries (worker vs imapd).
+	MailboxContentRev(ctx context.Context, mailboxID int64) (int64, error)
 	AppendMessage(ctx context.Context, msg *domain.Message, raw []byte) error
 	ListMessages(ctx context.Context, mailboxID int64, folder string, limit int) ([]domain.Message, error)
 	GetMessage(ctx context.Context, mailboxID int64, folder string, uid uint32) (*domain.Message, []byte, error)

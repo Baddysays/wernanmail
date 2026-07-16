@@ -191,10 +191,24 @@ CREATE INDEX IF NOT EXISTS idx_mail_filters_mailbox ON mail_filters(mailbox_id, 
 	if err != nil {
 		return err
 	}
-	// uid_validity / domain default quota added later; ignore error if column already exists.
+	// uid_validity / domain default quota / content_rev added later; ignore error if column already exists.
 	_, _ = s.db.Exec(`ALTER TABLE folder_uid ADD COLUMN uid_validity INTEGER NOT NULL DEFAULT 1`)
 	_, _ = s.db.Exec(`ALTER TABLE domains ADD COLUMN default_quota_bytes INTEGER NOT NULL DEFAULT 0`)
+	_, _ = s.db.Exec(`ALTER TABLE mailboxes ADD COLUMN content_rev INTEGER NOT NULL DEFAULT 0`)
 	return nil
+}
+
+func (s *Store) bumpContentRev(ctx context.Context, mailboxID int64) {
+	_, _ = s.db.ExecContext(ctx, `UPDATE mailboxes SET content_rev = content_rev + 1 WHERE id=?`, mailboxID)
+}
+
+func (s *Store) MailboxContentRev(ctx context.Context, mailboxID int64) (int64, error) {
+	var rev int64
+	err := s.db.QueryRowContext(ctx, `SELECT COALESCE(content_rev,0) FROM mailboxes WHERE id=?`, mailboxID).Scan(&rev)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, nil
+	}
+	return rev, err
 }
 
 func now() string { return time.Now().UTC().Format(time.RFC3339Nano) }
@@ -637,8 +651,10 @@ VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)`,
 		msg.Date.UTC().Format(time.RFC3339Nano), msg.Size, string(flags), msg.MaildirRel, msg.SpamScore, now())
 	if err != nil {
 		_ = s.md.Remove(rel)
+		return err
 	}
-	return err
+	s.bumpContentRev(ctx, msg.MailboxID)
+	return nil
 }
 
 func (s *Store) ListMessages(ctx context.Context, mailboxID int64, folder string, limit int) ([]domain.Message, error) {
@@ -712,7 +728,11 @@ func (s *Store) UpdateFlags(ctx context.Context, mailboxID int64, folder string,
 	}
 	b, _ := json.Marshal(flags)
 	_, err := s.db.ExecContext(ctx, `UPDATE messages SET flags_json=? WHERE mailbox_id=? AND folder=? AND uid=?`, string(b), mailboxID, folder, uid)
-	return err
+	if err != nil {
+		return err
+	}
+	s.bumpContentRev(ctx, mailboxID)
+	return nil
 }
 
 func (s *Store) MoveMessage(ctx context.Context, mailboxID int64, folder string, uid uint32, toFolder string) error {
@@ -733,6 +753,7 @@ func (s *Store) MoveMessage(ctx context.Context, mailboxID int64, folder string,
 		return err
 	}
 	_ = s.md.Remove(m.MaildirRel)
+	s.bumpContentRev(ctx, mailboxID)
 	return nil
 }
 
@@ -767,6 +788,7 @@ func (s *Store) DeleteMessage(ctx context.Context, mailboxID int64, folder strin
 		return err
 	}
 	_ = s.md.Remove(m.MaildirRel)
+	s.bumpContentRev(ctx, mailboxID)
 	return nil
 }
 

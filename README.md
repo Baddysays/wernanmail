@@ -92,10 +92,11 @@ docker compose run --rm init /app/docker-init show-admin-password
 ### Before you go live
 
 1. Copy `.env.example` → `.env` and set `MAIL_HOSTNAME`, `MAIL_EHLO`, `PUBLIC_URL`
-2. Replace self-signed certs in the `mail_tls` volume with `fullchain.pem` + `privkey.pem` (Certbot / commercial)
+2. Replace self-signed TLS: `MAIL_HOSTNAME=mail.example.com ./scripts/issue-tls-certbot.sh`
 3. Publish DNS: **MX · SPF · DKIM · DMARC · PTR** (MTA-STS / TLS-RPT optional)
 4. Open firewall: **25, 587, 143, 443** by default (`465` / `993` only if you add implicit TLS)
 5. Send a test both ways → check admin **Deliverability**
+6. Schedule backups: `./scripts/backup-data.sh` (SQLite + Maildir)
 
 Full operator checklist: **[docs/SERVER.md](docs/SERVER.md)** · product rules: **[docs/POLICY.md](docs/POLICY.md)**  
 Security policy: **[SECURITY.md](SECURITY.md)** · recent changes: **[CHANGELOG.md](CHANGELOG.md)** · license: **[MIT](LICENSE)**
@@ -114,16 +115,25 @@ docker compose down --volumes   # wipe mail + secrets
 |-------|------|
 | **Webmail** | React inbox — compose, folders, undo delete, remote images gated, moods, i18n |
 | **MTA** | Inbound SMTP + authenticated submission, pipeline (spam → light AV → store/queue) |
-| **IMAP** | Folders, APPEND, IDLE (poll), quotas |
+| **IMAP** | Folders, APPEND, IDLE via `content_rev` (~500 ms), quotas |
 | **Worker** | Local deliver, outbound SMTP, bounce path |
 | **Admin** | Domains, mailboxes, aliases, filters, quarantine learn, DNS/deliverability, settings, audit |
 | **Mailport** | Early preview route for future embedded inbox/compose flows |
+
+## Who this is for (honest)
+
+| Scenario | Recommendation |
+|----------|----------------|
+| Personal / family domain, **1–5 mailboxes**, OK to watch logs | **Yes** — light stack, modern UI, one-command Docker |
+| Learning Go MTA / forking a clean mail codebase | **Yes** |
+| Small business that needs **“install and forget”** like Mailcow | **Not yet** — still early; antispam is light, no CalDAV/CardDAV, single-node |
+| SLA / compliance / thousands of mailboxes | **No** — use Mailcow, Stalwart, or a hosted provider |
 
 ## Roadmap notes
 
 - **Mailport** is still a preview surface, not a finished embeddable product
 - **Implicit TLS** on `465` / `993` is optional; STARTTLS on `587` / `143` is the default Compose path
-- **Host-level ACME** (Certbot / Caddy / nginx) remains the intended v1 TLS automation story
+- **Host-level ACME** via [`scripts/issue-tls-certbot.sh`](scripts/issue-tls-certbot.sh) (Certbot → `mail_tls` volume)
 
 ## Product shots
 
@@ -152,11 +162,12 @@ All shots: [`docs/mockups/`](docs/mockups/) · notes: [docs/DESIGN.md](docs/DESI
 ```
 install.sh           one-command Docker entry
 docker-compose.yml   full production stack
+scripts/             docker-smoke, backup/restore, Certbot TLS helper
 web/                 webmail (React + TypeScript)
 admin/               operator console (React + TypeScript)
 server/              Go: api · mta · imapd · worker · admin · docker-init
 docs/                design, policy, server ops, mockups
-deploy/                deploy docs + native host helpers
+deploy/              deploy docs + native host helpers
 ```
 
 ## Dev (without Docker)

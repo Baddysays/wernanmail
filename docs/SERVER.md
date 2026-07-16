@@ -74,19 +74,36 @@ Do **not** commit real hostnames/IPs into the public repo.
 ### TLS
 
 Compose starts with a **self-signed** bootstrap cert so ports come up on day one.
-For production, replace files in the `mail_tls` volume (or bind-mount) as
-`fullchain.pem` + `privkey.pem`, then `docker compose restart`.
+For production, replace files in the `mail_tls` volume as `fullchain.pem` + `privkey.pem`.
 
-Typical path with Certbot on the host (HTTP-01 via nginx/`/.well-known/acme-challenge/`):
+Helper (HTTP-01 via host Certbot → install into Compose volume):
+
+```bash
+MAIL_HOSTNAME=mail.example.com ./scripts/issue-tls-certbot.sh
+```
+
+Manual path:
 
 ```bash
 certbot certonly --webroot -w /var/www/certbot -d mail.example.com
-# copy or bind the live fullchain/privkey into the mail_tls volume
-docker compose restart mta imapd
+LIVE_DIR=/etc/letsencrypt/live/mail.example.com ./scripts/issue-tls-certbot.sh
 ```
 
 DNS-01 is preferred when covering apex + `mail` without opening HTTP on the mail host.
 Built-in ACME inside the MTA is not required for v1; host-level Certbot/Caddy is fine.
+
+### Backup / restore
+
+Full message store (`mail.db` + `maildir/`):
+
+```bash
+./scripts/backup-data.sh /path/to/data ./wernanmail-backup.tgz
+# stop stack first
+WERNANMAIL_RESTORE_CONFIRM=yes ./scripts/restore-data.sh ./wernanmail-backup.tgz /path/to/data
+```
+
+Admin UI also exports **directory metadata** (domains/mailboxes/settings) via
+`GET /api/admin/backup` — that path does **not** include message bodies.
 
 ### Smoke after install
 

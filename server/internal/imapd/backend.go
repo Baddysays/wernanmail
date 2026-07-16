@@ -90,6 +90,7 @@ type User struct {
 	folders map[string]mailboxSnapshot
 	stop    chan struct{}
 	once    sync.Once
+	lastRev int64
 }
 
 func (u *User) Username() string { return u.mailbox.Address(u.domain.Name) }
@@ -156,11 +157,21 @@ type mailboxSnapshot struct {
 }
 
 func (u *User) pollUpdates() {
-	ticker := time.NewTicker(5 * time.Second)
+	// Worker and imapd are separate processes sharing SQLite. content_rev is the
+	// cross-process signal; FolderStats runs only when the revision changes.
+	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
+			rev, err := u.store.MailboxContentRev(context.Background(), u.mailbox.ID)
+			if err != nil {
+				continue
+			}
+			if rev == u.lastRev {
+				continue
+			}
+			u.lastRev = rev
 			u.pollFolders()
 		case <-u.stop:
 			return
