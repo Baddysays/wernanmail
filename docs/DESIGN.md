@@ -1,16 +1,21 @@
 # Design
 
 ## Chosen baseline
-**Paper Quiet** (`docs/mockups/wernanmail-style-02-paper-quiet.png`)
+**Paper Quiet** — see live product shots in [`docs/mockups/`](mockups/)
 
 - Light surfaces, calm teal-forward accent by default
 - Three columns: folders · list · reading pane
 - Airy but usable density; thin icons; readable body text
 
-### Admin console
-- Overview: quiet console — `docs/mockups/admin-variant-c-quiet-console.png`
-- Working screens: operator health strip — `docs/mockups/admin-variant-b-operator-strip.png`
-- Alternate paper-quiet pass — `docs/mockups/admin-variant-a-paper-quiet.png`
+### Product shots (current UI)
+| Shot | File |
+|------|------|
+| Sign-in (desktop) | `login-desktop.png` |
+| Sign-in (mobile) | `login-mobile.png` |
+| Compose | `compose.png` · Grove mood `compose-grove.png` |
+| Admin overview | `admin-overview.png` · mobile `admin-overview-mobile.png` |
+| Mailbox detail (mobile) | `admin-mailbox-mobile.png` |
+| Color moods (mobile) | `settings-moods-mobile.png` |
 
 ## Motion & craft (emil-design-eng)
 Apply [emilkowalski/skills · emil-design-eng](https://github.com/emilkowalski/skills):

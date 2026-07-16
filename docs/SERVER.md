@@ -145,7 +145,7 @@ SPA under [`admin/`](../admin/) — domains, mailboxes, queue, quarantine, setti
 
 **Look:** Overview = quiet console; other screens = operator health strip (MX/SPF/DKIM/DMARC/TLS/Queue). Paper Quiet palette.
 
-Mockups: [`docs/mockups/admin-variant-c-quiet-console.png`](mockups/admin-variant-c-quiet-console.png), [`docs/mockups/admin-variant-b-operator-strip.png`](mockups/admin-variant-b-operator-strip.png)
+Product shots: [`docs/mockups/admin-overview.png`](mockups/admin-overview.png), [`docs/mockups/login-desktop.png`](mockups/login-desktop.png) · full set in [`docs/mockups/`](mockups/)
 
 ## Coding rules
 

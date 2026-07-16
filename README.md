@@ -11,11 +11,11 @@ Webmail + Go MTA/IMAP + operator admin — Mailcow-class capability without Mail
 | **Stack** | SMTP · submission · IMAP · queue · webmail · admin |
 
 <p align="center">
-  <img src="docs/mockups/login-moods.png" alt="Wernanmail sign-in" width="780" />
+  <img src="docs/mockups/login-desktop.png" alt="Wernanmail sign-in" width="860" />
 </p>
 
 <p align="center">
-  <img src="docs/mockups/admin-variant-c-quiet-console.png" alt="Wernanmail admin overview" width="780" />
+  <img src="docs/mockups/admin-overview.png" alt="Wernanmail admin overview — ~84 MB stack" width="860" />
 </p>
 
 ## Why teams pick it
@@ -87,16 +87,37 @@ docker compose down --volumes   # wipe mail + secrets
 | **Admin** | Domains, mailboxes, aliases, filters, quarantine learn, DNS/deliverability, settings, audit |
 | **Mailport** | Embed inbox/compose in other products |
 
+## Product shots
+
+Compose, moods, and mobile — real UI, not mock concepts.
+
+<p align="center">
+  <img src="docs/mockups/compose.png" alt="Compose a new message" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/mockups/compose-grove.png" alt="Compose in Grove mood" width="720" />
+</p>
+
+<p align="center">
+  <img src="docs/mockups/login-mobile.png" alt="Sign-in on mobile" width="320" />
+  &nbsp;&nbsp;
+  <img src="docs/mockups/settings-moods-mobile.png" alt="Color moods on mobile" width="320" />
+</p>
+
+<p align="center">
+  <img src="docs/mockups/admin-overview-mobile.png" alt="Admin overview on mobile" width="320" />
+  &nbsp;&nbsp;
+  <img src="docs/mockups/admin-mailbox-mobile.png" alt="Mailbox settings on mobile" width="320" />
+</p>
+
 ## Design
 
 **Paper Quiet** — calm teal, three-column mail, soft motion.  
+Moods (Harbor / Reef / Grove / Ember / Mist) tint login and the whole client.  
 Admin = quiet overview console + operator health strip on working screens.
 
-More shots: [`docs/mockups/`](docs/mockups/) · notes: [docs/DESIGN.md](docs/DESIGN.md)
-
-<p align="center">
-  <img src="docs/mockups/admin-variant-b-operator-strip.png" alt="Admin with operator health strip" width="780" />
-</p>
+All shots: [`docs/mockups/`](docs/mockups/) · notes: [docs/DESIGN.md](docs/DESIGN.md)
 
 ## Repo map
 
