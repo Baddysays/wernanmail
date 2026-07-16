@@ -11,6 +11,23 @@ Webmail + Go MTA/IMAP + operator admin — Mailcow-class capability without Mail
 | **Stack** | SMTP · submission · IMAP · queue · webmail · admin |
 
 <p align="center">
+  <a href="https://wernanmail.ru"><img src="https://img.shields.io/badge/site-wernanmail.ru-1f6f8b?style=flat-square&logo=googlechrome&logoColor=white" alt="site"/></a>
+  &nbsp;
+  <a href="https://mail.wernanmail.ru"><img src="https://img.shields.io/badge/webmail-mail.wernanmail.ru-155a72?style=flat-square&logo=maildotru&logoColor=white" alt="webmail"/></a>
+  &nbsp;
+  <a href="https://mail.wernanmail.ru/admin/"><img src="https://img.shields.io/badge/admin-console-0f3d4d?style=flat-square" alt="admin"/></a>
+</p>
+
+### Website
+
+Live product site: **[wernanmail.ru](https://wernanmail.ru)** — hero, moods, one-command install, and the story of light self-hosted mail.  
+Running instance: **[mail.wernanmail.ru](https://mail.wernanmail.ru)** (webmail) · **[admin](https://mail.wernanmail.ru/admin/)**.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Baddysays/wernanmail/main/install.sh | bash
+```
+
+<p align="center">
   <img src="docs/mockups/login-desktop.png" alt="Wernanmail sign-in" width="860" />
 </p>
 
