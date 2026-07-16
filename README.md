@@ -125,6 +125,23 @@ Native binaries (existing `/opt/wernanmail` installs) remain supported via `./ru
 Light · fast · reliable.  
 No secrets or private infra inventory in git. Details: [docs/POLICY.md](docs/POLICY.md)
 
+## Acknowledgments / С благодарностью за идеи
+
+Wernanmail stands on the shoulders of the self-hosted mail world.  
+**С благодарностью за идеи** — и за то, что показали, как выглядит хорошая корпоративная почта:
+
+| Project | Why we looked |
+|---------|----------------|
+| **[Mailcow](https://mailcow.email/)** | The operator UX bar: domains, DKIM, quarantine, “it just feels complete” |
+| **[Stalwart](https://stalw.art/)** | Modern Rust mail server direction — JMAP/IMAP vision, tight resource story |
+| **[Maddy](https://maddy.email/)** | Compositional Go MTA thinking — keep the stack understandable |
+| **[Postal](https://docs.postalserver.io/)** | Clean product framing for outbound / ops-facing mail tools |
+| **[Mail-in-a-Box](https://mailinabox.email/)** | “One box, go live” install ethos |
+| **[Roundcube](https://roundcube.net/)** / webmail classics | What users expect from folders, compose, and reading pane |
+| **Postfix / Dovecot / Rspamd / OpenDKIM** | The protocol and auth foundation every serious stack still studies |
+
+None of these projects are affiliated with Wernanmail. We took **ideas and aspirations**, then built our own light path: less RAM, first-class webmail + admin, one Docker command.
+
 ---
 
 *Built to feel obvious. Clone it. One command. Own your mail.*
