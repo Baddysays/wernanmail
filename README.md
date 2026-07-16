@@ -16,6 +16,10 @@ Webmail + Go MTA/IMAP + operator admin — Mailcow-class capability without Mail
   <a href="https://mail.wernanmail.ru"><img src="https://img.shields.io/badge/webmail-mail.wernanmail.ru-155a72?style=flat-square&logo=maildotru&logoColor=white" alt="webmail"/></a>
   &nbsp;
   <a href="https://mail.wernanmail.ru/admin/"><img src="https://img.shields.io/badge/admin-console-0f3d4d?style=flat-square" alt="admin"/></a>
+  &nbsp;
+  <a href="https://github.com/Baddysays/wernanmail/actions/workflows/ci.yml"><img src="https://github.com/Baddysays/wernanmail/actions/workflows/ci.yml/badge.svg" alt="CI"/></a>
+  &nbsp;
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-0f766e?style=flat-square" alt="MIT License"/></a>
 </p>
 
 ### Website
@@ -26,6 +30,9 @@ Running instance: **[mail.wernanmail.ru](https://mail.wernanmail.ru)** (webmail)
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Baddysays/wernanmail/main/install.sh | bash
 ```
+
+The installer clones the repo into a temporary directory, creates `.env` from
+`.env.example` on first run, then starts the full Compose stack.
 
 <p align="center">
   <img src="docs/mockups/login-desktop.png" alt="Wernanmail sign-in" width="860" />
@@ -49,12 +56,18 @@ curl -fsSL https://raw.githubusercontent.com/Baddysays/wernanmail/main/install.s
 Linux host with Docker Engine + Compose v2:
 
 ```bash
+curl -fsSL https://raw.githubusercontent.com/Baddysays/wernanmail/main/install.sh | bash
+```
+
+Prefer a pinned local checkout instead?
+
+```bash
 git clone https://github.com/Baddysays/wernanmail.git
 cd wernanmail
 chmod +x install.sh && ./install.sh
 ```
 
-Same as:
+Under the hood this is:
 
 ```bash
 docker compose up --build -d
@@ -74,16 +87,18 @@ docker compose run --rm init /app/docker-init show-admin-password
 | SMTP | `25` |
 | Submission (STARTTLS) | `587` |
 | IMAP (STARTTLS) | `143` |
+| Optional implicit TLS | `465` / `993` via TLS terminator or custom config |
 
 ### Before you go live
 
 1. Copy `.env.example` → `.env` and set `MAIL_HOSTNAME`, `MAIL_EHLO`, `PUBLIC_URL`
 2. Replace self-signed certs in the `mail_tls` volume with `fullchain.pem` + `privkey.pem` (Certbot / commercial)
 3. Publish DNS: **MX · SPF · DKIM · DMARC · PTR** (MTA-STS / TLS-RPT optional)
-4. Open firewall: **25, 465, 587, 993, 443**
+4. Open firewall: **25, 587, 143, 443** by default (`465` / `993` only if you add implicit TLS)
 5. Send a test both ways → check admin **Deliverability**
 
-Full operator checklist: **[docs/SERVER.md](docs/SERVER.md)** · product rules: **[docs/POLICY.md](docs/POLICY.md)**
+Full operator checklist: **[docs/SERVER.md](docs/SERVER.md)** · product rules: **[docs/POLICY.md](docs/POLICY.md)**  
+Security policy: **[SECURITY.md](SECURITY.md)** · recent changes: **[CHANGELOG.md](CHANGELOG.md)** · license: **[MIT](LICENSE)**
 
 ```bash
 docker compose ps
@@ -102,30 +117,26 @@ docker compose down --volumes   # wipe mail + secrets
 | **IMAP** | Folders, APPEND, IDLE (poll), quotas |
 | **Worker** | Local deliver, outbound SMTP, bounce path |
 | **Admin** | Domains, mailboxes, aliases, filters, quarantine learn, DNS/deliverability, settings, audit |
-| **Mailport** | Embed inbox/compose in other products |
+| **Mailport** | Early preview route for future embedded inbox/compose flows |
+
+## Roadmap notes
+
+- **Mailport** is still a preview surface, not a finished embeddable product
+- **Implicit TLS** on `465` / `993` is optional; STARTTLS on `587` / `143` is the default Compose path
+- **Host-level ACME** (Certbot / Caddy / nginx) remains the intended v1 TLS automation story
 
 ## Product shots
 
-Compose, moods, and mobile — real UI, not mock concepts.
+Real UI, not mock concepts. More screenshots live in [`docs/mockups/`](docs/mockups/).
 
 <p align="center">
   <img src="docs/mockups/compose.png" alt="Compose a new message" width="720" />
 </p>
 
 <p align="center">
-  <img src="docs/mockups/compose-grove.png" alt="Compose in Grove mood" width="720" />
-</p>
-
-<p align="center">
   <img src="docs/mockups/login-mobile.png" alt="Sign-in on mobile" width="320" />
   &nbsp;&nbsp;
   <img src="docs/mockups/settings-moods-mobile.png" alt="Color moods on mobile" width="320" />
-</p>
-
-<p align="center">
-  <img src="docs/mockups/admin-overview-mobile.png" alt="Admin overview on mobile" width="320" />
-  &nbsp;&nbsp;
-  <img src="docs/mockups/admin-mailbox-mobile.png" alt="Mailbox settings on mobile" width="320" />
 </p>
 
 ## Design
@@ -145,7 +156,7 @@ web/                 webmail (React + TypeScript)
 admin/               operator console (React + TypeScript)
 server/              Go: api · mta · imapd · worker · admin · docker-init
 docs/                design, policy, server ops, mockups
-deploy/mail-host/    native binary host helpers
+deploy/                deploy docs + native host helpers
 ```
 
 ## Dev (without Docker)
@@ -162,6 +173,10 @@ Native binaries (existing `/opt/wernanmail` installs) remain supported via `./ru
 
 Light · fast · reliable.  
 No secrets or private infra inventory in git. Details: [docs/POLICY.md](docs/POLICY.md)
+
+## Security
+
+Please report security issues privately; see [SECURITY.md](SECURITY.md).
 
 ## Acknowledgments / С благодарностью за идеи
 

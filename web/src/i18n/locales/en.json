@@ -242,7 +242,7 @@
     "install": {
       "kicker": "Go live",
       "title": "One command on a clean Linux host.",
-      "body": "Docker builds the stack, bootstraps secrets, and brings up SMTP, IMAP, API, webmail, and admin. Then point DNS and TLS at wernanmail.ru.",
+      "body": "Docker clones the repo, builds the stack, bootstraps secrets, and brings up SMTP, IMAP, API, webmail, and admin. Requires Docker, Compose v2, and git.",
       "copy": "Copy",
       "copied": "Copied"
     },

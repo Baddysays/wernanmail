@@ -1,8 +1,33 @@
 #!/usr/bin/env bash
 # One-command install helper for Wernanmail full stack.
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-cd "$ROOT"
+
+REPO_URL="${WERNANMAIL_REPO_URL:-https://github.com/Baddysays/wernanmail.git}"
+REPO_REF="${WERNANMAIL_REF:-main}"
+
+if ! command -v git >/dev/null 2>&1; then
+  echo "Git is required for the installer." >&2
+  exit 1
+fi
+
+bootstrap_repo() {
+  local tmp
+  tmp="$(mktemp -d)"
+  trap 'rm -rf "$tmp"' EXIT
+  echo "Fetching Wernanmail into a temporary directory..."
+  git clone --depth 1 --branch "$REPO_REF" "$REPO_URL" "$tmp/repo"
+  cd "$tmp/repo"
+}
+
+if [ -f "./docker-compose.yml" ] && [ -f "./.env.example" ]; then
+  ROOT="$(pwd)"
+elif [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/docker-compose.yml" ]; then
+  ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  cd "$ROOT"
+else
+  bootstrap_repo
+  ROOT="$(pwd)"
+fi
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "Docker is required. Install Docker Engine + Compose v2, then re-run." >&2

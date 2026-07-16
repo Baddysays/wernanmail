@@ -18,8 +18,8 @@ The Phase 1 web client stays a thin IMAP/SMTP client. Point it at this stack whe
 
 ```
 Internet MX:25 ──► smtpd ──► pipeline (antispam → antivirus) ──► queue ──► worker ──► store
-Users :587/465 ► submission ───────────────────────────────────────┘              │
-Users :143/993 ► imapd ◄──────────────────────────────────────────────────────────┘
+Users :587 (or optional :465) ► submission ─────────────────────────┘              │
+Users :143 (or optional :993) ► imapd ◄────────────────────────────────────────────┘
 Admin UI HTTPS ► admin API ──► store / queue / settings / quarantine
 Web client ────► existing BFF (Phase 1) ──► this IMAP/SMTP
 ```
@@ -69,7 +69,7 @@ Do **not** commit real hostnames/IPs into the public repo.
 6. **DMARC** — start with `v=DMARC1; p=none; rua=mailto:postmaster@…`
 7. **PTR** — reverse DNS for the outbound IP (VPS provider) matching `MAIL_HOSTNAME`
 8. Optional: **MTA-STS** (`_mta-sts` TXT + `mta-sts.` HTTPS policy) and **TLS-RPT**
-9. Firewall: **25, 465, 587, 993** + HTTPS **443**
+9. Firewall: **25, 587, 143** + HTTPS **443** by default; add **465 / 993** only if you expose implicit TLS
 
 ### TLS
 
