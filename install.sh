@@ -30,3 +30,4 @@ echo "Admin password:"
 docker compose run --rm init /app/docker-init show-admin-password || true
 echo
 echo "Useful: docker compose ps | logs -f | down"
+echo "CI smoke:   ./scripts/docker-smoke.sh"

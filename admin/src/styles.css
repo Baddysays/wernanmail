@@ -856,6 +856,12 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   font-size: 0.76rem;
 }
 
+.dmarc-empty-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
 .form-stack {
   display: flex;
   flex-direction: column;

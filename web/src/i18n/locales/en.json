@@ -178,6 +178,7 @@
     "navLabel": "Site",
     "nav": {
       "why": "Why light",
+      "product": "Product",
       "moods": "Moods",
       "install": "Install"
     },
@@ -195,18 +196,48 @@
       "body": "No Mailcow-class footprint. Pure Go daemons, SQLite, Maildir, antispam, and a quiet UI — made for 1–2 GB hosts that still deserve real corporate mail.",
       "meter": "Target: under 500 MB while the stack is running."
     },
-    "peek": {
-      "label": "Webmail preview",
-      "inbox": "Inbox",
-      "sent": "Sent",
-      "drafts": "Drafts",
-      "subject": "Quiet by design",
-      "message": "Folders, compose, and moods that tint the whole workspace — without turning your inbox into a dashboard."
+    "stats": {
+      "label": "At a glance",
+      "ram": "<500 MB",
+      "ramHint": "running stack target",
+      "stack": "Full stack",
+      "stackHint": "SMTP · IMAP · webmail · admin",
+      "langs": "12 languages",
+      "langsHint": "webmail + admin UI"
+    },
+    "hero": {
+      "pills": ["SMTP", "IMAP", "Webmail", "Admin"]
+    },
+    "showcase": {
+      "kicker": "Product",
+      "title": "Not a mockup — the real UI.",
+      "body": "Screens from the repo: admin console, sign-in, compose, and mobile moods — same stack you install.",
+      "label": "Product screenshots",
+      "mobileLabel": "Mobile",
+      "repo": "All shots in docs/mockups on GitHub →",
+      "tabs": {
+        "inbox": "Admin",
+        "signin": "Sign in",
+        "compose": "Compose"
+      },
+      "alt": {
+        "inbox": "Wernanmail admin overview with deliverability and DNS chips",
+        "signin": "Wernanmail sign-in with mood picker",
+        "compose": "Compose dialog in the webmail client",
+        "mobileLogin": "Sign-in on mobile",
+        "mobileMoods": "Color mood settings on mobile"
+      },
+      "caption": {
+        "inbox": "Operator console — domains, queue, deliverability, under ~100 MB on a live host.",
+        "signin": "Aurora hero and mood dots carry into the inbox.",
+        "compose": "HTML compose, attachments, drafts — without a heavy editor."
+      }
     },
     "moods": {
       "kicker": "Atmosphere",
       "title": "Five moods. One calm inbox.",
-      "body": "Harbor at dawn, reef through the afternoon, ember after dark. Pick a mood — the brand site and the mail client shift together."
+      "body": "Harbor at dawn, reef through the afternoon, ember after dark. Pick a mood — the brand site and the mail client shift together.",
+      "previewAlt": "Compose in {{mood}} mood"
     },
     "install": {
       "kicker": "Go live",

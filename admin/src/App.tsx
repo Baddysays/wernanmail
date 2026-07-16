@@ -496,7 +496,10 @@ function DeliverabilityCard({
               ))}
             </div>
           ) : (
-            <p className="muted dmarc-empty">{t('deliverability.noReports')}</p>
+            <>
+              <p className="muted dmarc-empty">{t('deliverability.noReports')}</p>
+              <p className="muted dmarc-empty-hint">{t('deliverability.noReportsHint')}</p>
+            </>
           )}
         </div>
       ) : null}

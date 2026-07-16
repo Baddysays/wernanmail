@@ -80,7 +80,8 @@
     "postmaster": "Google Postmaster Tools ↗",
     "recipientHint": "Ask early recipients to mark messages Not spam and add the sender to contacts.",
     "reports": "Recent DMARC reports",
-    "noReports": "No aggregate reports yet"
+    "noReports": "No aggregate reports yet",
+    "noReportsHint": "Publish DMARC with rua=mailto:… and wait for providers to send XML to postmaster@your-domain."
   },
   "overview": {
     "healthyTitle": "Mail is healthy",

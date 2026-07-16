@@ -9,9 +9,15 @@ import {
   type MoodId,
 } from '../store/settings'
 import styles from './LandingPage.module.css'
+import {
+  mockupFallback,
+  mockupSrc,
+  type ShowcaseId,
+} from './landingMockups'
 
 const INSTALL_CMD = 'curl -fsSL https://raw.githubusercontent.com/Baddysays/wernanmail/main/install.sh | bash'
 const GITHUB_URL = 'https://github.com/Baddysays/wernanmail'
+const SHOWCASE_IDS: ShowcaseId[] = ['inbox', 'signin', 'compose']
 
 function useInView<T extends HTMLElement>(margin = '-12%') {
   const ref = useRef<T | null>(null)
@@ -42,8 +48,9 @@ export function LandingPage() {
   const effectiveMood = resolveMood(settings.mood)
   const [copied, setCopied] = useState(false)
   const [solidNav, setSolidNav] = useState(false)
+  const [showcase, setShowcase] = useState<ShowcaseId>('inbox')
   const why = useInView<HTMLElement>()
-  const peek = useInView<HTMLElement>()
+  const showcaseRef = useInView<HTMLElement>()
   const moods = useInView<HTMLElement>()
   const install = useInView<HTMLElement>()
 
@@ -112,6 +119,7 @@ export function LandingPage() {
         </a>
         <nav className={styles.topNav} aria-label={t('landing.navLabel')}>
           <a href="#why">{t('landing.nav.why')}</a>
+          <a href="#showcase">{t('landing.nav.product')}</a>
           <a href="#moods">{t('landing.nav.moods')}</a>
           <a href="#install">{t('landing.nav.install')}</a>
           <button type="button" className={styles.langBtn} onClick={toggleLang}>
@@ -146,20 +154,44 @@ export function LandingPage() {
           <span className={`${styles.envelope} ${styles.envelopeC}`} />
         </div>
 
-        <div className={styles.heroCopy}>
-          <h1 id="landing-brand" className={styles.brand}>
-            {t('app.name')}
-          </h1>
-          <p className={styles.headline}>{t('landing.headline')}</p>
-          <p className={styles.lede}>{t('landing.lede')}</p>
-          <div className={styles.ctaRow}>
-            <Link className={styles.ctaPrimary} to="/login">
-              {t('landing.cta.open')}
-            </Link>
-            <a className={styles.ctaGhost} href="#install">
-              {t('landing.cta.install')}
-            </a>
+        <div className={styles.heroInner}>
+          <div className={styles.heroCopy}>
+            <h1 id="landing-brand" className={styles.brand}>
+              {t('app.name')}
+            </h1>
+            <p className={styles.headline}>{t('landing.headline')}</p>
+            <p className={styles.lede}>{t('landing.lede')}</p>
+            <ul className={styles.heroPills} aria-label={t('landing.stats.label')}>
+              {(t('landing.hero.pills', { returnObjects: true }) as string[]).map((pill) => (
+                <li key={pill}>{pill}</li>
+              ))}
+            </ul>
+            <div className={styles.ctaRow}>
+              <Link className={styles.ctaPrimary} to="/login">
+                {t('landing.cta.open')}
+              </Link>
+              <a className={styles.ctaGhost} href="#install">
+                {t('landing.cta.install')}
+              </a>
+            </div>
           </div>
+
+          <figure className={styles.heroPoster} aria-hidden>
+            <div className={styles.heroPosterGlow} />
+            <img
+              className={styles.heroPosterImg}
+              src={mockupSrc('signin')}
+              alt=""
+              loading="eager"
+              decoding="async"
+              onError={(e) => {
+                const img = e.currentTarget
+                if (img.dataset.fallback) return
+                img.dataset.fallback = '1'
+                img.src = mockupFallback('signin')
+              }}
+            />
+          </figure>
         </div>
       </section>
 
@@ -174,6 +206,20 @@ export function LandingPage() {
           {t('landing.why.title')}
         </h2>
         <p className={styles.sectionBody}>{t('landing.why.body')}</p>
+        <ul className={styles.stats} aria-label={t('landing.stats.label')}>
+          <li>
+            <strong>{t('landing.stats.ram')}</strong>
+            <span>{t('landing.stats.ramHint')}</span>
+          </li>
+          <li>
+            <strong>{t('landing.stats.stack')}</strong>
+            <span>{t('landing.stats.stackHint')}</span>
+          </li>
+          <li>
+            <strong>{t('landing.stats.langs')}</strong>
+            <span>{t('landing.stats.langsHint')}</span>
+          </li>
+        </ul>
         <div className={styles.breath} aria-hidden>
           <div className={styles.breathTrack}>
             <span className={styles.breathFill} />
@@ -183,36 +229,76 @@ export function LandingPage() {
       </section>
 
       <section
-        ref={peek.ref}
-        className={`${styles.peek} ${peek.visible ? styles.in : ''}`}
-        aria-label={t('landing.peek.label')}
+        id="showcase"
+        ref={showcaseRef.ref}
+        className={`${styles.showcase} ${showcaseRef.visible ? styles.in : ''}`}
+        aria-labelledby="showcase-title"
       >
-        <div className={styles.peekPlane}>
-          <div className={styles.peekChrome}>
-            <span />
-            <span />
-            <span />
+        <div className={styles.showcaseInner}>
+          <p className={styles.kicker}>{t('landing.showcase.kicker')}</p>
+          <h2 id="showcase-title" className={styles.sectionTitle}>
+            {t('landing.showcase.title')}
+          </h2>
+          <p className={styles.sectionBody}>{t('landing.showcase.body')}</p>
+
+          <div className={styles.showcaseTabs} role="tablist" aria-label={t('landing.showcase.label')}>
+            {SHOWCASE_IDS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={showcase === id}
+                className={`${styles.showcaseTab} ${showcase === id ? styles.showcaseTabActive : ''}`}
+                onClick={() => setShowcase(id)}
+              >
+                {t(`landing.showcase.tabs.${id}`)}
+              </button>
+            ))}
           </div>
-          <div className={styles.peekBody}>
-            <aside className={styles.peekSide}>
-              <strong>{t('landing.peek.inbox')}</strong>
-              <em>{t('landing.peek.sent')}</em>
-              <em>{t('landing.peek.drafts')}</em>
-            </aside>
-            <div className={styles.peekList}>
-              {[0, 1, 2, 3].map((i) => (
-                <div key={i} className={styles.peekRow} style={{ animationDelay: `${120 + i * 70}ms` }}>
-                  <b />
-                  <i />
-                  <s />
-                </div>
-              ))}
-            </div>
-            <div className={styles.peekRead}>
-              <h3>{t('landing.peek.subject')}</h3>
-              <p>{t('landing.peek.message')}</p>
-            </div>
+
+          <figure className={styles.showcaseFrame}>
+            <div className={styles.showcaseGlow} aria-hidden />
+            <img
+              key={showcase}
+              className={styles.showcaseImg}
+              src={mockupSrc(showcase)}
+              alt={t(`landing.showcase.alt.${showcase}`)}
+              loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                const img = e.currentTarget
+                if (img.dataset.fallback) return
+                img.dataset.fallback = '1'
+                img.src = mockupFallback(showcase)
+              }}
+            />
+            <figcaption className={styles.showcaseCaption}>
+              {t(`landing.showcase.caption.${showcase}`)}
+            </figcaption>
+          </figure>
+
+          <div className={styles.mobilePair} aria-label={t('landing.showcase.mobileLabel')}>
+            <figure>
+              <img
+                src={mockupSrc('mobileLogin')}
+                alt={t('landing.showcase.alt.mobileLogin')}
+                loading="lazy"
+                decoding="async"
+              />
+            </figure>
+            <figure>
+              <img
+                src={mockupSrc('mobileMoods')}
+                alt={t('landing.showcase.alt.mobileMoods')}
+                loading="lazy"
+                decoding="async"
+              />
+            </figure>
           </div>
+
+          <a className={styles.showcaseRepo} href={`${GITHUB_URL}/tree/main/docs/mockups`} target="_blank" rel="noreferrer">
+            {t('landing.showcase.repo')}
+          </a>
         </div>
       </section>
 
@@ -227,21 +313,32 @@ export function LandingPage() {
           {t('landing.moods.title')}
         </h2>
         <p className={styles.sectionBody}>{t('landing.moods.body')}</p>
-        <div className={styles.moodPick} role="radiogroup" aria-label={t('settings.mood')}>
-          {MOOD_IDS.map((id) => (
-            <button
-              key={id}
-              type="button"
-              role="radio"
-              aria-checked={effectiveMood === id}
-              className={`${styles.moodBtn} ${effectiveMood === id ? styles.moodBtnActive : ''}`}
-              data-mood-swatch={id}
-              onClick={() => selectMood(id)}
-            >
-              <span className={styles.moodSwatch} />
-              <span className={styles.moodName}>{t(`settings.moods.${id}`)}</span>
-            </button>
-          ))}
+        <div className={styles.moodsLayout}>
+          <div className={styles.moodPick} role="radiogroup" aria-label={t('settings.mood')}>
+            {MOOD_IDS.map((id) => (
+              <button
+                key={id}
+                type="button"
+                role="radio"
+                aria-checked={effectiveMood === id}
+                className={`${styles.moodBtn} ${effectiveMood === id ? styles.moodBtnActive : ''}`}
+                data-mood-swatch={id}
+                onClick={() => selectMood(id)}
+              >
+                <span className={styles.moodSwatch} />
+                <span className={styles.moodName}>{t(`settings.moods.${id}`)}</span>
+              </button>
+            ))}
+          </div>
+          <figure className={styles.moodPreview}>
+            <img
+              key={effectiveMood}
+              src={mockupSrc('moodCompose', effectiveMood)}
+              alt={t('landing.moods.previewAlt', { mood: t(`settings.moods.${effectiveMood}`) })}
+              loading="lazy"
+              decoding="async"
+            />
+          </figure>
         </div>
       </section>
 
@@ -257,10 +354,17 @@ export function LandingPage() {
         </h2>
         <p className={styles.sectionBody}>{t('landing.install.body')}</p>
         <div className={styles.terminal}>
-          <code>{INSTALL_CMD}</code>
-          <button type="button" className={styles.copyBtn} onClick={() => void copyInstall()}>
-            {copied ? t('landing.install.copied') : t('landing.install.copy')}
-          </button>
+          <div className={styles.terminalBar} aria-hidden>
+            <span />
+            <span />
+            <span />
+          </div>
+          <div className={styles.terminalBody}>
+            <code>{INSTALL_CMD}</code>
+            <button type="button" className={styles.copyBtn} onClick={() => void copyInstall()}>
+              {copied ? t('landing.install.copied') : t('landing.install.copy')}
+            </button>
+          </div>
         </div>
         <div className={styles.installLinks}>
           <Link className={styles.ctaPrimary} to="/login">
@@ -276,10 +380,19 @@ export function LandingPage() {
       </section>
 
       <footer className={styles.footer}>
-        <p>
-          <strong>{t('app.name')}</strong>
-          <span> — {t('landing.footer.line')}</span>
-        </p>
+        <div className={styles.footerMain}>
+          <p className={styles.footerBrand}>
+            <strong>{t('app.name')}</strong>
+            <span> — {t('landing.footer.line')}</span>
+          </p>
+          <nav className={styles.footerNav} aria-label={t('landing.navLabel')}>
+            <Link to="/login">{t('landing.cta.open')}</Link>
+            <a href="/admin/">{t('landing.cta.admin')}</a>
+            <a href={GITHUB_URL} target="_blank" rel="noreferrer">
+              {t('landing.cta.github')}
+            </a>
+          </nav>
+        </div>
         <p className={styles.footerHost}>wernanmail.ru</p>
       </footer>
     </div>
