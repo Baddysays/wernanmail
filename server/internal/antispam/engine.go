@@ -420,20 +420,5 @@ func looksLikeIPHelo(helo string) bool {
 }
 
 func checkRBL(ip string, zones []string) string {
-	parsed := net.ParseIP(ip)
-	if parsed == nil {
-		return ""
-	}
-	b := parsed.To4()
-	if b == nil {
-		return ""
-	}
-	rev := fmt.Sprintf("%d.%d.%d.%d", b[3], b[2], b[1], b[0])
-	for _, zone := range zones {
-		name := rev + "." + zone
-		if _, err := net.LookupHost(name); err == nil {
-			return zone
-		}
-	}
-	return ""
+	return ListedOnRBL(ip, zones)
 }

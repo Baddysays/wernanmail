@@ -182,6 +182,45 @@ export type OpsStatus = {
   schemaVersion?: number
 }
 
+export type PostureCheck = {
+  state?: string
+  detail?: string
+}
+
+export type Posture = {
+  status?: string
+  ip?: string
+  ipSource?: string
+  ehlo?: string
+  ptr?: PostureCheck
+  rbl?: PostureCheck
+  antispam?: {
+    state?: string
+    detail?: string
+    rbls?: string[]
+    flagAt?: number
+    quarantineAt?: number
+    rejectAt?: number
+    greylistSeconds?: number
+    probe?: {
+      ok?: boolean
+      clean?: { score?: number; action?: string }
+      spammy?: { score?: number; action?: string }
+    }
+  }
+  stack?: {
+    state?: string
+    expected?: string[]
+    running?: string[]
+    missing?: string[]
+  }
+  queue?: {
+    state?: string
+    pending?: number
+    dead?: number
+  }
+}
+
 export type SparkSample = { t: number; n: number }
 
 export type DnsRecord = {

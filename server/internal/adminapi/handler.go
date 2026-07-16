@@ -60,6 +60,7 @@ func NewRouter(h *Handler) http.Handler {
 	r.Get("/healthz", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
 	})
+	r.Get("/readyz", h.readyz)
 	// Unauthenticated scrape target — keep admin bind private / firewalled.
 	r.Handle("/metrics", h.metricsHandler(metrics.New("admin")))
 	r.Post("/api/admin/login", h.login)
@@ -67,6 +68,7 @@ func NewRouter(h *Handler) http.Handler {
 	r.Group(func(r chi.Router) {
 		r.Use(h.auth)
 		r.Get("/api/admin/dashboard", h.dashboard)
+		r.Get("/api/admin/posture", h.posture)
 		r.Get("/api/admin/domains", h.listDomains)
 		r.Post("/api/admin/domains", h.createDomain)
 		r.Patch("/api/admin/domains/{id}", h.updateDomain)

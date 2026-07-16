@@ -102,8 +102,23 @@ Full message store (`mail.db` + `maildir/`):
 WERNANMAIL_RESTORE_CONFIRM=yes ./scripts/restore-data.sh ./wernanmail-backup.tgz /path/to/data
 ```
 
+Daily cron example (native install under `/opt/wernanmail`):
+
+```cron
+15 3 * * * root /opt/wernanmail/scripts/backup-data.sh /opt/wernanmail/data /var/backups/wernanmail/mail-$(date -u +\%Y\%m\%d).tgz
+```
+
+Keep at least 7 daily archives. Once a month, restore a copy into a throwaway directory and confirm `mail.db` opens (`sqlite3 … .tables`) before you need it in anger.
+
 Admin UI also exports **directory metadata** (domains/mailboxes/settings) via
 `GET /api/admin/backup` — that path does **not** include message bodies.
+
+### Readiness & outbound posture
+
+- `GET /readyz` (no auth) — queue dead letters + missing mail processes; HTTP 503 when degraded.
+- `GET /api/admin/posture` (auth) — outbound IP, PTR vs `MAIL_EHLO`, DNSBL cleanliness, antispam self-test, stack/queue summary.
+
+Optional override: `MAIL_PUBLIC_IP=x.x.x.x` when the mail hostname does not resolve to the sending address.
 
 ### Metrics
 

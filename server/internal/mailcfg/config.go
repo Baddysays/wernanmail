@@ -19,6 +19,7 @@ type Config struct {
 	AdminAddr      string
 	Hostname       string
 	EHLOHost       string // outbound EHLO; should match PTR when possible
+	PublicIP       string // optional override for reputation / PTR checks (MAIL_PUBLIC_IP)
 	AdminUser      string
 	AdminPassHash  []byte // bcrypt hash; never store plaintext after Load
 	RelayHost      string
@@ -67,6 +68,7 @@ func Load() Config {
 		AdminAddr:      getenv("ADMIN_ADDR", ":8090"),
 		Hostname:       host,
 		EHLOHost:       ehlo,
+		PublicIP:       strings.TrimSpace(getenv("MAIL_PUBLIC_IP", "")),
 		AdminUser:      getenv("ADMIN_USER", "admin"),
 		AdminPassHash:  hash,
 		RelayHost:      getenv("RELAY_HOST", ""),

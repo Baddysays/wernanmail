@@ -58,7 +58,13 @@
     "notInDns": "not in DNS",
     "tlsWarn": "check",
     "allOk": "All systems operational",
-    "attention": "Needs attention"
+    "attention": "Needs attention",
+    "stackOk": "{{n}}/5",
+    "stackMissing": "{{n}} down",
+    "ipClean": "clean",
+    "ipCheck": "check",
+    "spamOk": "ready",
+    "spamCheck": "check"
   },
   "resources": {
     "title": "Wernanmail resources",
@@ -79,6 +85,12 @@
     "title": "Deliverability",
     "ready": "published",
     "missing": "needs attention",
+    "ptrOk": "matches EHLO",
+    "ipClean": "not listed",
+    "spamOk": "engine ready",
+    "recheck": "Recheck",
+    "outboundIp": "Outbound IP {{ip}}",
+    "probe": "Antispam probe: clean→{{clean}}, spammy→{{spam}} ({{score}})",
     "postmaster": "Google Postmaster Tools ↗",
     "recipientHint": "Ask early recipients to mark messages Not spam and add the sender to contacts.",
     "reports": "Recent DMARC reports",
@@ -116,6 +128,7 @@
     "tls": "MTA TLS certs",
     "tlsOff": "not set (dev)",
     "sendRate": "Send rate",
+    "rbls": "Inbound RBLs",
     "on": "on",
     "off": "off",
     "none": "direct MX"

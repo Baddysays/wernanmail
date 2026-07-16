@@ -763,7 +763,20 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 }
 
 .deliverability-card h3 {
-  margin: 0 0 0.55rem;
+  margin: 0;
+}
+
+.deliverability-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.55rem;
+}
+
+.deliverability-recheck {
+  font-size: 0.78rem;
+  padding: 0.2rem 0.55rem;
 }
 
 .deliverability-checks {
@@ -778,6 +791,13 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   gap: 0.35rem;
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+.deliverability-ip,
+.deliverability-probe {
+  margin: 0.55rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.35;
 }
 
 .deliverability-check .status-dot {

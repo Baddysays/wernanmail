@@ -71,11 +71,12 @@ export function domainId(d: Domain | null | undefined): string | undefined {
   return id == null ? undefined : String(id)
 }
 
-export function dnsRecordsFor(domain: Domain | null | undefined): DnsRecord[] {
+export function dnsRecordsFor(domain: Domain | null | undefined, publicIP?: string): DnsRecord[] {
   const name = domainName(domain) || 'example.com'
   const selector = domain?.dkimSelector || domain?.DKIMSelector || 'wernan'
   const dkim = domain?.dkimPublic || domain?.DKIMPublic || ''
   const mailHost = `mail.${name}`
+  const ip = (publicIP || '').trim() || '62.109.27.220'
   return [
     {
       id: 'mx',
@@ -89,7 +90,7 @@ export function dnsRecordsFor(domain: Domain | null | undefined): DnsRecord[] {
       label: 'SPF',
       host: '@',
       type: 'TXT',
-      value: `v=spf1 a mx a:${mailHost} ip4:62.109.27.220 -all`,
+      value: `v=spf1 a mx a:${mailHost} ip4:${ip} -all`,
     },
     {
       id: 'dkim',
@@ -123,7 +124,7 @@ export function dnsRecordsFor(domain: Domain | null | undefined): DnsRecord[] {
     {
       id: 'ptr',
       label: 'PTR (reverse DNS)',
-      host: '62.109.27.220',
+      host: ip,
       type: 'PTR',
       value: `${mailHost}.  (set at VPS panel; must match MAIL_EHLO)`,
     },

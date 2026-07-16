@@ -18,6 +18,7 @@ import type {
   Mailbox,
   NavTab,
   OpsStatus,
+  Posture,
   QuarantineItem,
   QueueJob,
   SettingGroup,
@@ -373,10 +374,12 @@ function DNSDrawer({
   open,
   onClose,
   domain,
+  publicIP,
 }: {
   open: boolean
   onClose: () => void
   domain: Domain | null
+  publicIP?: string
 }) {
   const { t } = useTranslation()
   useEffect(() => {
@@ -388,7 +391,7 @@ function DNSDrawer({
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
   if (!open) return null
-  const records = dnsRecordsFor(domain)
+  const records = dnsRecordsFor(domain, publicIP)
   const name = domainName(domain) || '—'
   return (
     <>
@@ -453,36 +456,85 @@ function dnsChip(check: DnsCheck | undefined, labels: DnsChipLabels) {
 function DeliverabilityCard({
   dns,
   reports,
+  posture,
+  onRecheck,
 }: {
   dns: DnsStatus | null
   reports: DmarcReport[] | null
+  posture: Posture | null
+  onRecheck?: () => void
 }) {
   const { t } = useTranslation()
   const checks = [
     { id: 'spf', label: 'SPF', check: dns?.spf },
     { id: 'dkim', label: 'DKIM', check: dns?.dkim },
     { id: 'dmarc', label: 'DMARC', check: dns?.dmarc },
+    {
+      id: 'ptr',
+      label: 'PTR',
+      check: posture?.ptr,
+      okText: posture?.ip ? t('deliverability.ptrOk') : t('deliverability.ready'),
+    },
+    {
+      id: 'rbl',
+      label: 'IP',
+      check: posture?.rbl,
+      okText: t('deliverability.ipClean'),
+    },
+    {
+      id: 'spam',
+      label: 'Spam',
+      check: posture?.antispam
+        ? { state: posture.antispam.state, detail: posture.antispam.detail }
+        : undefined,
+      okText: t('deliverability.spamOk'),
+    },
   ]
+
+  const probe = posture?.antispam?.probe
 
   return (
     <section className="panel deliverability-card">
-      <h3>{t('deliverability.title')}</h3>
+      <div className="deliverability-head">
+        <h3>{t('deliverability.title')}</h3>
+        {onRecheck ? (
+          <button type="button" className="ghost deliverability-recheck" onClick={onRecheck}>
+            {t('deliverability.recheck')}
+          </button>
+        ) : null}
+      </div>
       <div className="deliverability-checks">
-        {checks.map(({ id, label, check }) => {
+        {checks.map(({ id, label, check, okText }) => {
           const status = dnsChip(check, {
-            ok: t('deliverability.ready'),
+            ok: okText || t('deliverability.ready'),
             missing: t('deliverability.missing'),
             checking: t('health.checking'),
+            warn: check?.detail,
           })
           return (
             <div className="deliverability-check" key={id} title={check?.detail}>
               <span className={`status-dot ${status.state === 'ok' ? 'on' : status.state === 'bad' ? 'off' : ''}`} />
               <strong>{label}</strong>
-              <span>{status.text}</span>
+              <span>{status.state === 'ok' ? status.text : check?.detail || status.text}</span>
             </div>
           )
         })}
       </div>
+      {posture?.ip ? (
+        <p className="deliverability-ip muted" title={posture.ipSource}>
+          {t('deliverability.outboundIp', { ip: posture.ip })}
+          {posture.ehlo ? ` · EHLO ${posture.ehlo}` : ''}
+        </p>
+      ) : null}
+      {probe ? (
+        <p className="deliverability-probe muted" title={posture?.antispam?.detail}>
+          {t('deliverability.probe', {
+            clean: probe.clean?.action || '—',
+            spam: probe.spammy?.action || '—',
+            score: typeof probe.spammy?.score === 'number' ? probe.spammy.score.toFixed(1) : '—',
+          })}
+        </p>
+      ) : null}
       <p className="deliverability-hint">
         <a href="https://postmaster.google.com/" target="_blank" rel="noreferrer">
           {t('deliverability.postmaster')}
@@ -519,20 +571,24 @@ function HealthStrip({
   dash,
   dns,
   ops,
+  posture,
   updatedAt,
   onRefresh,
 }: {
   dash: Dashboard | null
   dns: DnsStatus | null
   ops: OpsStatus | null
+  posture: Posture | null
   updatedAt: number | null
   onRefresh?: () => void
 }) {
   const { t } = useTranslation()
-  const queueN = dash?.queuePending ?? 0
-  const dead = dash?.queueDead ?? 0
+  const queueN = dash?.queuePending ?? posture?.queue?.pending ?? 0
+  const dead = dash?.queueDead ?? posture?.queue?.dead ?? 0
   const tlsOk = Boolean(ops?.tlsConfigured)
-  const systemsOk = dead === 0 && queueN < 50
+  const stackMissing = posture?.stack?.missing?.length ?? 0
+  const stackRunning = posture?.stack?.running?.length ?? 0
+  const systemsOk = dead === 0 && queueN < 50 && stackMissing === 0
 
   const [, setTick] = useState(0)
   useEffect(() => {
@@ -571,11 +627,37 @@ function HealthStrip({
     warn: t('health.publishTxt'),
   })
 
+  const stackState =
+    !posture?.stack ? 'warn' : stackMissing > 0 ? 'bad' : stackRunning > 0 ? 'ok' : 'warn'
+  const stackText = !posture?.stack
+    ? t('health.checking')
+    : stackMissing > 0
+      ? t('health.stackMissing', { n: stackMissing })
+      : t('health.stackOk', { n: stackRunning })
+  const ipChip = dnsChip(posture?.rbl, {
+    ok: t('health.ipClean'),
+    missing: t('health.ipCheck'),
+    checking: t('health.checking'),
+    warn: posture?.rbl?.detail || t('health.ipCheck'),
+  })
+  const spamChip = dnsChip(
+    posture?.antispam ? { state: posture.antispam.state, detail: posture.antispam.detail } : undefined,
+    {
+      ok: t('health.spamOk'),
+      missing: t('health.spamCheck'),
+      checking: t('health.checking'),
+      warn: posture?.antispam?.detail || t('health.spamCheck'),
+    },
+  )
+
   const chips = [
+    { id: 'stack', label: 'STACK', title: posture?.stack?.missing?.join(', '), state: stackState, text: stackText },
     { id: 'mx', label: 'MX', title: dns?.mx?.detail, ...mx },
     { id: 'spf', label: 'SPF', title: dns?.spf?.detail, ...spf },
     { id: 'dkim', label: 'DKIM', title: dns?.dkim?.detail, ...dkim },
     { id: 'dmarc', label: 'DMARC', title: dns?.dmarc?.detail, ...dmarc },
+    { id: 'ip', label: 'IP', title: posture?.rbl?.detail || posture?.ip, ...ipChip },
+    { id: 'spam', label: 'SPAM', title: posture?.antispam?.detail, ...spamChip },
     { id: 'tls', label: 'TLS', state: tlsOk ? 'ok' : 'warn', text: tlsOk ? t('health.ok') : t('health.tlsWarn') },
     { id: 'queue', label: 'QUEUE', state: dead > 0 ? 'bad' : queueN >= 50 ? 'warn' : 'ok', text: String(queueN) },
   ]
@@ -655,6 +737,7 @@ export function App() {
   const [dmarcReports, setDmarcReports] = useState<DmarcReport[] | null>(null)
   const [hostStats, setHostStats] = useState<HostStats | null>(null)
   const [ops, setOps] = useState<OpsStatus | null>(null)
+  const [posture, setPosture] = useState<Posture | null>(null)
   const [updatedAt, setUpdatedAt] = useState<number | null>(null)
   const [busy, setBusy] = useState(false)
   const [mbSearch, setMbSearch] = useState('')
@@ -678,11 +761,13 @@ export function App() {
       api<HostStats>('/api/admin/host-stats', creds!),
       api<OpsStatus>('/api/admin/ops', creds!),
       api<DmarcReport[]>(`/api/admin/dmarc-reports${q}`, creds!),
+      api<Posture>('/api/admin/posture', creds!),
     ])
     if (settled[0].status === 'fulfilled') setDnsStatus(settled[0].value)
     if (settled[1].status === 'fulfilled') setHostStats(settled[1].value)
     if (settled[2].status === 'fulfilled') setOps(settled[2].value)
     if (settled[3].status === 'fulfilled') setDmarcReports(asList(settled[3].value))
+    if (settled[4].status === 'fulfilled') setPosture(settled[4].value)
     return d
   }, [creds, dnsDomain?.name])
 
@@ -1270,8 +1355,10 @@ export function App() {
   const healthy = useMemo(() => {
     const pending = dash?.queuePending ?? 0
     const dead = dash?.queueDead ?? 0
-    return dead === 0 && pending < 50
-  }, [dash])
+    const stackOk = !posture?.stack || (posture.stack.missing?.length ?? 0) === 0
+    const ipOk = !posture?.rbl || posture.rbl.state !== 'bad'
+    return dead === 0 && pending < 50 && stackOk && ipOk
+  }, [dash, posture])
 
   const filteredMailboxes = useMemo(() => {
     const q = mbSearch.trim().toLowerCase()
@@ -1428,6 +1515,7 @@ export function App() {
           dash={dash}
           dns={dnsStatus}
           ops={ops}
+          posture={posture}
           updatedAt={updatedAt}
           onRefresh={() => void refreshDash().catch(() => {})}
         />
@@ -1462,6 +1550,7 @@ export function App() {
                 dash={dash}
                 dns={dnsStatus}
                 ops={ops}
+                posture={posture}
                 updatedAt={updatedAt}
                 onRefresh={() => void refreshDash().catch(() => {})}
               />
@@ -1534,11 +1623,26 @@ export function App() {
                     <span className="muted">{t('overview.sendRate')}</span>
                     <strong>{String(ops?.rateSendPerHour ?? settings['mail.rate_send_per_hour'] ?? '—')}/h</strong>
                   </div>
+                  <div>
+                    <span className="muted">{t('overview.rbls')}</span>
+                    <strong>
+                      {String(
+                        posture?.antispam?.rbls?.join(', ') ||
+                          settings['antispam.rbls'] ||
+                          t('overview.none'),
+                      )}
+                    </strong>
+                  </div>
                 </div>
               </div>
             </div>
             <aside className="stack-aside">
-              <DeliverabilityCard dns={dnsStatus} reports={dmarcReports} />
+              <DeliverabilityCard
+                dns={dnsStatus}
+                reports={dmarcReports}
+                posture={posture}
+                onRecheck={() => void refreshDash().catch(() => {})}
+              />
               <div className="panel">
                 <h3>{t('overview.dnsTitle')}</h3>
                 <p className="muted">{t('overview.dnsBody')}</p>
@@ -2494,7 +2598,12 @@ export function App() {
         ) : null}
       </main>
 
-      <DNSDrawer open={dnsOpen} onClose={() => setDnsOpen(false)} domain={dnsDomain} />
+      <DNSDrawer
+        open={dnsOpen}
+        onClose={() => setDnsOpen(false)}
+        domain={dnsDomain}
+        publicIP={posture?.ip}
+      />
     </div>
   )
 }
