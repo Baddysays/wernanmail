@@ -762,6 +762,11 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   margin: 0.65rem 0 0.85rem;
 }
 
+.backup-section-title {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+}
+
 .deliverability-card h3 {
   margin: 0;
 }

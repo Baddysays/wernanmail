@@ -86,6 +86,7 @@ func NewRouter(h *Handler) http.Handler {
 		r.Post("/api/admin/queue/{id}/retry", h.retryQueue)
 		r.Post("/api/admin/queue/{id}/delete", h.deleteQueue)
 		r.Get("/api/admin/backup", h.backup)
+		r.Get("/api/admin/backup/full", h.backupFull)
 		r.Post("/api/admin/backup/restore", h.restoreBackup)
 		r.Get("/api/admin/ops", h.opsStatus)
 		r.Get("/api/admin/dns-status", h.dnsStatus)

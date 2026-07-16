@@ -110,8 +110,10 @@ Daily cron example (native install under `/opt/wernanmail`):
 
 Keep at least 7 daily archives. Once a month, restore a copy into a throwaway directory and confirm `mail.db` opens (`sqlite3 … .tables`) before you need it in anger.
 
-Admin UI also exports **directory metadata** (domains/mailboxes/settings) via
-`GET /api/admin/backup` — that path does **not** include message bodies.
+Admin UI:
+
+- **Full backup** — `GET /api/admin/backup/full` streams `mail.db` + `maildir/` as `.tar.gz` (same payload as the script). Restore remains CLI-only via `restore-data.sh`.
+- **Config JSON** — `GET /api/admin/backup` exports domains/mailboxes/settings only (no message bodies, passwords, or DKIM private keys).
 
 ### Readiness & outbound posture
 

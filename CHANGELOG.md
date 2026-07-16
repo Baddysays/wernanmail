@@ -44,6 +44,7 @@ All notable changes to Wernanmail will be documented in this file.
 - Admin Deliverability: PTR/IP/Spam rows + recheck; HealthStrip STACK/IP/SPAM chips.
 - Backup cron + restore drill notes in `docs/SERVER.md`.
 - Optional `MAIL_PUBLIC_IP` for reputation checks.
+- Admin **Download full backup** — streams `mail.db` + Maildir as `.tar.gz` (`GET /api/admin/backup/full`).
 
 ### Changed
 

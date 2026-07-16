@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LOCALES, setAdminLang } from './i18n'
-import { api, asList, dnsRecordsFor, domainId, domainName, isUnauthorized } from './api'
+import { api, asList, authHeader, dnsRecordsFor, domainId, domainName, isUnauthorized } from './api'
 import { MailboxFilters } from './MailboxFilters'
 import { Select } from './Select'
 import type {
@@ -1311,6 +1311,40 @@ export function App() {
     }
   }
 
+  async function downloadFullBackup() {
+    setBusy(true)
+    setError('')
+    try {
+      const headers: Record<string, string> = {}
+      if (creds?.token) {
+        headers.Authorization = `Bearer ${creds.token}`
+      } else if (creds?.user) {
+        // Legacy Basic fallback if a password was ever stored alongside the session.
+        const pass = (creds as AdminCreds & { pass?: string }).pass
+        if (pass != null) headers.Authorization = authHeader(creds.user, pass)
+      }
+      const res = await fetch('/api/admin/backup/full', { headers })
+      if (!res.ok) {
+        const json = (await res.json().catch(() => ({}))) as { error?: { message?: string } }
+        throw new Error(json?.error?.message || res.statusText || `HTTP ${res.status}`)
+      }
+      const blob = await res.blob()
+      const cd = res.headers.get('Content-Disposition') || ''
+      const match = /filename="?([^"]+)"?/i.exec(cd)
+      const filename = match?.[1] || `wernanmail-data-${new Date().toISOString().slice(0, 10)}.tar.gz`
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function restoreBackupFile(file: File | undefined) {
     if (!file) return
     setBusy(true)
@@ -2525,6 +2559,19 @@ export function App() {
               </div>
             </div>
             <div className="panel">
+              <h3 className="backup-section-title">{t('backup.fullTitle')}</h3>
+              <p className="muted">{t('backup.fullHint')}</p>
+              <div className="row" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
+                <button type="button" className="primary" onClick={() => void downloadFullBackup()} disabled={busy}>
+                  {busy ? t('backup.fullLoading') : t('backup.fullDownload')}
+                </button>
+              </div>
+              <p className="muted" style={{ marginTop: '0.75rem' }}>
+                {t('backup.fullRestoreHint')}
+              </p>
+            </div>
+            <div className="panel" style={{ marginTop: '1rem' }}>
+              <h3 className="backup-section-title">{t('backup.configTitle')}</h3>
               <p className="muted">{t('backup.hint')}</p>
               <div className="row" style={{ gap: '0.75rem', flexWrap: 'wrap' }}>
                 <button type="button" className="primary" onClick={() => void downloadBackup()} disabled={busy}>
