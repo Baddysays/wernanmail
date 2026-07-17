@@ -1,0 +1,5 @@
+# Daily Wernanmail full backup at 03:15 UTC. Keep last 7 days (see scripts/cron-backup.sh).
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+15 3 * * * root ROOT=/opt/wernanmail /opt/wernanmail/scripts/cron-backup.sh >>/var/log/wernanmail-backup.log 2>&1

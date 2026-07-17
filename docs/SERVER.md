@@ -102,13 +102,20 @@ Full message store (`mail.db` + `maildir/`):
 WERNANMAIL_RESTORE_CONFIRM=yes ./scripts/restore-data.sh ./wernanmail-backup.tgz /path/to/data
 ```
 
-Daily cron example (native install under `/opt/wernanmail`):
+Daily cron (native install): install `scripts/cron-backup.sh` and the snippet
+`deploy/mail-host/cron.d-wernanmail-backup` as `/etc/cron.d/wernanmail-backup`.
 
-```cron
-15 3 * * * root /opt/wernanmail/scripts/backup-data.sh /opt/wernanmail/data /var/backups/wernanmail/mail-$(date -u +\%Y\%m\%d).tgz
+```bash
+install -m 755 scripts/cron-backup.sh /opt/wernanmail/scripts/cron-backup.sh
+install -m 644 deploy/mail-host/cron.d-wernanmail-backup /etc/cron.d/wernanmail-backup
+mkdir -p /var/backups/wernanmail
 ```
 
-Keep at least 7 daily archives. Once a month, restore a copy into a throwaway directory and confirm `mail.db` opens (`sqlite3 … .tables`) before you need it in anger.
+Runs at 03:15 UTC into `/var/backups/wernanmail/mail-*.tgz`, keeps 7 days (`KEEP_DAYS`).
+Log: `/var/log/wernanmail-backup.log`.
+
+Once a month, restore a copy into a throwaway directory and confirm `mail.db` opens
+(`sqlite3 … .tables`) before you need it in anger.
 
 Admin UI:
 

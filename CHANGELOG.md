@@ -2,6 +2,27 @@
 
 All notable changes to Wernanmail will be documented in this file.
 
+## [0.3.0] - 2026-07-17
+
+### Added
+
+- Prometheus `/metrics` on admin (store gauges) and api; optional `METRICS_ADDR` for mta/worker.
+- Structured `slog` lines for queue job ok/fail in the worker.
+- Versioned SQLite migrations (`schema_migrations`, current schema v2).
+- Admin Overview: DB schema version + link to `/metrics`.
+- Compose nginx + docker-smoke checks for Prometheus metrics.
+- Public `GET /readyz` for stack/queue readiness (503 when degraded).
+- Authenticated `GET /api/admin/posture`: outbound IP cleanliness (PTR + DNSBL), antispam probe, stack status.
+- Admin Deliverability: PTR/IP/Spam rows + recheck; HealthStrip STACK/IP/SPAM chips.
+- Admin **Download full backup** — streams `mail.db` + Maildir as `.tar.gz` (`GET /api/admin/backup/full`).
+- Daily backup cron helper (`scripts/cron-backup.sh`) with 7-day retention.
+- Optional `MAIL_PUBLIC_IP` for reputation checks.
+
+### Changed
+
+- DNSBL lookups ignore Spamhaus-style `127.255.255.*` “open resolver” answers (no false listed).
+- Operator docs: readiness, posture, backup cron, restore drill.
+
 ## [0.2.0] - 2026-07-17
 
 ### Added
@@ -32,26 +53,7 @@ All notable changes to Wernanmail will be documented in this file.
 
 ## Unreleased
 
-### Added
-
-- Prometheus `/metrics` on admin (store gauges) and api; optional `METRICS_ADDR` for mta/worker.
-- Structured `slog` lines for queue job ok/fail in the worker.
-- Versioned SQLite migrations (`schema_migrations`, current schema v2).
-- Admin Overview: DB schema version + link to `/metrics`.
-- Compose nginx + docker-smoke checks for Prometheus metrics.
-- Public `GET /readyz` for stack/queue readiness (503 when degraded).
-- Authenticated `GET /api/admin/posture`: outbound IP cleanliness (PTR + DNSBL), antispam probe, stack status.
-- Admin Deliverability: PTR/IP/Spam rows + recheck; HealthStrip STACK/IP/SPAM chips.
-- Backup cron + restore drill notes in `docs/SERVER.md`.
-- Optional `MAIL_PUBLIC_IP` for reputation checks.
-- Admin **Download full backup** — streams `mail.db` + Maildir as `.tar.gz` (`GET /api/admin/backup/full`).
-
-### Changed
-
-- DNSBL lookups ignore Spamhaus-style `127.255.255.*` “open resolver” answers (no false listed).
-
 ### Still open
 
 - Mailport embed surface (preview only).
 - Built-in ACME inside the MTA (host Certbot helper remains the supported path).
-
