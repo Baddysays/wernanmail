@@ -90,6 +90,13 @@
     "ipClean": "не в чёрных списках",
     "spamOk": "движок готов",
     "recheck": "Проверить снова",
+    "scoreAria": "Оценка доставляемости {{score}} из 10",
+    "verdict": {
+      "perfect": "Отлично — как 10/10 у mail-tester",
+      "good": "Хорошо — мелкие пробелы ещё могут мешать inbox",
+      "attention": "Нужна работа — поправьте DNS или репутацию IP",
+      "critical": "Критично — у многих провайдеров доставка не пройдёт"
+    },
     "outboundIp": "Исходящий IP {{ip}}",
     "probe": "Антиспам: чистое→{{clean}}, спам→{{spam}} ({{score}})",
     "postmaster": "Google Postmaster Tools ↗",

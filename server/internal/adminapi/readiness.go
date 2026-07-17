@@ -88,9 +88,11 @@ func (h *Handler) posture(w http.ResponseWriter, r *http.Request) {
 	}
 
 	spam := h.antispamPosture(ctx)
+	dns := h.collectDNSStatus(ctx, r.URL.Query().Get("domain"))
+	rating := buildDeliverabilityRating(dns, ptr, rbl, spam)
 
 	overall := "ok"
-	for _, st := range []string{ptr["state"], rbl["state"], spam["state"].(string), stackState, queueState} {
+	for _, st := range []string{ptr["state"], rbl["state"], spam["state"].(string), stackState, queueState, dns.MX["state"], dns.SPF["state"], dns.DKIM["state"], dns.DMARC["state"]} {
 		if st == "bad" || st == "missing" {
 			overall = "bad"
 			break
@@ -109,6 +111,15 @@ func (h *Handler) posture(w http.ResponseWriter, r *http.Request) {
 		"ptr":       ptr,
 		"rbl":       rbl,
 		"antispam":  spam,
+		"dns": map[string]any{
+			"domain":   dns.Domain,
+			"mailHost": dns.MailHost,
+			"mx":       dns.MX,
+			"spf":      dns.SPF,
+			"dkim":     dns.DKIM,
+			"dmarc":    dns.DMARC,
+		},
+		"rating": rating,
 		"stack": map[string]any{
 			"state":    stackState,
 			"mode":     stackMode,

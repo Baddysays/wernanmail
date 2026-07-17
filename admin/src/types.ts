@@ -187,6 +187,22 @@ export type PostureCheck = {
   detail?: string
 }
 
+export type DeliverabilityItem = {
+  id?: string
+  label?: string
+  state?: string
+  points?: number
+  max?: number
+  detail?: string
+}
+
+export type DeliverabilityRating = {
+  score?: number
+  max?: number
+  verdict?: 'perfect' | 'good' | 'attention' | 'critical' | string
+  items?: DeliverabilityItem[]
+}
+
 export type Posture = {
   status?: string
   ip?: string
@@ -208,6 +224,15 @@ export type Posture = {
       spammy?: { score?: number; action?: string }
     }
   }
+  dns?: {
+    domain?: string
+    mailHost?: string
+    mx?: PostureCheck
+    spf?: PostureCheck
+    dkim?: PostureCheck
+    dmarc?: PostureCheck
+  }
+  rating?: DeliverabilityRating
   stack?: {
     state?: string
     mode?: string

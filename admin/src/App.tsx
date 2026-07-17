@@ -465,10 +465,15 @@ function DeliverabilityCard({
   onRecheck?: () => void
 }) {
   const { t } = useTranslation()
+  const rating = posture?.rating
+  const score =
+    typeof rating?.score === 'number' ? rating.score : null
+  const verdict = rating?.verdict || ''
   const checks = [
-    { id: 'spf', label: 'SPF', check: dns?.spf },
-    { id: 'dkim', label: 'DKIM', check: dns?.dkim },
-    { id: 'dmarc', label: 'DMARC', check: dns?.dmarc },
+    { id: 'mx', label: 'MX', check: dns?.mx || posture?.dns?.mx },
+    { id: 'spf', label: 'SPF', check: dns?.spf || posture?.dns?.spf },
+    { id: 'dkim', label: 'DKIM', check: dns?.dkim || posture?.dns?.dkim },
+    { id: 'dmarc', label: 'DMARC', check: dns?.dmarc || posture?.dns?.dmarc },
     {
       id: 'ptr',
       label: 'PTR',
@@ -492,6 +497,12 @@ function DeliverabilityCard({
   ]
 
   const probe = posture?.antispam?.probe
+  const scoreLabel =
+    score == null
+      ? '—'
+      : Number.isInteger(score)
+        ? String(score)
+        : score.toFixed(1)
 
   return (
     <section className="panel deliverability-card">
@@ -503,6 +514,17 @@ function DeliverabilityCard({
           </button>
         ) : null}
       </div>
+      {score != null ? (
+        <div className={`deliverability-score verdict-${verdict || 'attention'}`}>
+          <div className="deliverability-score-num" aria-label={t('deliverability.scoreAria', { score: scoreLabel })}>
+            <span className="deliverability-score-value">{scoreLabel}</span>
+            <span className="deliverability-score-max">/10</span>
+          </div>
+          <p className="deliverability-score-verdict">
+            {t(`deliverability.verdict.${verdict || 'attention'}`)}
+          </p>
+        </div>
+      ) : null}
       <div className="deliverability-checks">
         {checks.map(({ id, label, check, okText }) => {
           const status = dnsChip(check, {
@@ -511,11 +533,17 @@ function DeliverabilityCard({
             checking: t('health.checking'),
             warn: check?.detail,
           })
+          const pts = rating?.items?.find((it) => it.id === id)
           return (
             <div className="deliverability-check" key={id} title={check?.detail}>
               <span className={`status-dot ${status.state === 'ok' ? 'on' : status.state === 'bad' ? 'off' : ''}`} />
               <strong>{label}</strong>
               <span>{status.state === 'ok' ? status.text : check?.detail || status.text}</span>
+              {pts && typeof pts.max === 'number' ? (
+                <em className="deliverability-pts">
+                  {typeof pts.points === 'number' ? pts.points : 0}/{pts.max}
+                </em>
+              ) : null}
             </div>
           )
         })}
@@ -771,7 +799,7 @@ export function App() {
       api<HostStats>('/api/admin/host-stats', creds!),
       api<OpsStatus>('/api/admin/ops', creds!),
       api<DmarcReport[]>(`/api/admin/dmarc-reports${q}`, creds!),
-      api<Posture>('/api/admin/posture', creds!),
+      api<Posture>(`/api/admin/posture${q}`, creds!),
     ])
     if (settled[0].status === 'fulfilled') setDnsStatus(settled[0].value)
     if (settled[1].status === 'fulfilled') setHostStats(settled[1].value)

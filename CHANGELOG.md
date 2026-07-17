@@ -2,6 +2,12 @@
 
 All notable changes to Wernanmail will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Admin deliverability score **0–10** from SPF/DKIM/DMARC/MX/PTR/RBL/antispam (`rating` on `GET /api/admin/posture`).
+
 ## [0.3.0] - 2026-07-17
 
 ### Added

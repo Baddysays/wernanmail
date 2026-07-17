@@ -784,6 +784,61 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   padding: 0.2rem 0.55rem;
 }
 
+.deliverability-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.85rem;
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 70%, #e8f5e9);
+  border: 1px solid color-mix(in srgb, var(--border) 80%, #a5d6a7);
+}
+
+.deliverability-score.verdict-good {
+  background: color-mix(in srgb, var(--panel) 70%, #e3f2fd);
+  border-color: color-mix(in srgb, var(--border) 80%, #90caf9);
+}
+
+.deliverability-score.verdict-attention {
+  background: color-mix(in srgb, var(--panel) 70%, #fff8e1);
+  border-color: color-mix(in srgb, var(--border) 80%, #ffe082);
+}
+
+.deliverability-score.verdict-critical {
+  background: color-mix(in srgb, var(--panel) 70%, #ffebee);
+  border-color: color-mix(in srgb, var(--border) 80%, #ef9a9a);
+}
+
+.deliverability-score-num {
+  display: flex;
+  align-items: baseline;
+  gap: 0.1rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.deliverability-score-value {
+  font-size: 2.1rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.deliverability-score-max {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.deliverability-score-verdict {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
 .deliverability-checks {
   display: grid;
   gap: 0.35rem;
@@ -791,11 +846,19 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .deliverability-check {
   display: grid;
-  grid-template-columns: auto 3.25rem minmax(0, 1fr);
+  grid-template-columns: auto 3.25rem minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.35rem;
   font-size: 0.82rem;
   color: var(--muted);
+}
+
+.deliverability-pts {
+  font-style: normal;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  opacity: 0.85;
 }
 
 .deliverability-ip,

@@ -90,6 +90,13 @@
     "ipClean": "not listed",
     "spamOk": "engine ready",
     "recheck": "Recheck",
+    "scoreAria": "Deliverability score {{score}} out of 10",
+    "verdict": {
+      "perfect": "Excellent — like a 10/10 mail-tester result",
+      "good": "Good — minor gaps may still hurt inbox placement",
+      "attention": "Needs work — fix DNS or IP reputation",
+      "critical": "Critical — delivery will fail for many providers"
+    },
     "outboundIp": "Outbound IP {{ip}}",
     "probe": "Antispam probe: clean→{{clean}}, spammy→{{spam}} ({{score}})",
     "postmaster": "Google Postmaster Tools ↗",
