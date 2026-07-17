@@ -82,17 +82,15 @@ type Session struct {
 }
 
 func (s *Session) AuthMechanisms() []string {
-	return []string{sasl.Plain}
+	// LOGIN kept for Outlook / legacy clients that prefer it over PLAIN.
+	return []string{sasl.Plain, sasl.Login}
 }
 
 func (s *Session) Auth(mech string) (sasl.Server, error) {
-	if mech != sasl.Plain {
-		return nil, smtp.ErrAuthUnsupported
-	}
-	return sasl.NewPlainServer(func(identity, username, password string) error {
-		_ = identity
+	finish := func(username, password string) error {
 		m, d, err := s.authenticate(username, password)
 		if err != nil || m == nil || d == nil {
+			log.Printf("smtp auth fail ip=%s user=%q mech=%s", s.remoteIP, username, mech)
 			if s.backend.AuthLimiter != nil && !s.backend.AuthLimiter.Allow("auth:"+s.remoteIP) {
 				return &smtp.SMTPError{Code: 421, Message: "too many auth failures"}
 			}
@@ -104,8 +102,22 @@ func (s *Session) Auth(mech string) (sasl.Server, error) {
 		s.authedLocal = m.LocalPart
 		s.authedDomain = d.Name
 		s.authedAddr = m.Address(d.Name)
+		log.Printf("smtp auth ok ip=%s user=%s mech=%s", s.remoteIP, s.authedAddr, mech)
 		return nil
-	}), nil
+	}
+	switch mech {
+	case sasl.Plain:
+		return sasl.NewPlainServer(func(identity, username, password string) error {
+			_ = identity
+			return finish(username, password)
+		}), nil
+	case sasl.Login:
+		return sasl.NewLoginServer(func(username, password string) error {
+			return finish(username, password)
+		}), nil
+	default:
+		return nil, smtp.ErrAuthUnsupported
+	}
 }
 
 func (s *Session) authenticate(username, password string) (*domain.Mailbox, *domain.Domain, error) {
