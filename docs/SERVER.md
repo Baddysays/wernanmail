@@ -124,15 +124,20 @@ Admin UI:
 
 ### Readiness & outbound posture
 
-- `GET /readyz` (no auth) — queue dead letters + missing mail processes; HTTP 503 when degraded.
+- `GET /readyz` (no auth) — slim `{status: ok|degraded}` for the public; HTTP 503 when degraded.
+  Details (queue/procs) only for loopback or `SCRAPE_ALLOW` CIDRs.
 - `GET /api/admin/posture` (auth) — outbound IP, PTR vs `MAIL_EHLO`, DNSBL cleanliness, antispam self-test, stack/queue summary.
 
-Optional override: `MAIL_PUBLIC_IP=x.x.x.x` when the mail hostname does not resolve to the sending address.
+Optional overrides:
+
+- `MAIL_PUBLIC_IP=x.x.x.x` when the mail hostname does not resolve to the sending address.
+- `SCRAPE_ALLOW=10.0.0.0/8` for Prometheus hosts (loopback always allowed).
+- `WERNANMAIL_STACK_CHECK=skip` to disable `/proc` process checks (auto in Docker).
 
 ### Metrics
 
-Admin exposes Prometheus text metrics at `GET /metrics` (no auth — scrape only from
-a private network or localhost):
+Admin exposes Prometheus text metrics at `GET /metrics` (no auth, **loopback /
+`SCRAPE_ALLOW` only**; nginx edge also `allow 127.0.0.1; deny all`):
 
 - queue pending / dead
 - quarantine open count

@@ -60,6 +60,7 @@
     "allOk": "All systems operational",
     "attention": "Needs attention",
     "stackOk": "{{n}}/5",
+    "stackSkip": "n/a",
     "stackMissing": "{{n}} down",
     "ipClean": "clean",
     "ipCheck": "check",

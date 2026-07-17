@@ -1,6 +1,7 @@
 package antispam
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -17,6 +18,7 @@ type DNSBLResult struct {
 // QueryDNSBL looks up ip against a single DNSBL zone.
 // Spamhaus-style 127.255.255.* answers are treated as inconclusive (open-resolver / policy),
 // not as a listing — so public resolvers do not false-positive outbound checks.
+// Resolver failures (timeout, SERVFAIL) are inconclusive; only NXDOMAIN means clean.
 func QueryDNSBL(ip, zone string) DNSBLResult {
 	zone = strings.TrimSpace(strings.TrimSuffix(zone, "."))
 	out := DNSBLResult{Zone: zone}
@@ -40,18 +42,23 @@ func QueryDNSBL(ip, zone string) DNSBLResult {
 	name := fmt.Sprintf("%d.%d.%d.%d.%s", b[3], b[2], b[1], b[0], zone)
 	hosts, err := net.LookupHost(name)
 	if err != nil {
-		// NXDOMAIN / no answer → clean.
-		out.Detail = "not listed"
+		var dnsErr *net.DNSError
+		if errors.As(err, &dnsErr) && dnsErr.IsNotFound {
+			out.Detail = "not listed"
+			return out
+		}
+		out.Inconclusive = true
+		out.Detail = "DNSBL lookup failed: " + err.Error()
 		return out
 	}
 	listed, inconclusive, detail := interpretDNSBLA(hosts)
 	out.Listed = listed
-	out.Inconclusive = inconclusive
+	out.Inconclusive = inconclusive && !listed
 	out.Detail = detail
 	if listed && detail == "" {
 		out.Detail = "listed"
 	}
-	if !listed && !inconclusive {
+	if !listed && !out.Inconclusive {
 		out.Detail = "not listed"
 	}
 	return out
@@ -69,6 +76,7 @@ func ListedOnRBL(ip string, zones []string) string {
 }
 
 func interpretDNSBLA(hosts []string) (listed, inconclusive bool, detail string) {
+	var listedCode, inconclDetail string
 	for _, h := range hosts {
 		ip := net.ParseIP(h)
 		if ip == nil {
@@ -80,12 +88,24 @@ func interpretDNSBLA(hosts []string) (listed, inconclusive bool, detail string) 
 		}
 		// Spamhaus / similar: 127.255.255.x = query error / open resolver / rate limit.
 		if v4[1] == 255 && v4[2] == 255 {
-			return false, true, fmt.Sprintf("DNSBL query inconclusive (%s)", h)
+			inconclusive = true
+			if inconclDetail == "" {
+				inconclDetail = fmt.Sprintf("DNSBL query inconclusive (%s)", h)
+			}
+			continue
 		}
 		// Conventional listing codes live in 127.0.0.2–127.0.0.255.
 		if v4[1] == 0 && v4[2] == 0 && v4[3] >= 2 {
-			return true, false, h
+			listed = true
+			listedCode = h
+			// Keep scanning in case other codes exist; listing wins.
 		}
+	}
+	if listed {
+		return true, false, listedCode
+	}
+	if inconclusive {
+		return false, true, inconclDetail
 	}
 	return false, false, ""
 }

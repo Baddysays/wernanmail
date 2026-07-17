@@ -32,7 +32,7 @@ func main() {
 	if uiDir != "" {
 		fs := http.FileServer(http.Dir(uiDir))
 		handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/healthz" || r.URL.Path == "/metrics" {
+			if strings.HasPrefix(r.URL.Path, "/api/") || r.URL.Path == "/healthz" || r.URL.Path == "/readyz" || r.URL.Path == "/metrics" {
 				api.ServeHTTP(w, r)
 				return
 			}

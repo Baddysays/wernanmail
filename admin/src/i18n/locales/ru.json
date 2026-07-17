@@ -60,6 +60,7 @@
     "allOk": "Все системы в норме",
     "attention": "Нужно внимание",
     "stackOk": "{{n}}/5",
+    "stackSkip": "н/д",
     "stackMissing": "{{n}} нет",
     "ipClean": "чист",
     "ipCheck": "проверьте",

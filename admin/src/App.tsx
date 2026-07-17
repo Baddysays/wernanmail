@@ -627,13 +627,23 @@ function HealthStrip({
     warn: t('health.publishTxt'),
   })
 
-  const stackState =
-    !posture?.stack ? 'warn' : stackMissing > 0 ? 'bad' : stackRunning > 0 ? 'ok' : 'warn'
+  const stackSkip = posture?.stack?.mode === 'skip'
+  const stackState = !posture?.stack
+    ? 'warn'
+    : stackSkip
+      ? 'ok'
+      : stackMissing > 0
+        ? 'bad'
+        : stackRunning > 0
+          ? 'ok'
+          : 'warn'
   const stackText = !posture?.stack
     ? t('health.checking')
-    : stackMissing > 0
-      ? t('health.stackMissing', { n: stackMissing })
-      : t('health.stackOk', { n: stackRunning })
+    : stackSkip
+      ? t('health.stackSkip')
+      : stackMissing > 0
+        ? t('health.stackMissing', { n: stackMissing })
+        : t('health.stackOk', { n: stackRunning })
   const ipChip = dnsChip(posture?.rbl, {
     ok: t('health.ipClean'),
     missing: t('health.ipCheck'),
@@ -1389,7 +1399,10 @@ export function App() {
   const healthy = useMemo(() => {
     const pending = dash?.queuePending ?? 0
     const dead = dash?.queueDead ?? 0
-    const stackOk = !posture?.stack || (posture.stack.missing?.length ?? 0) === 0
+    const stackOk =
+      !posture?.stack ||
+      posture.stack.mode === 'skip' ||
+      (posture.stack.missing?.length ?? 0) === 0
     const ipOk = !posture?.rbl || posture.rbl.state !== 'bad'
     return dead === 0 && pending < 50 && stackOk && ipOk
   }, [dash, posture])

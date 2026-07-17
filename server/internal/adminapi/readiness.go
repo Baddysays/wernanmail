@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -17,24 +18,34 @@ import (
 var expectedMailProcs = []string{"mta", "imapd", "worker", "admin", "api"}
 
 // readyz is a public liveness/readiness probe for monitoring (no auth).
+// Public clients get a slim {status} payload. Loopback / SCRAPE_ALLOW get details.
 func (h *Handler) readyz(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	pending, dead := h.queueCounts(ctx)
-	running, missing := h.stackProcs()
+	pending, dead, qErr := h.queueCounts(ctx)
+	running, missing, stackMode := h.stackProcs()
 	status := "ok"
 	code := http.StatusOK
-	if dead > 0 || len(missing) > 0 {
+	if qErr != nil || dead > 0 {
 		status = "degraded"
 		code = http.StatusServiceUnavailable
 	}
-	writeJSON(w, code, map[string]any{
-		"status":       status,
-		"queuePending": pending,
-		"queueDead":    dead,
-		"procsRunning": len(running),
-		"procsExpected": len(expectedMailProcs),
-		"missing":      missing,
-	})
+	if stackMode == "proc" && len(missing) > 0 {
+		status = "degraded"
+		code = http.StatusServiceUnavailable
+	}
+	out := map[string]any{"status": status}
+	if scrapeAllowed(r) {
+		out["queuePending"] = pending
+		out["queueDead"] = dead
+		out["procsRunning"] = len(running)
+		out["procsExpected"] = len(expectedMailProcs)
+		out["missing"] = missing
+		out["stackMode"] = stackMode
+		if qErr != nil {
+			out["queueError"] = qErr.Error()
+		}
+	}
+	writeJSON(w, code, out)
 }
 
 // posture returns outbound IP cleanliness, antispam self-test, and stack/queue health.
@@ -43,16 +54,21 @@ func (h *Handler) posture(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	_ = h.Settings.Reload(ctx)
 
-	pending, dead := h.queueCounts(ctx)
-	running, missing := h.stackProcs()
+	pending, dead, qErr := h.queueCounts(ctx)
+	running, missing, stackMode := h.stackProcs()
 	stackState := "ok"
-	if len(missing) > 0 {
+	switch {
+	case stackMode == "skip":
+		stackState = "ok" // container / explicit skip — process list not meaningful
+	case len(missing) > 0:
 		stackState = "missing"
-	} else if len(running) == 0 {
+	case len(running) == 0:
 		stackState = "warn"
 	}
 	queueState := "ok"
-	if dead > 0 {
+	if qErr != nil {
+		queueState = "bad"
+	} else if dead > 0 {
 		queueState = "bad"
 	} else if pending >= 50 {
 		queueState = "warn"
@@ -95,6 +111,7 @@ func (h *Handler) posture(w http.ResponseWriter, r *http.Request) {
 		"antispam":  spam,
 		"stack": map[string]any{
 			"state":    stackState,
+			"mode":     stackMode,
 			"expected": expectedMailProcs,
 			"running":  running,
 			"missing":  missing,
@@ -103,22 +120,35 @@ func (h *Handler) posture(w http.ResponseWriter, r *http.Request) {
 			"state":   queueState,
 			"pending": pending,
 			"dead":    dead,
+			"error": func() string {
+				if qErr != nil {
+					return qErr.Error()
+				}
+				return ""
+			}(),
 		},
 	})
 }
 
-func (h *Handler) queueCounts(ctx context.Context) (pending, dead int) {
+func (h *Handler) queueCounts(ctx context.Context) (pending, dead int, err error) {
 	if h.Queue == nil {
-		return 0, 0
+		return 0, 0, fmt.Errorf("queue store unavailable")
 	}
 	p, d, err := h.Queue.Count(ctx)
 	if err != nil {
-		return 0, 0
+		return 0, 0, err
 	}
-	return p, d
+	return p, d, nil
 }
 
-func (h *Handler) stackProcs() (running, missing []string) {
+// stackProcs returns running/missing daemon names and the check mode:
+//   - "proc": host /proc scan (native install)
+//   - "skip": containers / WERNANMAIL_STACK_CHECK=skip (cross-process /proc is meaningless)
+func (h *Handler) stackProcs() (running, missing []string, mode string) {
+	mode = stackCheckMode()
+	if mode == "skip" {
+		return []string{}, []string{}, mode
+	}
 	found := map[string]bool{}
 	for _, p := range findMailPIDs() {
 		found[p.name] = true
@@ -136,7 +166,24 @@ func (h *Handler) stackProcs() (running, missing []string) {
 	if missing == nil {
 		missing = []string{}
 	}
-	return running, missing
+	return running, missing, mode
+}
+
+func stackCheckMode() string {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("WERNANMAIL_STACK_CHECK"))) {
+	case "skip", "none", "off", "0", "false":
+		return "skip"
+	case "proc", "host":
+		return "proc"
+	}
+	if _, err := os.Stat("/.dockerenv"); err == nil {
+		return "skip"
+	}
+	// Common container markers when /.dockerenv is absent.
+	if _, err := os.Stat("/run/.containerenv"); err == nil {
+		return "skip"
+	}
+	return "proc"
 }
 
 func (h *Handler) resolveOutboundIP(ctx context.Context) (ip, source string) {

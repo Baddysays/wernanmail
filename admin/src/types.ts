@@ -210,6 +210,7 @@ export type Posture = {
   }
   stack?: {
     state?: string
+    mode?: string
     expected?: string[]
     running?: string[]
     missing?: string[]

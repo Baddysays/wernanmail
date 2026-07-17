@@ -53,6 +53,15 @@ All notable changes to Wernanmail will be documented in this file.
 
 ## Unreleased
 
+### Fixed
+
+- Full admin backup packs to a temp archive before streaming (no truncated 200 OK).
+- `/metrics` restricted to loopback + `SCRAPE_ALLOW`; nginx edge deny-by-default.
+- Public `/readyz` returns slim `{status}`; details only for scrape-allowed clients.
+- DNSBL: NXDOMAIN = clean; resolver errors = inconclusive (not false-clean).
+- Stack process checks skipped in Docker (`/.dockerenv` / `WERNANMAIL_STACK_CHECK=skip`).
+- `/readyz` wired when `ADMIN_UI_DIR` serves the SPA.
+
 ### Still open
 
 - Mailport embed surface (preview only).

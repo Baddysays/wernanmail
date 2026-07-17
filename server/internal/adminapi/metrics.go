@@ -7,8 +7,13 @@ import (
 )
 
 // metricsHandler exposes Prometheus text metrics from the admin process + store gauges.
+// Unauthenticated; restricted to loopback and SCRAPE_ALLOW.
 func (h *Handler) metricsHandler(reg *metrics.Registry) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !scrapeAllowed(r) {
+			denyScrape(w)
+			return
+		}
 		ctx := r.Context()
 		if h.Queue != nil {
 			pending, dead, err := h.Queue.Count(ctx)

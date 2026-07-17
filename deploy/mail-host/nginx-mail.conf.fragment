@@ -28,13 +28,18 @@ location = /healthz {
   proxy_pass http://127.0.0.1:8090/healthz;
 }
 
+# Public probe returns slim {status}. Details only for loopback / SCRAPE_ALLOW.
 location = /readyz {
   access_log off;
   proxy_pass http://127.0.0.1:8090/readyz;
 }
 
-# Prometheus scrape (admin process + store gauges). Keep private if exposing publicly.
+# Scrape endpoints: localhost only at the edge (app also enforces SCRAPE_ALLOW).
 location = /metrics {
+  allow 127.0.0.1;
+  allow ::1;
+  deny all;
+  access_log off;
   proxy_pass http://127.0.0.1:8090/metrics;
 }
 
