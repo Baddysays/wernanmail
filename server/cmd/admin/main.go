@@ -1,13 +1,17 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/Baddysays/wernanmail/server/internal/adminapi"
+	"github.com/Baddysays/wernanmail/server/internal/alerts"
 	"github.com/Baddysays/wernanmail/server/internal/mailcfg"
 	"github.com/Baddysays/wernanmail/server/internal/settings"
 	"github.com/Baddysays/wernanmail/server/internal/store/sqlite"
@@ -25,7 +29,12 @@ func main() {
 		Store:    st,
 		Settings: settings.NewManager(st),
 		Queue:    st,
+		Alerts:   alerts.NewWatcher(),
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	h.StartWatchdog(ctx)
+
 	api := adminapi.NewRouter(h)
 	uiDir := strings.TrimSpace(os.Getenv("ADMIN_UI_DIR"))
 	var handler http.Handler = api
@@ -46,7 +55,14 @@ func main() {
 		})
 	}
 	log.Printf("admin api listening on %s", cfg.AdminAddr)
-	log.Fatal(http.ListenAndServe(cfg.AdminAddr, handler))
+	srv := &http.Server{Addr: cfg.AdminAddr, Handler: handler}
+	go func() {
+		<-ctx.Done()
+		_ = srv.Shutdown(context.Background())
+	}()
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
 }
 
 func fileExists(p string) bool {

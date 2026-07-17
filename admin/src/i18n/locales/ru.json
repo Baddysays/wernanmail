@@ -313,7 +313,8 @@
       "rates": "Лимиты и защита от злоупотреблений",
       "antispam": "Антиспам",
       "quarantine": "Карантин и антивирус",
-      "security": "Безопасность и доступ"
+      "security": "Безопасность и доступ",
+      "alerts": "Алерты"
     },
     "groupHints": {
       "interface": "Язык админки и прочие параметры отображения.",
@@ -322,8 +323,12 @@
       "rates": "Ограничения на отправку и SMTP-соединения.",
       "antispam": "Пороги score, RBL и текст отклонения.",
       "quarantine": "Антивирус и срок хранения карантина.",
-      "security": "Политика паролей ящиков и суперпользователь."
+      "security": "Политика паролей ящиков и суперпользователь.",
+      "alerts": "Куда писать, если очередь зависла или процессы упали. Лучше внешняя почта или Telegram — не тот же сервер."
     },
+    "secretKept": "сохранён (оставьте или вставьте новый)",
+    "testAlert": "Отправить тест",
+    "testAlertHint": "Письмо / Telegram / webhook по текущим настройкам.",
     "keys": {
       "mail.max_message_bytes": "Макс. размер письма (байты)",
       "mail.rate_submit_per_min": "Лимит submission / мин",
@@ -352,7 +357,14 @@
       "security.password_require_digit": "Пароль должен содержать цифру",
       "security.password_require_upper": "Пароль должен содержать заглавную",
       "admin.superuser_enabled": "Суперпользователь (вход в webmail от имени ящика)",
-      "admin.webmail_url": "URL webmail"
+      "admin.webmail_url": "URL webmail",
+      "alerts.enabled": "Включить алерты",
+      "alerts.email": "Email для алертов (лучше внешний, через запятую)",
+      "alerts.telegram_bot_token": "Telegram bot token",
+      "alerts.telegram_chat_id": "Telegram chat id",
+      "alerts.webhook_url": "Webhook URL (опционально)",
+      "alerts.cooldown_minutes": "Не повторять один алерт чаще (мин)",
+      "alerts.pending_warn": "Предупреждать при pending ≥"
     }
   },
   "backup": {

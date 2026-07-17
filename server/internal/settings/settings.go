@@ -39,7 +39,25 @@ const (
 	KeyPasswordRequireUpper = "security.password_require_upper"
 	KeySuperuserEnabled    = "admin.superuser_enabled"
 	KeyWebmailURL          = "admin.webmail_url"
+
+	KeyAlertsEnabled           = "alerts.enabled"
+	KeyAlertsEmail             = "alerts.email"
+	KeyAlertsTelegramBotToken  = "alerts.telegram_bot_token"
+	KeyAlertsTelegramChatID    = "alerts.telegram_chat_id"
+	KeyAlertsWebhookURL        = "alerts.webhook_url"
+	KeyAlertsCooldownMinutes  = "alerts.cooldown_minutes"
+	KeyAlertsPendingWarn       = "alerts.pending_warn"
 )
+
+// SecretKeys must not be returned in plaintext over the admin API.
+func SecretKeys() map[string]struct{} {
+	return map[string]struct{}{
+		KeyAlertsTelegramBotToken: {},
+	}
+}
+
+// SecretMask is returned for configured secrets; PUT with this value keeps the old secret.
+const SecretMask = "••••••••"
 
 // Defaults returns built-in defaults.
 func Defaults() map[string]string {
@@ -72,6 +90,13 @@ func Defaults() map[string]string {
 		KeyPasswordRequireUpper: "false",
 		KeySuperuserEnabled:     "false",
 		KeyWebmailURL:           "",
+		KeyAlertsEnabled:          "false",
+		KeyAlertsEmail:            "",
+		KeyAlertsTelegramBotToken: "",
+		KeyAlertsTelegramChatID:   "",
+		KeyAlertsWebhookURL:       "",
+		KeyAlertsCooldownMinutes: "60",
+		KeyAlertsPendingWarn:      "50",
 	}
 }
 

@@ -313,7 +313,8 @@
       "rates": "Rate limits & abuse",
       "antispam": "Antispam",
       "quarantine": "Quarantine & antivirus",
-      "security": "Security & access"
+      "security": "Security & access",
+      "alerts": "Alerts"
     },
     "groupHints": {
       "interface": "Admin language and display preferences.",
@@ -322,8 +323,12 @@
       "rates": "Caps on sending and SMTP connections.",
       "antispam": "Score thresholds, RBLs, and reject text.",
       "quarantine": "Antivirus and quarantine retention.",
-      "security": "Mailbox password policy and superuser access."
+      "security": "Mailbox password policy and superuser access.",
+      "alerts": "Where to notify if the queue stalls or processes die. Prefer an external inbox or Telegram — not this same server."
     },
+    "secretKept": "saved (leave as-is or paste a new token)",
+    "testAlert": "Send test alert",
+    "testAlertHint": "Uses the current email / Telegram / webhook settings.",
     "keys": {
       "mail.max_message_bytes": "Max message size (bytes)",
       "mail.rate_submit_per_min": "Submission rate / min",
@@ -352,7 +357,14 @@
       "security.password_require_digit": "Password must contain a digit",
       "security.password_require_upper": "Password must contain uppercase",
       "admin.superuser_enabled": "Superuser (open webmail as mailbox)",
-      "admin.webmail_url": "Webmail base URL"
+      "admin.webmail_url": "Webmail base URL",
+      "alerts.enabled": "Enable alerts",
+      "alerts.email": "Alert email (prefer external, comma-separated)",
+      "alerts.telegram_bot_token": "Telegram bot token",
+      "alerts.telegram_chat_id": "Telegram chat id",
+      "alerts.webhook_url": "Webhook URL (optional)",
+      "alerts.cooldown_minutes": "Min minutes between same alert",
+      "alerts.pending_warn": "Warn when pending ≥"
     }
   },
   "backup": {

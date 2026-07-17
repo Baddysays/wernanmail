@@ -8,7 +8,7 @@ export type NavTab =
   | 'backup'
   | 'audit'
 
-export type SettingType = 'text' | 'number' | 'bool' | 'textarea'
+export type SettingType = 'text' | 'number' | 'bool' | 'textarea' | 'password'
 
 export type SettingField = {
   key: string

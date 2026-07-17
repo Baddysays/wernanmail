@@ -7,6 +7,7 @@ All notable changes to Wernanmail will be documented in this file.
 ### Added
 
 - Admin deliverability score **0–10** from SPF/DKIM/DMARC/MX/PTR/RBL/antispam (`rating` on `GET /api/admin/posture`).
+- Operator **alerts** in Settings: email / Telegram / webhook, watchdog in admin process, test button (`POST /api/admin/alerts/test`).
 
 ## [0.3.0] - 2026-07-17
 

@@ -87,6 +87,18 @@ const SETTING_GROUPS: SettingGroup[] = [
       { key: 'admin.webmail_url', type: 'text' },
     ],
   },
+  {
+    id: 'alerts',
+    fields: [
+      { key: 'alerts.enabled', type: 'bool' },
+      { key: 'alerts.email', type: 'text' },
+      { key: 'alerts.telegram_bot_token', type: 'password' },
+      { key: 'alerts.telegram_chat_id', type: 'text' },
+      { key: 'alerts.webhook_url', type: 'text' },
+      { key: 'alerts.cooldown_minutes', type: 'number' },
+      { key: 'alerts.pending_warn', type: 'number' },
+    ],
+  },
 ]
 
 const SPARK_KEY = 'wm_queue_spark'
@@ -1355,6 +1367,30 @@ export function App() {
     }
   }
 
+  async function testAlerts() {
+    setBusy(true)
+    setError('')
+    try {
+      if (settingsDirty) {
+        setSettings(
+          await api<Record<string, unknown>>('/api/admin/settings', {
+            ...creds,
+            method: 'PUT',
+            body: settings,
+          }),
+        )
+        setSettingsDirty(false)
+      }
+      await api<{ ok?: boolean }>('/api/admin/alerts/test', { ...creds, method: 'POST', body: {} })
+      setSettingsSaved(true)
+      window.setTimeout(() => setSettingsSaved(false), 2500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function downloadBackup() {
     setBusy(true)
     try {
@@ -2589,7 +2625,19 @@ export function App() {
                           ) : (
                             <input
                               id={`set-${field.key}`}
-                              type={field.type === 'number' ? 'number' : 'text'}
+                              type={
+                                field.type === 'number'
+                                  ? 'number'
+                                  : field.type === 'password'
+                                    ? 'password'
+                                    : 'text'
+                              }
+                              autoComplete={field.type === 'password' ? 'new-password' : undefined}
+                              placeholder={
+                                field.type === 'password' && value
+                                  ? t('settings.secretKept')
+                                  : undefined
+                              }
                               value={value}
                               onChange={(e) => {
                                 setSettingsDirty(true)
@@ -2601,6 +2649,21 @@ export function App() {
                       )
                     })}
                   </div>
+                  {g.id === 'alerts' ? (
+                    <div className="row" style={{ marginTop: '0.85rem' }}>
+                      <button
+                        type="button"
+                        className="ghost"
+                        disabled={busy}
+                        onClick={() => void testAlerts()}
+                      >
+                        {t('settings.testAlert')}
+                      </button>
+                      <p className="muted" style={{ margin: 0 }}>
+                        {t('settings.testAlertHint')}
+                      </p>
+                    </div>
+                  ) : null}
                 </section>
               ))}
 

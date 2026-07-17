@@ -20,6 +20,7 @@ import (
 	"github.com/go-chi/cors"
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/Baddysays/wernanmail/server/internal/alerts"
 	"github.com/Baddysays/wernanmail/server/internal/antispam"
 	"github.com/Baddysays/wernanmail/server/internal/dnsauth"
 	"github.com/Baddysays/wernanmail/server/internal/domain"
@@ -39,6 +40,7 @@ type Handler struct {
 	Settings *settings.Manager
 	Queue    store.QueueStore
 	Tokens   *TokenStore
+	Alerts   *alerts.Watcher
 }
 
 func NewRouter(h *Handler) http.Handler {
@@ -99,6 +101,7 @@ func NewRouter(h *Handler) http.Handler {
 		r.Put("/api/admin/mailboxes/{id}/filters", h.putMailboxFilters)
 		r.Get("/api/admin/settings", h.getSettings)
 		r.Put("/api/admin/settings", h.putSettings)
+		r.Post("/api/admin/alerts/test", h.testAlerts)
 		r.Get("/api/admin/audit", h.listAudit)
 	})
 	return r
@@ -729,9 +732,10 @@ func (h *Handler) backup(w http.ResponseWriter, r *http.Request) {
 
 func redactSettings(in map[string]string) map[string]string {
 	out := make(map[string]string, len(in))
+	secrets := settings.SecretKeys()
 	for k, v := range in {
 		lk := strings.ToLower(k)
-		if strings.Contains(lk, "password") || strings.Contains(lk, "secret") || strings.Contains(lk, "private") || strings.Contains(lk, "key") {
+		if _, ok := secrets[k]; ok || strings.Contains(lk, "password") || strings.Contains(lk, "secret") || strings.Contains(lk, "private") || strings.Contains(lk, "token") || strings.Contains(lk, "key") {
 			if v != "" {
 				out[k] = "[redacted]"
 				continue
@@ -1195,7 +1199,7 @@ func (h *Handler) putMailboxFilters(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) getSettings(w http.ResponseWriter, r *http.Request) {
 	_ = h.Settings.Reload(r.Context())
-	writeJSON(w, http.StatusOK, h.Settings.All())
+	writeJSON(w, http.StatusOK, publicSettings(h.Settings.All()))
 }
 
 func (h *Handler) putSettings(w http.ResponseWriter, r *http.Request) {
@@ -1204,14 +1208,33 @@ func (h *Handler) putSettings(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, http.StatusBadRequest, "admin.bad_request", "bad json")
 		return
 	}
+	secrets := settings.SecretKeys()
 	for k, v := range body {
+		if _, isSecret := secrets[k]; isSecret {
+			if v == "" || v == settings.SecretMask {
+				continue // keep existing secret
+			}
+		}
 		if err := h.Settings.Set(r.Context(), k, v); err != nil {
 			writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
 			return
 		}
 	}
 	_ = h.Store.AddAudit(r.Context(), &domain.AuditEntry{Actor: h.actor(r), Action: "settings.update", Detail: strconv.Itoa(len(body))})
-	writeJSON(w, http.StatusOK, h.Settings.All())
+	writeJSON(w, http.StatusOK, publicSettings(h.Settings.All()))
+}
+
+func publicSettings(in map[string]string) map[string]string {
+	out := make(map[string]string, len(in))
+	secrets := settings.SecretKeys()
+	for k, v := range in {
+		if _, ok := secrets[k]; ok && v != "" {
+			out[k] = settings.SecretMask
+			continue
+		}
+		out[k] = v
+	}
+	return out
 }
 
 func (h *Handler) listAudit(w http.ResponseWriter, r *http.Request) {
