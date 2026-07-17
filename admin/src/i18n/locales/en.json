@@ -90,12 +90,13 @@
     "ipClean": "not listed",
     "spamOk": "engine ready",
     "recheck": "Recheck",
+    "rechecking": "Checking…",
     "scoreAria": "Deliverability score {{score}} out of 10",
     "verdict": {
-      "perfect": "Excellent — like a 10/10 mail-tester result",
-      "good": "Good — minor gaps may still hurt inbox placement",
-      "attention": "Needs work — fix DNS or IP reputation",
-      "critical": "Critical — delivery will fail for many providers"
+      "perfect": "Deliverability check",
+      "good": "Deliverability check",
+      "attention": "Deliverability check — needs attention",
+      "critical": "Deliverability check — critical"
     },
     "outboundIp": "Outbound IP {{ip}}",
     "probe": "Antispam probe: clean→{{clean}}, spammy→{{spam}} ({{score}})",

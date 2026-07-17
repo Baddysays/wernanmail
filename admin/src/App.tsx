@@ -462,13 +462,27 @@ function DeliverabilityCard({
   dns: DnsStatus | null
   reports: DmarcReport[] | null
   posture: Posture | null
-  onRecheck?: () => void
+  onRecheck?: () => void | Promise<void>
 }) {
   const { t } = useTranslation()
+  const [checking, setChecking] = useState(false)
   const rating = posture?.rating
   const score =
     typeof rating?.score === 'number' ? rating.score : null
   const verdict = rating?.verdict || ''
+
+  async function handleRecheck() {
+    if (!onRecheck || checking) return
+    setChecking(true)
+    try {
+      await onRecheck()
+    } catch {
+      /* keep previous score; button feedback already shown */
+    } finally {
+      setChecking(false)
+    }
+  }
+
   const checks = [
     { id: 'mx', label: 'MX', check: dns?.mx || posture?.dns?.mx },
     { id: 'spf', label: 'SPF', check: dns?.spf || posture?.dns?.spf },
@@ -509,19 +523,29 @@ function DeliverabilityCard({
       <div className="deliverability-head">
         <h3>{t('deliverability.title')}</h3>
         {onRecheck ? (
-          <button type="button" className="ghost deliverability-recheck" onClick={onRecheck}>
-            {t('deliverability.recheck')}
+          <button
+            type="button"
+            className="ghost deliverability-recheck"
+            onClick={() => void handleRecheck()}
+            disabled={checking}
+            aria-busy={checking}
+          >
+            {checking ? t('deliverability.rechecking') : t('deliverability.recheck')}
           </button>
         ) : null}
       </div>
       {score != null ? (
-        <div className={`deliverability-score verdict-${verdict || 'attention'}`}>
+        <div
+          className={`deliverability-score verdict-${verdict || 'attention'}${checking ? ' is-checking' : ''}`}
+        >
           <div className="deliverability-score-num" aria-label={t('deliverability.scoreAria', { score: scoreLabel })}>
             <span className="deliverability-score-value">{scoreLabel}</span>
             <span className="deliverability-score-max">/10</span>
           </div>
           <p className="deliverability-score-verdict">
-            {t(`deliverability.verdict.${verdict || 'attention'}`)}
+            {checking
+              ? t('deliverability.rechecking')
+              : t(`deliverability.verdict.${verdict || 'attention'}`)}
           </p>
         </div>
       ) : null}
@@ -1716,7 +1740,7 @@ export function App() {
                 dns={dnsStatus}
                 reports={dmarcReports}
                 posture={posture}
-                onRecheck={() => void refreshDash().catch(() => {})}
+                onRecheck={() => refreshDash().then(() => undefined)}
               />
               <div className="panel">
                 <h3>{t('overview.dnsTitle')}</h3>

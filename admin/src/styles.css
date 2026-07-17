@@ -782,6 +782,16 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .deliverability-recheck {
   font-size: 0.78rem;
   padding: 0.2rem 0.55rem;
+  transition: transform 120ms ease-out, opacity 120ms ease-out;
+}
+
+.deliverability-recheck:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.deliverability-recheck:disabled {
+  opacity: 0.65;
+  cursor: wait;
 }
 
 .deliverability-score {
@@ -837,6 +847,22 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   font-size: 0.82rem;
   line-height: 1.35;
   color: var(--ink);
+}
+
+.deliverability-score.is-checking {
+  opacity: 0.72;
+  transition: opacity 160ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deliverability-recheck,
+  .deliverability-score.is-checking {
+    transition: none;
+  }
+
+  .deliverability-recheck:active:not(:disabled) {
+    transform: none;
+  }
 }
 
 .deliverability-checks {
