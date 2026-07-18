@@ -4,12 +4,18 @@ All notable changes to Wernanmail will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-18
+
 ### Added
 
 - Admin deliverability score **0–10** from SPF/DKIM/DMARC/MX/PTR/RBL/antispam (`rating` on `GET /api/admin/posture`).
 - Operator **alerts** in Settings: email / Telegram / webhook, watchdog in admin process, test button (`POST /api/admin/alerts/test`).
 - **ARC** (RFC 8617): seal outbound with domain DKIM keys after DKIM; verify inbound chain and prepend `Authentication-Results` (spf/dkim/arc).
-- **MTA-STS / TLS-RPT / BIMI** posture checks (optional; missing does not lower score), DNS helper chips, TLS-RPT ingest + `GET /api/admin/tls-rpt-reports`.
+- **MTA-STS / TLS-RPT / BIMI** posture checks (optional; missing does not lower score), DNS helper chips, TLS-RPT ingest + `GET /api/admin/tls-rpt-reports` (schema v3).
+
+### Fixed
+
+- Concurrent SQLite migrations on multi-process start no longer crash when another process already stamped the same version.
 
 ## [0.3.0] - 2026-07-17
 
