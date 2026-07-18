@@ -87,7 +87,7 @@ WERNANMAIL_NONINTERACTIVE=1 \
 6. **DMARC** — start with `v=DMARC1; p=none; rua=mailto:postmaster@…`
 7. **PTR** — reverse DNS for the outbound IP (VPS provider) matching `MAIL_EHLO` / `MAIL_HOSTNAME`
 8. Optional: **MTA-STS** (`_mta-sts` TXT + HTTPS policy at `https://mta-sts.<domain>/.well-known/mta-sts.txt` — point `mta-sts` A/AAAA at the API host or reverse-proxy `/.well-known/mta-sts.txt`), **TLS-RPT** (`_smtp._tls` TXT; aggregates land in admin like DMARC), **BIMI** (`default._bimi` TXT + SVG at `l=` URL; no VMC required for the helper)
-9. Firewall: **25, 587, 143, 80, 443** by default; add **465 / 993** only if you expose implicit TLS
+9. Firewall: **25, 587, 143, 80, 443** by default; `install.sh` also reports **465 / 993** and can open them if you expose implicit TLS
 
 ### TLS
 

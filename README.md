@@ -92,7 +92,7 @@ WERNANMAIL_NONINTERACTIVE=1 MAIL_HOSTNAME=mail.example.com PUBLIC_URL=https://ma
 2. Add your domain → **Generate DKIM**  
 3. Follow **Setup — go live** on Overview (and **DNS helper** for copy-paste records)  
 4. Publish **MX · SPF · DKIM · DMARC · PTR** at your DNS panel  
-5. Open firewall: **25, 587, 143, 80, 443**  
+5. Open firewall: **25, 587, 143, 80, 443** (add **465 / 993** only if you expose IMAPS/SMTPS)  
 6. If the browser still warns about HTTPS:  
    `./scripts/issue-tls-certbot.sh`  
 7. Send a test both ways → watch **Deliverability** (aim for score **8+**)  
