@@ -4,13 +4,22 @@ All notable changes to Wernanmail will be documented in this file.
 
 ## [Unreleased]
 
+### Still open
+
+- Mailport embed surface (preview only).
+- Built-in ACME inside the MTA (host Certbot helper remains the supported path).
+
+## [0.5.0] - 2026-07-18
+
 ### Added
 
-- Native **SMTPS :465** and **IMAPS :993** listeners (`SMTPS_ADDR` / `IMAPS_ADDR`) for Outlook and other implicit-TLS clients; Compose publishes them by default.
-- Webmail: resume/edit drafts, Archive/Spam/move actions, list previews, load-more pagination, custom folders, Bcc, mark unread.
-- Webmail compose **autosave** to Drafts after idle typing (and on close); draft API returns id and replaces previous copy.
-- **First-run install wizard** (`install.sh`): hostname / URL / contact email prompts, optional Let's Encrypt, local port/firewall check with UFW/firewalld open offer, plain-language next steps.
+- **First-run install wizard** (`install.sh`): hostname / URL / contact email prompts, optional Let's Encrypt, local port/firewall check with UFW/firewalld open offer (including **465 / 993**), plain-language next steps.
 - Admin Overview **Setup — go live** checklist (hostname, TLS, MX, SPF/DKIM/DMARC, PTR, score) with RU/EN copy.
+- Native **SMTPS :465** and **IMAPS :993** listeners (`SMTPS_ADDR` / `IMAPS_ADDR`) for Outlook and other implicit-TLS clients; Compose publishes them by default.
+- Webmail: resume/edit drafts, Archive/Spam/move actions, list BODY.PEEK previews, load-more pagination, custom folders, Bcc, mark unread.
+- Webmail compose **autosave** to Drafts after idle typing (and on close); draft API returns id and replaces previous copy.
+
+## [0.4.0] - 2026-07-18
 
 ### Added
 
@@ -22,6 +31,12 @@ All notable changes to Wernanmail will be documented in this file.
 ### Fixed
 
 - Concurrent SQLite migrations on multi-process start no longer crash when another process already stamped the same version.
+- Full admin backup packs to a temp archive before streaming (no truncated 200 OK).
+- `/metrics` restricted to loopback + `SCRAPE_ALLOW`; nginx edge deny-by-default.
+- Public `/readyz` returns slim `{status}`; details only for scrape-allowed clients.
+- DNSBL: NXDOMAIN = clean; resolver errors = inconclusive (not false-clean).
+- Stack process checks skipped in Docker (`/.dockerenv` / `WERNANMAIL_STACK_CHECK=skip`).
+- `/readyz` wired when `ADMIN_UI_DIR` serves the SPA.
 
 ## [0.3.0] - 2026-07-17
 
@@ -71,19 +86,3 @@ All notable changes to Wernanmail will be documented in this file.
 - README: CI badge, license badge, honest port guidance, roadmap notes.
 - Landing page: real product screenshots, OG metadata, showcase section.
 - Admin deliverability card: DMARC empty-state hint (RU/EN).
-
-## Unreleased
-
-### Fixed
-
-- Full admin backup packs to a temp archive before streaming (no truncated 200 OK).
-- `/metrics` restricted to loopback + `SCRAPE_ALLOW`; nginx edge deny-by-default.
-- Public `/readyz` returns slim `{status}`; details only for scrape-allowed clients.
-- DNSBL: NXDOMAIN = clean; resolver errors = inconclusive (not false-clean).
-- Stack process checks skipped in Docker (`/.dockerenv` / `WERNANMAIL_STACK_CHECK=skip`).
-- `/readyz` wired when `ADMIN_UI_DIR` serves the SPA.
-
-### Still open
-
-- Mailport embed surface (preview only).
-- Built-in ACME inside the MTA (host Certbot helper remains the supported path).
