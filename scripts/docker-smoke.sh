@@ -18,7 +18,9 @@ export MAIL_EHLO="${MAIL_EHLO:-localhost}"
 export PUBLIC_URL="${PUBLIC_URL:-https://localhost}"
 export SMTP_PORT="${SMTP_PORT:-2525}"
 export SUBMISSION_PORT="${SUBMISSION_PORT:-2587}"
+export SMTPS_PORT="${SMTPS_PORT:-2465}"
 export IMAP_PORT="${IMAP_PORT:-2143}"
+export IMAPS_PORT="${IMAPS_PORT:-2993}"
 export HTTP_PORT="${HTTP_PORT:-8088}"
 export HTTPS_PORT="${HTTPS_PORT:-8443}"
 export COOKIE_SECURE="${COOKIE_SECURE:-false}"
@@ -60,8 +62,14 @@ curl -fsSk "https://127.0.0.1:${HTTPS_PORT}/readyz" | grep -q '"status"' || {
   exit 1
 }
 
-echo "Checking Prometheus metrics..."
-metrics="$(curl -fsSk "https://127.0.0.1:${HTTPS_PORT}/metrics")"
+echo "Checking Prometheus metrics (loopback inside admin; edge /metrics stays deny-by-default)..."
+# Host→published HTTPS sees the Docker bridge IP, so nginx correctly returns 403.
+edge_code="$(curl -sk -o /dev/null -w '%{http_code}' "https://127.0.0.1:${HTTPS_PORT}/metrics" || true)"
+if [ "$edge_code" != "403" ]; then
+  echo "edge /metrics HTTP status: $edge_code (expected 403)" >&2
+  exit 1
+fi
+metrics="$(docker compose exec -T admin wget -qO- http://127.0.0.1:8090/metrics)"
 echo "$metrics" | grep -q 'wernanmail_up{process="admin"} 1' || {
   echo "metrics missing wernanmail_up admin" >&2
   exit 1
