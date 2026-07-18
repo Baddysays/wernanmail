@@ -49,8 +49,14 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 			continue
 		}
 		if err := s.applyMigration(m); err != nil {
+			// Another process may have applied the same version concurrently.
+			if again, aerr := s.appliedMigrations(); aerr == nil && again[m.version] {
+				applied[m.version] = true
+				continue
+			}
 			return fmt.Errorf("migration %d (%s): %w", m.version, m.name, err)
 		}
+		applied[m.version] = true
 	}
 	return nil
 }
