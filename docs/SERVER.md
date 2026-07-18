@@ -59,6 +59,24 @@ Web client ────► existing BFF (Phase 1) ──► this IMAP/SMTP
 
 Do **not** commit real hostnames/IPs into the public repo.
 
+### First install (Docker, plain language)
+
+1. Point **A/AAAA** for `mail.example.com` at the VPS **before** you ask for Let's Encrypt  
+2. On the VPS: `curl -fsSL https://raw.githubusercontent.com/Baddysays/wernanmail/main/install.sh | bash`  
+3. Answer the prompts (hostname, public URL, contact email, TLS yes/no)  
+4. Open Admin → follow **Setup — go live** and **DNS helper**  
+5. Create a mailbox, send a test, check **Deliverability**
+
+CI / scripts (no prompts):
+
+```bash
+WERNANMAIL_NONINTERACTIVE=1 \
+  MAIL_HOSTNAME=mail.example.com \
+  PUBLIC_URL=https://mail.example.com \
+  CERTBOT_EMAIL=you@example.com \
+  ./install.sh
+```
+
 ### DNS
 
 1. Wait until the domain is **delegated** at the TLD (public resolvers must answer)
@@ -67,19 +85,22 @@ Do **not** commit real hostnames/IPs into the public repo.
 4. **SPF** — `v=spf1 mx a:mail.… -all` (or `ip4:` of the outbound IP)
 5. **DKIM** — publish public key from admin → Domains → DKIM
 6. **DMARC** — start with `v=DMARC1; p=none; rua=mailto:postmaster@…`
-7. **PTR** — reverse DNS for the outbound IP (VPS provider) matching `MAIL_HOSTNAME`
+7. **PTR** — reverse DNS for the outbound IP (VPS provider) matching `MAIL_EHLO` / `MAIL_HOSTNAME`
 8. Optional: **MTA-STS** (`_mta-sts` TXT + HTTPS policy at `https://mta-sts.<domain>/.well-known/mta-sts.txt` — point `mta-sts` A/AAAA at the API host or reverse-proxy `/.well-known/mta-sts.txt`), **TLS-RPT** (`_smtp._tls` TXT; aggregates land in admin like DMARC), **BIMI** (`default._bimi` TXT + SVG at `l=` URL; no VMC required for the helper)
-9. Firewall: **25, 587, 143** + HTTPS **443** by default; add **465 / 993** only if you expose implicit TLS
+9. Firewall: **25, 587, 143, 80, 443** by default; add **465 / 993** only if you expose implicit TLS
 
 ### TLS
 
-Compose starts with a **self-signed** bootstrap cert so ports come up on day one.
-For production, replace files in the `mail_tls` volume as `fullchain.pem` + `privkey.pem`.
+Compose starts with a **temporary self-signed** certificate so ports come up on day one.
+Browsers will warn until you install a real certificate — that is expected.
 
-Helper (HTTP-01 via host Certbot → install into Compose volume):
+Recommended path (HTTP-01 via host Certbot → Docker `mail_tls` volume):
 
 ```bash
-MAIL_HOSTNAME=mail.example.com ./scripts/issue-tls-certbot.sh
+# After DNS points here and port 80 is open:
+./scripts/issue-tls-certbot.sh
+# or:
+MAIL_HOSTNAME=mail.example.com CERTBOT_EMAIL=you@example.com ./scripts/issue-tls-certbot.sh
 ```
 
 Manual path:

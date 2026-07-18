@@ -31,8 +31,7 @@ Running instance: **[mail.wernanmail.ru](https://mail.wernanmail.ru)** (webmail)
 curl -fsSL https://raw.githubusercontent.com/Baddysays/wernanmail/main/install.sh | bash
 ```
 
-The installer clones the repo into a temporary directory, creates `.env` from
-`.env.example` on first run, then starts the full Compose stack.
+The installer asks for your **mail hostname**, public URL, and contact email, writes `.env`, starts Docker Compose, prints the admin password, and can request a Let's Encrypt certificate.
 
 <p align="center">
   <img src="docs/mockups/login-desktop.png" alt="Wernanmail sign-in" width="860" />
@@ -45,21 +44,21 @@ The installer clones the repo into a temporary directory, creates `.env` from
 ## Why teams pick it
 
 - **Actually light** — five small Go processes + React SPAs. No SOGo, no ClamAV by default, no multi‑GB baseline.
-- **Operator-first admin** — domains, DKIM, DNS helper chips (MX/SPF/DKIM/DMARC/TLS), queue, quarantine, deliverability card, mailbox filters.
-- **Real webmail** — three-pane inbox, HTML compose, attachments, drafts, search, threading, undo trash, remote-image blocking, 12 languages.
-- **Outbound you can trust** — SPF/DKIM/DMARC hooks, MTA-STS helper, DMARC aggregate storage, worker logs that say `outbound ok`.
-- **Defense without bloat** — MIME-aware light attachment policy + scoring antispam (URI/heuristics + learn-from-quarantine). Optional ClamAV later on larger hosts.
-- **One-command install** — secrets, bootstrap TLS, full stack on `docker compose up --build -d`.
+- **Operator-first admin** — domains, DKIM, DNS helper, Setup checklist, deliverability score, queue, quarantine.
+- **Real webmail** — three-pane inbox, HTML compose, attachments, drafts with autosave, search, undo trash, remote-image blocking, 12 languages.
+- **Outbound you can trust** — SPF/DKIM/DMARC hooks, MTA-STS/TLS-RPT/BIMI helpers, ARC, DMARC/TLS report storage.
+- **Defense without bloat** — MIME-aware light attachment policy + scoring antispam. Optional ClamAV later on larger hosts.
+- **Guided install** — hostname prompts, optional Let's Encrypt, clear “what to do next” for DNS.
 
-## Install in one command
+## Install (first time on a VPS)
 
-Linux host with Docker Engine + Compose v2:
+**You need:** a Linux VPS, Docker Engine + Compose v2, a domain whose **A/AAAA** already points at this server.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/Baddysays/wernanmail/main/install.sh | bash
 ```
 
-Prefer a pinned local checkout instead?
+Or from a git checkout:
 
 ```bash
 git clone https://github.com/Baddysays/wernanmail.git
@@ -67,39 +66,39 @@ cd wernanmail
 chmod +x install.sh && ./install.sh
 ```
 
-Under the hood this is:
+The script will ask (in plain language):
+
+1. **Mail hostname** — e.g. `mail.example.com` (not `localhost`)
+2. **Public URL** — usually `https://mail.example.com`
+3. **Contact email** — for Let's Encrypt notices
+4. **Issue TLS now?** — if yes, runs Certbot (port **80** must be open)
+
+When it finishes you get:
+
+- Webmail and Admin URLs  
+- Admin username/password  
+- A short checklist: open Admin → **Setup**, publish DNS, open firewall ports  
+
+Non-interactive / CI:
 
 ```bash
-docker compose up --build -d
+WERNANMAIL_NONINTERACTIVE=1 MAIL_HOSTNAME=mail.example.com PUBLIC_URL=https://mail.example.com ./install.sh
 ```
 
-That builds and starts **SMTP, submission, IMAP, queue worker, API, webmail, and admin**.  
-First boot generates admin password, session key, master password, and a bootstrap TLS cert.
+### After install — finish go-live
 
-```bash
-docker compose run --rm init /app/docker-init show-admin-password
-```
+1. Open **Admin** → sign in with the printed password  
+2. Add your domain → **Generate DKIM**  
+3. Follow **Setup — go live** on Overview (and **DNS helper** for copy-paste records)  
+4. Publish **MX · SPF · DKIM · DMARC · PTR** at your DNS panel  
+5. Open firewall: **25, 587, 143, 80, 443**  
+6. If the browser still warns about HTTPS:  
+   `./scripts/issue-tls-certbot.sh`  
+7. Send a test both ways → watch **Deliverability** (aim for score **8+**)  
+8. Schedule backups: `./scripts/backup-data.sh`
 
-| Surface | URL / port |
-|---------|------------|
-| Webmail | `https://localhost/` |
-| Admin | `https://localhost/admin/` |
-| SMTP | `25` |
-| Submission (STARTTLS) | `587` |
-| IMAP (STARTTLS) | `143` |
-| Optional implicit TLS | `465` / `993` via TLS terminator or custom config |
-
-### Before you go live
-
-1. Copy `.env.example` → `.env` and set `MAIL_HOSTNAME`, `MAIL_EHLO`, `PUBLIC_URL`
-2. Replace self-signed TLS: `MAIL_HOSTNAME=mail.example.com ./scripts/issue-tls-certbot.sh`
-3. Publish DNS: **MX · SPF · DKIM · DMARC · PTR** (MTA-STS / TLS-RPT optional)
-4. Open firewall: **25, 587, 143, 443** by default (`465` / `993` only if you add implicit TLS)
-5. Send a test both ways → check admin **Deliverability**
-6. Schedule backups: `./scripts/backup-data.sh` (SQLite + Maildir)
-
-Full operator checklist: **[docs/SERVER.md](docs/SERVER.md)** · product rules: **[docs/POLICY.md](docs/POLICY.md)**  
-Security policy: **[SECURITY.md](SECURITY.md)** · recent changes: **[CHANGELOG.md](CHANGELOG.md)** · license: **[MIT](LICENSE)**
+Full operator notes: **[docs/SERVER.md](docs/SERVER.md)** · product rules: **[docs/POLICY.md](docs/POLICY.md)**  
+Security: **[SECURITY.md](SECURITY.md)** · changes: **[CHANGELOG.md](CHANGELOG.md)** · license: **[MIT](LICENSE)**
 
 ```bash
 docker compose ps
@@ -108,6 +107,15 @@ docker compose restart
 docker compose down             # keeps mail + secrets
 docker compose down --volumes   # wipe mail + secrets
 ```
+
+| Surface | URL / port |
+|---------|------------|
+| Webmail | `https://your-host/` |
+| Admin | `https://your-host/admin/` |
+| SMTP | `25` |
+| Submission (STARTTLS) | `587` |
+| IMAP (STARTTLS) | `143` |
+| Optional implicit TLS | `465` / `993` via TLS terminator or custom config |
 
 ## What ships in the stack
 

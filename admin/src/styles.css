@@ -738,6 +738,87 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   line-height: 1.45;
 }
 
+.setup-card {
+  margin-top: 0.75rem;
+}
+
+.setup-card-done {
+  border-color: color-mix(in srgb, #2f7d4a 35%, var(--border));
+}
+
+.setup-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.setup-head h3 {
+  margin: 0 0 0.2rem;
+}
+
+.setup-lead {
+  margin: 0;
+  max-width: 40rem;
+  line-height: 1.4;
+}
+
+.setup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.setup-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+}
+
+.setup-steps li {
+  display: grid;
+  grid-template-columns: 1.4rem 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  padding: 0.45rem 0.5rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--bg) 65%, transparent);
+}
+
+.setup-steps li.is-ok .setup-mark {
+  color: #2f7d4a;
+}
+
+.setup-steps li.is-todo .setup-mark {
+  color: var(--muted);
+}
+
+.setup-mark {
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.setup-steps strong {
+  display: block;
+  font-size: 0.92rem;
+}
+
+.setup-steps p {
+  margin: 0.15rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.35;
+}
+
+.setup-hint {
+  margin: 0.65rem 0 0;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
 .overview-metrics {
   display: grid;
   grid-template-columns: 1.4fr 0.8fr;

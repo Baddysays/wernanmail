@@ -466,6 +466,144 @@ function dnsChip(check: DnsCheck | undefined, labels: DnsChipLabels) {
   }
 }
 
+function SetupChecklist({
+  dns,
+  posture,
+  ops,
+  onOpenDns,
+  onRecheck,
+}: {
+  dns: DnsStatus | null
+  posture: Posture | null
+  ops: OpsStatus | null
+  onOpenDns: () => void
+  onRecheck?: () => void | Promise<void>
+}) {
+  const { t } = useTranslation()
+  const [checking, setChecking] = useState(false)
+  const ehlo = (posture?.ehlo || '').toLowerCase()
+  const hostOk = Boolean(ehlo) && ehlo !== 'localhost' && !ehlo.endsWith('.localhost')
+  const tlsOk = Boolean(ops?.tlsConfigured)
+  const mxOk = (dns?.mx || posture?.dns?.mx)?.state === 'ok'
+  const spfOk = (dns?.spf || posture?.dns?.spf)?.state === 'ok'
+  const dkimOk = (dns?.dkim || posture?.dns?.dkim)?.state === 'ok'
+  const dmarcOk = (dns?.dmarc || posture?.dns?.dmarc)?.state === 'ok'
+  const ptrOk = posture?.ptr?.state === 'ok'
+  const score = posture?.rating?.score
+  const scoreOk = typeof score === 'number' && score >= 8
+  const steps = [
+    {
+      id: 'host',
+      ok: hostOk,
+      title: t('setup.hostTitle'),
+      detail: hostOk
+        ? t('setup.hostOk', { host: posture?.ehlo })
+        : t('setup.hostMissing'),
+    },
+    {
+      id: 'tls',
+      ok: tlsOk,
+      title: t('setup.tlsTitle'),
+      detail: tlsOk ? t('setup.tlsOk') : t('setup.tlsMissing'),
+    },
+    {
+      id: 'mx',
+      ok: mxOk,
+      title: t('setup.mxTitle'),
+      detail: mxOk ? t('setup.mxOk') : t('setup.mxMissing'),
+    },
+    {
+      id: 'auth',
+      ok: spfOk && dkimOk && dmarcOk,
+      title: t('setup.authTitle'),
+      detail:
+        spfOk && dkimOk && dmarcOk
+          ? t('setup.authOk')
+          : t('setup.authMissing', {
+              spf: spfOk ? '✓' : '✗',
+              dkim: dkimOk ? '✓' : '✗',
+              dmarc: dmarcOk ? '✓' : '✗',
+            }),
+    },
+    {
+      id: 'ptr',
+      ok: ptrOk,
+      title: t('setup.ptrTitle'),
+      detail: ptrOk ? t('setup.ptrOk') : t('setup.ptrMissing'),
+    },
+    {
+      id: 'score',
+      ok: scoreOk,
+      title: t('setup.scoreTitle'),
+      detail:
+        typeof score === 'number'
+          ? t('setup.scoreDetail', { score: Number.isInteger(score) ? score : score.toFixed(1) })
+          : t('setup.scorePending'),
+    },
+  ]
+  const done = steps.filter((s) => s.ok).length
+  const allOk = done === steps.length
+
+  async function handleRecheck() {
+    if (!onRecheck || checking) return
+    setChecking(true)
+    try {
+      await onRecheck()
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  return (
+    <section className={`panel setup-card${allOk ? ' setup-card-done' : ''}`}>
+      <div className="setup-head">
+        <div>
+          <h3>{t('setup.title')}</h3>
+          <p className="muted setup-lead">
+            {allOk ? t('setup.leadDone') : t('setup.lead', { done, total: steps.length })}
+          </p>
+        </div>
+        <div className="setup-actions">
+          {onRecheck ? (
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => void handleRecheck()}
+              disabled={checking}
+            >
+              {checking ? t('deliverability.rechecking') : t('deliverability.recheck')}
+            </button>
+          ) : null}
+          <button type="button" className="primary" onClick={onOpenDns}>
+            {t('overview.openDns')}
+          </button>
+        </div>
+      </div>
+      <ol className="setup-steps">
+        {steps.map((step) => (
+          <li key={step.id} className={step.ok ? 'is-ok' : 'is-todo'}>
+            <span className="setup-mark" aria-hidden>
+              {step.ok ? '✓' : '○'}
+            </span>
+            <div>
+              <strong>{step.title}</strong>
+              <p className="muted">{step.detail}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+      {!tlsOk ? (
+        <p className="setup-hint muted">
+          {t('setup.tlsHint')}
+        </p>
+      ) : null}
+      {!allOk ? (
+        <p className="setup-hint muted">{t('setup.firewallHint')}</p>
+      ) : null}
+    </section>
+  )
+}
+
 function DeliverabilityCard({
   dns,
   reports,
@@ -1743,6 +1881,13 @@ export function App() {
                 posture={posture}
                 updatedAt={updatedAt}
                 onRefresh={() => void refreshDash().catch(() => {})}
+              />
+              <SetupChecklist
+                dns={dnsStatus}
+                posture={posture}
+                ops={ops}
+                onOpenDns={() => setDnsOpen(true)}
+                onRecheck={() => refreshDash().then(() => undefined)}
               />
               <ResourcesPanel host={hostStats} ops={ops} />
               <div className="overview-metrics">

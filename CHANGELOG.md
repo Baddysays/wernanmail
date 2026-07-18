@@ -8,6 +8,8 @@ All notable changes to Wernanmail will be documented in this file.
 
 - Webmail: resume/edit drafts, Archive/Spam/move actions, list previews, load-more pagination, custom folders, Bcc, mark unread.
 - Webmail compose **autosave** to Drafts after idle typing (and on close); draft API returns id and replaces previous copy.
+- **First-run install wizard** (`install.sh`): hostname / URL / contact email prompts, optional Let's Encrypt, plain-language next steps.
+- Admin Overview **Setup — go live** checklist (hostname, TLS, MX, SPF/DKIM/DMARC, PTR, score) with RU/EN copy.
 
 ### Added
 
