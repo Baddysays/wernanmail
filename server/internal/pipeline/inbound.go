@@ -13,6 +13,7 @@ import (
 	"github.com/Baddysays/wernanmail/server/internal/antispam"
 	"github.com/Baddysays/wernanmail/server/internal/antivirus"
 	"github.com/Baddysays/wernanmail/server/internal/dmarc"
+	"github.com/Baddysays/wernanmail/server/internal/dnsauth"
 	"github.com/Baddysays/wernanmail/server/internal/domain"
 	"github.com/Baddysays/wernanmail/server/internal/mailfilter"
 	"github.com/Baddysays/wernanmail/server/internal/queue"
@@ -71,6 +72,16 @@ func (p *Inbound) Process(ctx context.Context, in ProcessInput) Result {
 	if maxBytes > 0 && len(raw) > maxBytes {
 		return Result{Action: domain.SpamReject, Err: fmt.Errorf("message too large"), SMTPMessage: "message too large"}
 	}
+
+	authHost := strings.TrimSpace(in.Hostname)
+	if authHost == "" {
+		authHost = "localhost"
+	}
+	checker := &dnsauth.Checker{}
+	spfRes := checker.CheckSPF(ctx, in.From, in.RemoteIP)
+	dkimRes := checker.CheckDKIM(ctx, raw)
+	arcRes := checker.CheckARC(raw)
+	raw = dnsauth.PrependAuthResults(raw, authHost, spfRes, dkimRes, arcRes)
 	raw = received.Prepend(raw, in.Helo, in.RemoteIP, in.Hostname, in.AuthUser)
 
 	headers := parseHeaders(raw)

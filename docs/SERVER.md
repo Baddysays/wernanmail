@@ -49,7 +49,7 @@ Web client ────► existing BFF (Phase 1) ──► this IMAP/SMTP
 | `pipeline` | Inbound: spam → AV → enqueue / quarantine |
 | `antispam` | Scoring engine (SPF/DKIM/DMARC hooks, RBL, heuristics) |
 | `antivirus` | `Scanner` interface; `light`/`noop`; optional ClamAV on larger hosts |
-| `dnsauth` | SPF verify, DKIM sign/verify, DMARC |
+| `dnsauth` | SPF verify, DKIM sign/verify, ARC seal/verify, Authentication-Results |
 | `outbound` | MX resolve + SMTP client |
 | `smtpd` / `imapd` | Protocol daemons |
 | `adminapi` | Admin REST |

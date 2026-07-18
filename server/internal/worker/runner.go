@@ -260,6 +260,23 @@ func (r *Runner) handle(ctx context.Context, job *domain.QueueJob) error {
 					} else {
 						log.Printf("dkim sign: %v", err)
 					}
+					authHost := r.Hostname
+					if authHost == "" {
+						authHost = d.Name
+					}
+					sel := d.DKIMSelector
+					if sel == "" {
+						sel = "wernan"
+					}
+					sealed, err := dnsauth.SealARC(raw, d.Name, sel, d.DKIMPrivate, authHost, []string{
+						"dkim=pass header.d=" + d.Name,
+						"spf=none smtp.mailfrom=" + p.From,
+					})
+					if err == nil {
+						raw = sealed
+					} else {
+						log.Printf("arc seal: %v", err)
+					}
 				}
 			} else {
 				raw = outbound.EnsureRFCHeaders(raw, idHost)
