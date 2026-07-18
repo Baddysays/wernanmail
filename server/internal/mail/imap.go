@@ -105,12 +105,16 @@ func folderHasAttr(attrs []string, want string) bool {
 }
 
 // ListMessages fetches recent message summaries from a folder.
-func ListMessages(creds session.Credentials, folder string, limit uint32) ([]MessageSummary, error) {
+// offset skips the newest N messages (for "load more" older pages).
+func ListMessages(creds session.Credentials, folder string, limit, offset uint32) ([]MessageSummary, error) {
 	if folder == "" {
 		folder = "INBOX"
 	}
 	if limit == 0 {
 		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
 	}
 
 	c, err := ConnectIMAP(creds)
@@ -123,17 +127,25 @@ func ListMessages(creds session.Credentials, folder string, limit uint32) ([]Mes
 	if err != nil {
 		return nil, err
 	}
-	if mbox.Messages == 0 {
+	if mbox.Messages == 0 || offset >= mbox.Messages {
 		return []MessageSummary{}, nil
 	}
 
-	from := uint32(1)
-	if mbox.Messages > limit {
-		from = mbox.Messages - limit + 1
+	to := mbox.Messages - offset
+	available := to
+	take := limit
+	if available < take {
+		take = available
 	}
-	seqset := new(imap.SeqSet)
-	seqset.AddRange(from, mbox.Messages)
+	from := uint32(1)
+	if to > take {
+		from = to - take + 1
+	}
 
+	seqset := new(imap.SeqSet)
+	seqset.AddRange(from, to)
+
+	previewSec := previewBodySection()
 	items := []imap.FetchItem{
 		imap.FetchEnvelope,
 		imap.FetchFlags,
@@ -141,9 +153,10 @@ func ListMessages(creds session.Credentials, folder string, limit uint32) ([]Mes
 		imap.FetchRFC822Size,
 		imap.FetchInternalDate,
 		imap.FetchBodyStructure,
+		previewSec.FetchItem(),
 	}
 
-	messages := make(chan *imap.Message, int(limit))
+	messages := make(chan *imap.Message, int(take))
 	done := make(chan error, 1)
 	go func() {
 		done <- c.Fetch(seqset, items, messages)
@@ -169,6 +182,7 @@ func ListMessages(creds session.Credentials, folder string, limit uint32) ([]Mes
 			Size:          msg.Size,
 			HasAttachment: bodyStructureHasAttachment(msg.BodyStructure),
 			MessageID:     msg.Envelope.MessageId,
+			Preview:       previewFromMessage(msg, previewSec),
 		}
 		out = append(out, sum)
 	}
@@ -628,7 +642,7 @@ func AppendDraft(creds session.Credentials, raw []byte) error {
 func SearchMessages(creds session.Credentials, folder, query string, limit uint32) ([]MessageSummary, error) {
 	query = strings.TrimSpace(query)
 	if query == "" {
-		return ListMessages(creds, folder, limit)
+		return ListMessages(creds, folder, limit, 0)
 	}
 	if folder == "" {
 		folder = "INBOX"
@@ -666,6 +680,7 @@ func SearchMessages(creds session.Credentials, folder, query string, limit uint3
 
 	seqset := new(imap.SeqSet)
 	seqset.AddNum(uids...)
+	previewSec := previewBodySection()
 	items := []imap.FetchItem{
 		imap.FetchEnvelope,
 		imap.FetchFlags,
@@ -673,6 +688,7 @@ func SearchMessages(creds session.Credentials, folder, query string, limit uint3
 		imap.FetchRFC822Size,
 		imap.FetchInternalDate,
 		imap.FetchBodyStructure,
+		previewSec.FetchItem(),
 	}
 	messages := make(chan *imap.Message, len(uids))
 	done := make(chan error, 1)
@@ -700,6 +716,7 @@ func SearchMessages(creds session.Credentials, folder, query string, limit uint3
 			Size:          msg.Size,
 			HasAttachment: bodyStructureHasAttachment(msg.BodyStructure),
 			MessageID:     msg.Envelope.MessageId,
+			Preview:       previewFromMessage(msg, previewSec),
 		}
 	}
 	if err := <-done; err != nil {

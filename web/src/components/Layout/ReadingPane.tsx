@@ -5,11 +5,15 @@ import type { UiMessage } from '../../api/types'
 import { formatBytes, formatMessageDate } from '../../utils/format'
 import { useSettings } from '../../store/settings'
 import {
+  IconArchive,
   IconDownload,
+  IconEdit,
   IconForward,
+  IconMarkUnread,
   IconPaperclip,
   IconReply,
   IconReplyAll,
+  IconSpam,
   IconStar,
   IconTrash,
 } from '../icons'
@@ -18,11 +22,18 @@ import styles from './ReadingPane.module.css'
 type ReadingPaneProps = {
   message: UiMessage | null
   loading?: boolean
+  isDraft?: boolean
+  canArchive?: boolean
+  canSpam?: boolean
   onBack?: () => void
   onReply?: (message: UiMessage) => void
   onReplyAll?: (message: UiMessage) => void
   onForward?: (message: UiMessage) => void
   onTrash?: (message: UiMessage) => void
+  onArchive?: (message: UiMessage) => void
+  onSpam?: (message: UiMessage) => void
+  onEditDraft?: (message: UiMessage) => void
+  onMarkUnread?: (message: UiMessage) => void
   onToggleStar?: (message: UiMessage) => void
   onDownloadError?: () => void
 }
@@ -52,11 +63,18 @@ blockquote{margin:0.5em 0;padding-left:0.85em;border-left:3px solid #ccc;color:#
 export function ReadingPane({
   message,
   loading,
+  isDraft,
+  canArchive,
+  canSpam,
   onBack,
   onReply,
   onReplyAll,
   onForward,
   onTrash,
+  onArchive,
+  onSpam,
+  onEditDraft,
+  onMarkUnread,
   onToggleStar,
   onDownloadError,
 }: ReadingPaneProps) {
@@ -137,6 +155,17 @@ export function ReadingPane({
           <span className={styles.folderTag}>{message.folder}</span>
         </div>
         <div className={styles.actions}>
+          {isDraft && onEditDraft ? (
+            <button
+              type="button"
+              className={styles.iconBtn}
+              aria-label={t('mail.editDraft')}
+              title={t('mail.editDraft')}
+              onClick={() => onEditDraft(message)}
+            >
+              <IconEdit size={17} />
+            </button>
+          ) : null}
           <button
             type="button"
             className={styles.iconBtn}
@@ -146,33 +175,70 @@ export function ReadingPane({
           >
             <IconStar size={17} filled={message.starred} />
           </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            aria-label={t('mail.reply')}
-            title={t('mail.reply')}
-            onClick={() => onReply?.(message)}
-          >
-            <IconReply size={17} />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            aria-label={t('mail.replyAll')}
-            title={t('mail.replyAll')}
-            onClick={() => onReplyAll?.(message)}
-          >
-            <IconReplyAll size={17} />
-          </button>
-          <button
-            type="button"
-            className={styles.iconBtn}
-            aria-label={t('mail.forward')}
-            title={t('mail.forward')}
-            onClick={() => onForward?.(message)}
-          >
-            <IconForward size={17} />
-          </button>
+          {!isDraft ? (
+            <>
+              <button
+                type="button"
+                className={styles.iconBtn}
+                aria-label={t('mail.reply')}
+                title={t('mail.reply')}
+                onClick={() => onReply?.(message)}
+              >
+                <IconReply size={17} />
+              </button>
+              <button
+                type="button"
+                className={styles.iconBtn}
+                aria-label={t('mail.replyAll')}
+                title={t('mail.replyAll')}
+                onClick={() => onReplyAll?.(message)}
+              >
+                <IconReplyAll size={17} />
+              </button>
+              <button
+                type="button"
+                className={styles.iconBtn}
+                aria-label={t('mail.forward')}
+                title={t('mail.forward')}
+                onClick={() => onForward?.(message)}
+              >
+                <IconForward size={17} />
+              </button>
+            </>
+          ) : null}
+          {onMarkUnread ? (
+            <button
+              type="button"
+              className={styles.iconBtn}
+              aria-label={t('mail.markUnread')}
+              title={t('mail.markUnread')}
+              onClick={() => onMarkUnread(message)}
+            >
+              <IconMarkUnread size={17} />
+            </button>
+          ) : null}
+          {canArchive && onArchive ? (
+            <button
+              type="button"
+              className={styles.iconBtn}
+              aria-label={t('mail.archive')}
+              title={t('mail.archive')}
+              onClick={() => onArchive(message)}
+            >
+              <IconArchive size={17} />
+            </button>
+          ) : null}
+          {canSpam && onSpam ? (
+            <button
+              type="button"
+              className={styles.iconBtn}
+              aria-label={t('mail.spam')}
+              title={t('mail.spam')}
+              onClick={() => onSpam(message)}
+            >
+              <IconSpam size={17} />
+            </button>
+          ) : null}
           <button
             type="button"
             className={styles.iconBtn}
@@ -257,18 +323,33 @@ export function ReadingPane({
       </div>
 
       <footer className={styles.footer}>
-        <button type="button" className={styles.footerBtn} onClick={() => onReply?.(message)}>
-          <IconReply size={15} />
-          {t('mail.reply')}
-        </button>
-        <button type="button" className={styles.footerBtn} onClick={() => onReplyAll?.(message)}>
-          <IconReplyAll size={15} />
-          {t('mail.replyAll')}
-        </button>
-        <button type="button" className={styles.footerBtn} onClick={() => onForward?.(message)}>
-          <IconForward size={15} />
-          {t('mail.forward')}
-        </button>
+        {isDraft && onEditDraft ? (
+          <button type="button" className={styles.footerBtn} onClick={() => onEditDraft(message)}>
+            <IconEdit size={15} />
+            {t('mail.editDraft')}
+          </button>
+        ) : (
+          <>
+            <button type="button" className={styles.footerBtn} onClick={() => onReply?.(message)}>
+              <IconReply size={15} />
+              {t('mail.reply')}
+            </button>
+            <button type="button" className={styles.footerBtn} onClick={() => onReplyAll?.(message)}>
+              <IconReplyAll size={15} />
+              {t('mail.replyAll')}
+            </button>
+            <button type="button" className={styles.footerBtn} onClick={() => onForward?.(message)}>
+              <IconForward size={15} />
+              {t('mail.forward')}
+            </button>
+          </>
+        )}
+        {canArchive && onArchive ? (
+          <button type="button" className={styles.footerBtn} onClick={() => onArchive(message)}>
+            <IconArchive size={15} />
+            {t('mail.archive')}
+          </button>
+        ) : null}
         <button
           type="button"
           className={`${styles.footerBtn} ${styles.footerDanger}`}

@@ -28,8 +28,10 @@ export function Sidebar({
       </button>
 
       <nav className={styles.nav} aria-label={t('nav.folders')}>
-        {folders.map((folder) => {
+        {folders.map((folder, index) => {
           const role = folderRole(folder)
+          const prevRole = index > 0 ? folderRole(folders[index - 1]) : null
+          const showMoreLabel = role === 'other' && prevRole !== 'other'
           const active = folder.name === activeFolder
           const label =
             role === 'other'
@@ -37,25 +39,32 @@ export function Sidebar({
               : t(`nav.${role}`, { defaultValue: folder.name })
           const unseen = folder.unseen ?? 0
           return (
-            <button
-              key={folder.name}
-              type="button"
-              className={`${styles.navItem} ${active ? styles.navItemActive : ''} ${role === 'spam' ? styles.navSpam : ''}`}
-              onClick={() => onSelectFolder(folder.name)}
-            >
-              <FolderIcon role={role} />
-              <span className={styles.navLabel}>{label}</span>
-              {unseen > 0 ? (
-                <span className={`${styles.navCount} ${styles.navBadge}`} aria-label={t('mail.unread', { count: unseen })}>
-                  {unseen > 99 ? '99+' : unseen}
-                </span>
+            <div key={folder.name}>
+              {showMoreLabel ? (
+                <p className={styles.sectionLabel}>{t('nav.moreFolders')}</p>
               ) : null}
-            </button>
+              <button
+                type="button"
+                className={`${styles.navItem} ${active ? styles.navItemActive : ''} ${role === 'spam' ? styles.navSpam : ''}`}
+                onClick={() => onSelectFolder(folder.name)}
+              >
+                <FolderIcon role={role} />
+                <span className={styles.navLabel}>{label}</span>
+                {unseen > 0 ? (
+                  <span
+                    className={`${styles.navCount} ${styles.navBadge}`}
+                    aria-label={t('mail.unread', { count: unseen })}
+                  >
+                    {unseen > 99 ? '99+' : unseen}
+                  </span>
+                ) : null}
+              </button>
+            </div>
           )
         })}
       </nav>
 
-      <p className={styles.sectionLabel}>{t('nav.settings')}</p>
+      <p className={`${styles.sectionLabel} ${styles.sectionLabelFooter}`}>{t('nav.settings')}</p>
       <nav className={styles.nav}>
         <Link to="/settings" className={styles.navItem}>
           <SettingsIcon />

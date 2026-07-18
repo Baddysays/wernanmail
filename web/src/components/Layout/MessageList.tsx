@@ -9,11 +9,15 @@ type MessageListProps = {
   messages: UiMessage[]
   selectedId: string | null
   loading?: boolean
+  loadingMore?: boolean
+  hasMore?: boolean
   folderRole?: FolderRole
   searchQuery?: string
   onSearchChange?: (q: string) => void
   onSelect: (id: string) => void
+  onOpen?: (id: string) => void
   onRefresh?: () => void
+  onLoadMore?: () => void
   onToggleStar?: (id: string) => void
   onTrashSelected?: () => void
   onCompose?: () => void
@@ -24,11 +28,15 @@ export function MessageList({
   messages,
   selectedId,
   loading,
+  loadingMore,
+  hasMore,
   folderRole = 'other',
   searchQuery = '',
   onSearchChange,
   onSelect,
+  onOpen,
   onRefresh,
+  onLoadMore,
   onToggleStar,
   onTrashSelected,
   onCompose,
@@ -156,10 +164,12 @@ export function MessageList({
                   .filter(Boolean)
                   .join(' ')}
                 onClick={() => onSelect(message.id)}
+                onDoubleClick={() => onOpen?.(message.id)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault()
-                    onSelect(message.id)
+                    if (folderRole === 'drafts' && onOpen) onOpen(message.id)
+                    else onSelect(message.id)
                   }
                 }}
                 tabIndex={0}
@@ -196,6 +206,18 @@ export function MessageList({
               </div>
             )
           })}
+          {hasMore ? (
+            <div className={styles.loadMore}>
+              <button
+                type="button"
+                className={styles.loadMoreBtn}
+                onClick={onLoadMore}
+                disabled={loadingMore}
+              >
+                {loadingMore ? t('common.loading') : t('mail.loadMore')}
+              </button>
+            </div>
+          ) : null}
         </div>
       )}
     </section>

@@ -13,20 +13,31 @@ export type ComposeAttachment = {
 export type ComposeDraft = {
   to?: string
   cc?: string
+  bcc?: string
   subject?: string
   body?: string
   html?: string
   inReplyTo?: string
   references?: string
   attachments?: ComposeAttachment[]
+  /** When set, a successful save/send should delete this previous draft UID. */
+  replaceDraftId?: string
+  replaceDraftFolder?: string
 }
 
 type ComposeDialogProps = {
   open: boolean
   draft?: ComposeDraft | null
   onClose: () => void
-  onSent?: (info: { to: string[] }) => void
-  onDraftSaved?: () => void
+  onSent?: (info: {
+    to: string[]
+    replaceDraftId?: string
+    replaceDraftFolder?: string
+  }) => void
+  onDraftSaved?: (info: {
+    replaceDraftId?: string
+    replaceDraftFolder?: string
+  }) => void
 }
 
 type PendingFile =
@@ -86,19 +97,25 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [to, setTo] = useState('')
   const [cc, setCc] = useState('')
+  const [bcc, setBcc] = useState('')
   const [showCc, setShowCc] = useState(false)
+  const [showBcc, setShowBcc] = useState(false)
   const [subject, setSubject] = useState('')
   const [files, setFiles] = useState<PendingFile[]>([])
   const [status, setStatus] = useState<'idle' | 'sending' | 'saving'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const busy = status !== 'idle'
+  const replaceDraftId = draft?.replaceDraftId
+  const replaceDraftFolder = draft?.replaceDraftFolder
 
   useEffect(() => {
     if (!open) return
     setTo(draft?.to ?? '')
     setCc(draft?.cc ?? '')
+    setBcc(draft?.bcc ?? '')
     setShowCc(Boolean(draft?.cc))
+    setShowBcc(Boolean(draft?.bcc))
     setSubject(draft?.subject ?? '')
     setFiles(
       (draft?.attachments ?? []).map((att, i) => ({
@@ -200,6 +217,7 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
     return {
       to: recipients,
       cc: showCc ? splitAddresses(cc) : [],
+      bcc: showBcc ? splitAddresses(bcc) : [],
       subject: subject.trim(),
       text: text || '',
       html,
@@ -221,7 +239,11 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
       }
       await sendMessage(payload)
       setDirty(false)
-      onSent?.({ to: payload.to })
+      onSent?.({
+        to: payload.to,
+        replaceDraftId,
+        replaceDraftFolder,
+      })
       onClose()
     } catch (err) {
       if (err instanceof ApiError) {
@@ -249,7 +271,10 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
       }
       await saveDraft(payload)
       setDirty(false)
-      onDraftSaved?.()
+      onDraftSaved?.({
+        replaceDraftId,
+        replaceDraftFolder,
+      })
       onClose()
     } catch (err) {
       if (err instanceof ApiError) {
@@ -316,6 +341,15 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
                 {t('compose.cc')}
               </button>
             ) : null}
+            {!showBcc ? (
+              <button
+                type="button"
+                className={styles.ccToggle}
+                onClick={() => setShowBcc(true)}
+              >
+                {t('compose.bcc')}
+              </button>
+            ) : null}
           </div>
 
           {showCc ? (
@@ -332,6 +366,25 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
                   setDirty(true)
                 }}
                 placeholder={t('compose.ccPlaceholder')}
+                autoComplete="email"
+              />
+            </div>
+          ) : null}
+
+          {showBcc ? (
+            <div className={styles.row}>
+              <label className={styles.label} htmlFor="compose-bcc">
+                {t('compose.bcc')}
+              </label>
+              <input
+                id="compose-bcc"
+                className={styles.input}
+                value={bcc}
+                onChange={(e) => {
+                  setBcc(e.target.value)
+                  setDirty(true)
+                }}
+                placeholder={t('compose.bccPlaceholder')}
                 autoComplete="email"
               />
             </div>

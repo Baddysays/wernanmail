@@ -16,7 +16,8 @@
     "logout": "Log out",
     "folders": "Folders",
     "search": "Search mail",
-    "help": "Help"
+    "help": "Help",
+    "moreFolders": "More folders"
   },
   "login": {
     "title": "Sign in",
@@ -108,7 +109,14 @@
     "undo": "Undo",
     "restored": "Message restored",
     "imagesBlocked": "Remote images are blocked to protect privacy",
-    "showImages": "Show images"
+    "showImages": "Show images",
+    "archive": "Archive",
+    "archived": "Moved to Archive",
+    "spam": "Report spam",
+    "spammed": "Moved to Spam",
+    "editDraft": "Edit draft",
+    "markUnread": "Mark unread",
+    "loadMore": "Load older messages"
   },
   "errors": {
     "generic": "Something went wrong",
@@ -140,9 +148,11 @@
     "title": "New message",
     "to": "To",
     "cc": "Cc",
+    "bcc": "Bcc",
     "subject": "Subject",
     "toPlaceholder": "name@example.com",
     "ccPlaceholder": "optional",
+    "bccPlaceholder": "optional",
     "subjectPlaceholder": "Subject",
     "bodyPlaceholder": "Write your message…",
     "send": "Send",

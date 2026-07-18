@@ -29,8 +29,17 @@ func (h *Handler) ListMessages(w http.ResponseWriter, r *http.Request) {
 		}
 		limit = uint32(n)
 	}
+	var offset uint32
+	if raw := r.URL.Query().Get("offset"); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 || n > 100_000 {
+			writeError(w, http.StatusBadRequest, CodeInvalidRequest)
+			return
+		}
+		offset = uint32(n)
+	}
 
-	msgs, err := mail.ListMessages(sess.Creds, folder, limit)
+	msgs, err := mail.ListMessages(sess.Creds, folder, limit, offset)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, CodeFetchFailed)
 		return

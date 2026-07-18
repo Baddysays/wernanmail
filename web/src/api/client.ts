@@ -100,8 +100,9 @@ export function fetchFolders() {
   return apiGet<import('./types').Folder[]>('/api/folders')
 }
 
-export function fetchMessages(folder: string, limit = 50) {
+export function fetchMessages(folder: string, limit = 50, offset = 0) {
   const q = new URLSearchParams({ folder, limit: String(limit) })
+  if (offset > 0) q.set('offset', String(offset))
   return apiGet<import('./types').MessageSummary[]>(`/api/messages?${q}`)
 }
 

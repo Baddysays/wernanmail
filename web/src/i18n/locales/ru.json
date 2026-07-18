@@ -16,7 +16,8 @@
     "logout": "Выйти",
     "folders": "Папки",
     "search": "Поиск писем",
-    "help": "Справка"
+    "help": "Справка",
+    "moreFolders": "Другие папки"
   },
   "login": {
     "title": "Вход",
@@ -108,7 +109,14 @@
     "undo": "Отменить",
     "restored": "Письмо возвращено",
     "imagesBlocked": "Внешние картинки скрыты для защиты приватности",
-    "showImages": "Показать"
+    "showImages": "Показать",
+    "archive": "В архив",
+    "archived": "Перемещено в Архив",
+    "spam": "Это спам",
+    "spammed": "Перемещено в Спам",
+    "editDraft": "Редактировать",
+    "markUnread": "Непрочитанное",
+    "loadMore": "Загрузить старые"
   },
   "errors": {
     "generic": "Что-то пошло не так",
@@ -135,9 +143,11 @@
     "title": "Новое письмо",
     "to": "Кому",
     "cc": "Копия",
+    "bcc": "Скрытая",
     "subject": "Тема",
     "toPlaceholder": "name@example.com",
     "ccPlaceholder": "необязательно",
+    "bccPlaceholder": "необязательно",
     "subjectPlaceholder": "Тема",
     "bodyPlaceholder": "Напишите сообщение…",
     "send": "Отправить",

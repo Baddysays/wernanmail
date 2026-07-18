@@ -29,6 +29,7 @@ type MessageSummary struct {
 	Size          uint32    `json:"size,omitempty"`
 	HasAttachment bool      `json:"hasAttachment,omitempty"`
 	MessageID     string    `json:"messageId,omitempty"`
+	Preview       string    `json:"preview,omitempty"`
 }
 
 // AttachmentMeta describes an attachment without its payload.

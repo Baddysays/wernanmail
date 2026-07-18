@@ -114,3 +114,37 @@ export function IconDownload({ size, className }: IconProps) {
     </Svg>
   )
 }
+
+export function IconArchive({ size, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path d="M4 7h16v2H4V7zM6 9v10h12V9M10 13h4" {...stroke} />
+    </Svg>
+  )
+}
+
+export function IconSpam({ size, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path d="M12 3l9 16H3L12 3zM12 10v4M12 17h.01" {...stroke} />
+    </Svg>
+  )
+}
+
+export function IconEdit({ size, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3z" {...stroke} />
+      <path d="M13 6l3 3" {...stroke} />
+    </Svg>
+  )
+}
+
+export function IconMarkUnread({ size, className }: IconProps) {
+  return (
+    <Svg size={size} className={className}>
+      <path d="M4 6h16v12H4V6zm0 0l8 6 8-6" {...stroke} />
+    </Svg>
+  )
+}
+

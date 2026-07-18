@@ -29,6 +29,7 @@ export type MessageSummary = {
   size?: number
   hasAttachment?: boolean
   messageId?: string
+  preview?: string
 }
 
 export type MessageDetail = MessageSummary & {
@@ -75,15 +76,15 @@ export function folderRole(folder: Folder): FolderRole {
   }
   if (attrs.some((a) => a.includes('sent'))) return 'sent'
   if (attrs.some((a) => a.includes('draft'))) return 'drafts'
-  if (attrs.some((a) => a.includes('archive') || a.includes('all'))) return 'archive'
+  if (attrs.some((a) => a.includes('archive'))) return 'archive'
   if (attrs.some((a) => a.includes('junk') || a.includes('spam'))) return 'spam'
   if (attrs.some((a) => a.includes('trash') || a.includes('bin'))) return 'trash'
   const n = folder.name.toLowerCase()
-  if (n.includes('sent')) return 'sent'
-  if (n.includes('draft')) return 'drafts'
-  if (n.includes('spam') || n.includes('junk')) return 'spam'
-  if (n.includes('trash') || n.includes('deleted')) return 'trash'
-  if (n.includes('archive')) return 'archive'
+  if (n.includes('sent') || n.includes('отправлен')) return 'sent'
+  if (n.includes('draft') || n.includes('чернов')) return 'drafts'
+  if (n.includes('spam') || n.includes('junk') || n.includes('спам')) return 'spam'
+  if (n.includes('trash') || n.includes('deleted') || n.includes('корзин')) return 'trash'
+  if (n.includes('archive') || n.includes('архив')) return 'archive'
   return 'other'
 }
 
@@ -107,7 +108,7 @@ export function summaryToUi(msg: MessageSummary, folder: string): UiMessage {
     from,
     to,
     subject: msg.subject,
-    preview: '',
+    preview: (msg.preview ?? '').trim(),
     body: '',
     date: msg.date,
     unread: !seen,

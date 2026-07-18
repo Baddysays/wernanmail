@@ -235,6 +235,37 @@
   color: var(--text-muted);
 }
 
+.loadMore {
+  padding: 0.65rem 0.85rem 1rem;
+}
+
+.loadMoreBtn {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: var(--radius-md);
+  padding: 0.45rem 0.75rem;
+  font: inherit;
+  cursor: pointer;
+  transition: background 140ms var(--ease-out), color 140ms var(--ease-out),
+    transform 120ms var(--ease-out);
+}
+
+.loadMoreBtn:hover:not(:disabled) {
+  background: var(--bg-muted);
+  color: var(--text-primary);
+}
+
+.loadMoreBtn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.loadMoreBtn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
 .empty {
   display: grid;
   place-content: center;
