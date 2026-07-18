@@ -169,21 +169,30 @@ func (h *Handler) SendMessage(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) SaveDraft(w http.ResponseWriter, r *http.Request) {
 	sess := sessionFrom(r)
 	r.Body = http.MaxBytesReader(w, r.Body, 32<<20)
-	var req mail.SendRequest
-	if err := decodeJSON(r, &req); err != nil {
+	var body struct {
+		mail.SendRequest
+		ReplaceID     string `json:"replaceId"`
+		ReplaceFolder string `json:"replaceFolder"`
+	}
+	if err := decodeJSON(r, &body); err != nil {
 		writeError(w, http.StatusBadRequest, CodeInvalidRequest)
 		return
 	}
-	if _, err := mail.DecodeOutboundAttachments(req.Attachments); err != nil {
+	if _, err := mail.DecodeOutboundAttachments(body.Attachments); err != nil {
 		writeError(w, http.StatusBadRequest, CodeInvalidRequest)
 		return
 	}
-	if err := mail.SaveDraft(sess.Creds, req); err != nil {
+	id, folder, err := mail.SaveDraft(sess.Creds, body.SendRequest, body.ReplaceID, body.ReplaceFolder)
+	if err != nil {
 		log.Printf("draft failed user=%s: %v", sess.Creds.Username, err)
 		writeError(w, http.StatusBadGateway, CodeSendFailed)
 		return
 	}
-	writeData(w, http.StatusOK, map[string]string{"status": "draft"})
+	writeData(w, http.StatusOK, map[string]string{
+		"status": "draft",
+		"id":     id,
+		"folder": folder,
+	})
 }
 
 func (h *Handler) UpdateMessageFlags(w http.ResponseWriter, r *http.Request) {

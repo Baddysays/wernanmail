@@ -175,7 +175,10 @@
     "draftFailed": "Could not save the draft",
     "draftSaved": "Draft saved",
     "viewDraft": "Open Drafts",
-    "discardConfirm": "Discard this message?"
+    "discardConfirm": "Discard this message?",
+    "autosaving": "Saving draft…",
+    "autosaved": "Draft saved",
+    "autosaveFailed": "Could not autosave"
   },
   "mailport": {
     "title": "Embed mail into your product",

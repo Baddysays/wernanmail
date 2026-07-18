@@ -28,13 +28,30 @@ const (
 )
 
 // SaveDraft builds MIME and APPEND to the Drafts mailbox.
-func SaveDraft(creds session.Credentials, req SendRequest) error {
+// replaceID/replaceFolder, when set, delete the previous draft copy after a successful append.
+func SaveDraft(creds session.Credentials, req SendRequest, replaceID, replaceFolder string) (id, folder string, err error) {
 	if _, err := DecodeOutboundAttachments(req.Attachments); err != nil {
-		return err
+		return "", "", err
 	}
 	from := creds.Username
 	raw := buildMIME(from, req, creds.SMTPHost, false)
-	return AppendDraft(creds, raw)
+	uid, folder, err := AppendDraft(creds, raw)
+	if err != nil {
+		return "", "", err
+	}
+	if replaceID != "" {
+		rf := replaceFolder
+		if rf == "" {
+			rf = folder
+		}
+		if rf != "" && !(rf == folder && replaceID == fmt.Sprintf("%d", uid)) {
+			_ = DeleteMessage(creds, rf, replaceID)
+		}
+	}
+	if uid == 0 {
+		return "", folder, nil
+	}
+	return fmt.Sprintf("%d", uid), folder, nil
 }
 
 // SendMessageWithPolicy applies body templates/footers before MIME build so Sent matches outbound.

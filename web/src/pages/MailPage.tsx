@@ -785,23 +785,24 @@ export function MailPage() {
         draft={composeDraft}
         onClose={closeCompose}
         onDraftSaved={(info) => {
-          void (async () => {
-            await discardReplacedDraft(info)
-            pushToast({
-              tone: 'success',
-              title: t('compose.draftSaved'),
-              actionLabel: t('compose.viewDraft'),
-              onAction: () => {
-                const drafts = sidebarFolders.find((f) => folderRole(f) === 'drafts')
-                if (drafts) {
-                  setFolderName(drafts.name)
-                  void loadMessages(drafts.name)
-                }
-              },
-            })
+          if (info.silent) {
             void loadFolders()
-            if (activeRole === 'drafts') void loadMessages(folderName)
-          })()
+            return
+          }
+          pushToast({
+            tone: 'success',
+            title: t('compose.draftSaved'),
+            actionLabel: t('compose.viewDraft'),
+            onAction: () => {
+              const drafts = sidebarFolders.find((f) => folderRole(f) === 'drafts')
+              if (drafts) {
+                setFolderName(drafts.name)
+                void loadMessages(drafts.name)
+              }
+            },
+          })
+          void loadFolders()
+          if (activeRole === 'drafts') void loadMessages(folderName)
         }}
         onSent={(info) => {
           void (async () => {

@@ -35,8 +35,9 @@ type ComposeDialogProps = {
     replaceDraftFolder?: string
   }) => void
   onDraftSaved?: (info: {
-    replaceDraftId?: string
-    replaceDraftFolder?: string
+    id?: string
+    folder?: string
+    silent?: boolean
   }) => void
 }
 
@@ -46,6 +47,7 @@ type PendingFile =
 
 const MAX_FILE_BYTES = 15 * 1024 * 1024
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024
+const AUTOSAVE_MS = 2500
 
 function splitAddresses(raw: string): string[] {
   return raw
@@ -103,11 +105,25 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
   const [subject, setSubject] = useState('')
   const [files, setFiles] = useState<PendingFile[]>([])
   const [status, setStatus] = useState<'idle' | 'sending' | 'saving'>('idle')
+  const [autosaveHint, setAutosaveHint] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [error, setError] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
+  const [draftId, setDraftId] = useState<string | undefined>()
+  const [draftFolder, setDraftFolder] = useState<string | undefined>()
   const busy = status !== 'idle'
-  const replaceDraftId = draft?.replaceDraftId
-  const replaceDraftFolder = draft?.replaceDraftFolder
+  const draftMetaRef = useRef({ id: undefined as string | undefined, folder: undefined as string | undefined })
+  const savingRef = useRef(false)
+  const openRef = useRef(open)
+  const inReplyTo = draft?.inReplyTo
+  const references = draft?.references
+
+  useEffect(() => {
+    openRef.current = open
+  }, [open])
+
+  useEffect(() => {
+    draftMetaRef.current = { id: draftId, folder: draftFolder }
+  }, [draftId, draftFolder])
 
   useEffect(() => {
     if (!open) return
@@ -125,8 +141,11 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
         size: estimateB64Size(att.content),
       })),
     )
+    setDraftId(draft?.replaceDraftId)
+    setDraftFolder(draft?.replaceDraftFolder)
     setError(null)
     setStatus('idle')
+    setAutosaveHint('idle')
     setDirty(false)
     const timer = window.setTimeout(() => {
       const el = editorRef.current
@@ -140,13 +159,132 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
     return () => window.clearTimeout(timer)
   }, [open, draft])
 
-  function requestClose() {
-    if (busy) return
+  function markDirty() {
+    setDirty(true)
+    setAutosaveHint((h) => (h === 'saved' ? 'idle' : h))
+  }
+
+  function readEditor() {
+    const editor = editorRef.current
+    const htmlRaw = (editor?.innerHTML ?? '').trim()
+    const text = (editor?.innerText ?? '').replace(/\u00a0/g, ' ').trim()
+    const html =
+      htmlRaw && htmlRaw !== '<br>' && htmlRaw !== '<div><br></div>'
+        ? htmlRaw
+        : undefined
+    return { text, html }
+  }
+
+  function hasMeaningfulContent(
+    toVal: string,
+    ccVal: string,
+    bccVal: string,
+    subjectVal: string,
+    text: string,
+    fileCount: number,
+  ) {
+    return Boolean(
+      splitAddresses(toVal).length ||
+        splitAddresses(ccVal).length ||
+        splitAddresses(bccVal).length ||
+        subjectVal.trim() ||
+        text.trim() ||
+        fileCount > 0,
+    )
+  }
+
+  async function buildPayload(requireTo: boolean) {
+    const recipients = splitAddresses(to)
+    if (requireTo && recipients.length === 0) {
+      setError(t('compose.toRequired'))
+      return null
+    }
+    const { text, html } = readEditor()
+    const attachments: ComposeAttachment[] = []
+    for (const item of files) {
+      if (item.kind === 'ready') attachments.push(item.att)
+      else attachments.push(await fileToAttachment(item.file))
+    }
+    return {
+      to: recipients,
+      cc: showCc ? splitAddresses(cc) : [],
+      bcc: showBcc ? splitAddresses(bcc) : [],
+      subject: subject.trim(),
+      text: text || '',
+      html,
+      attachments: attachments.length ? attachments : undefined,
+      inReplyTo,
+      references,
+    }
+  }
+
+  async function persistDraft(opts: { silent: boolean; closeAfter?: boolean }) {
+    if (savingRef.current || status === 'sending') return false
+    const { text } = readEditor()
     if (
-      dirty &&
-      !window.confirm(t('compose.discardConfirm'))
+      !hasMeaningfulContent(to, showCc ? cc : '', showBcc ? bcc : '', subject, text, files.length)
     ) {
-      return
+      return false
+    }
+    savingRef.current = true
+    if (opts.silent) setAutosaveHint('saving')
+    else {
+      setError(null)
+      setStatus('saving')
+    }
+    try {
+      const payload = await buildPayload(false)
+      if (!payload) return false
+      const meta = draftMetaRef.current
+      const result = await saveDraft({
+        ...payload,
+        replaceId: meta.id,
+        replaceFolder: meta.folder,
+      })
+      if (result.id) {
+        setDraftId(result.id)
+        draftMetaRef.current.id = result.id
+      }
+      if (result.folder) {
+        setDraftFolder(result.folder)
+        draftMetaRef.current.folder = result.folder
+      }
+      setDirty(false)
+      setAutosaveHint('saved')
+      onDraftSaved?.({
+        id: result.id || meta.id,
+        folder: result.folder || meta.folder,
+        silent: opts.silent,
+      })
+      if (opts.closeAfter) onClose()
+      return true
+    } catch (err) {
+      if (opts.silent) {
+        setAutosaveHint('error')
+      } else if (err instanceof ApiError) {
+        setError(
+          t(`errors.codes.${err.code}`, {
+            defaultValue: t('compose.draftFailed'),
+          }),
+        )
+      } else {
+        setError(t('errors.network'))
+      }
+      return false
+    } finally {
+      savingRef.current = false
+      if (!opts.silent) setStatus('idle')
+    }
+  }
+
+  async function requestClose() {
+    if (busy || savingRef.current) return
+    if (dirty) {
+      const { text } = readEditor()
+      if (hasMeaningfulContent(to, showCc ? cc : '', showBcc ? bcc : '', subject, text, files.length)) {
+        await persistDraft({ silent: true, closeAfter: true })
+        return
+      }
     }
     onClose()
   }
@@ -154,17 +292,28 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
   useEffect(() => {
     if (!open) return
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') requestClose()
+      if (e.key === 'Escape') void requestClose()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, busy, dirty, onClose])
+  }, [open, busy, dirty, to, cc, bcc, subject, files])
+
+  useEffect(() => {
+    if (!open || !dirty || busy) return
+    const timer = window.setTimeout(() => {
+      if (!openRef.current || savingRef.current) return
+      void persistDraft({ silent: true })
+    }, AUTOSAVE_MS)
+    return () => window.clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce on content edits
+  }, [open, dirty, to, cc, bcc, subject, files, busy])
 
   if (!open) return null
 
   function exec(cmd: string, value?: string) {
     editorRef.current?.focus()
     document.execCommand(cmd, false, value)
+    markDirty()
   }
 
   function addFiles(list: FileList | null) {
@@ -192,39 +341,8 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
       })
     }
     setFiles(next)
-    setDirty(true)
+    markDirty()
     if (fileInputRef.current) fileInputRef.current.value = ''
-  }
-
-  async function buildPayload(requireTo: boolean) {
-    const recipients = splitAddresses(to)
-    if (requireTo && recipients.length === 0) {
-      setError(t('compose.toRequired'))
-      return null
-    }
-    const editor = editorRef.current
-    const htmlRaw = (editor?.innerHTML ?? '').trim()
-    const text = (editor?.innerText ?? '').replace(/\u00a0/g, ' ').trim()
-    const html =
-      htmlRaw && htmlRaw !== '<br>' && htmlRaw !== '<div><br></div>'
-        ? htmlRaw
-        : undefined
-    const attachments: ComposeAttachment[] = []
-    for (const item of files) {
-      if (item.kind === 'ready') attachments.push(item.att)
-      else attachments.push(await fileToAttachment(item.file))
-    }
-    return {
-      to: recipients,
-      cc: showCc ? splitAddresses(cc) : [],
-      bcc: showBcc ? splitAddresses(bcc) : [],
-      subject: subject.trim(),
-      text: text || '',
-      html,
-      attachments: attachments.length ? attachments : undefined,
-      inReplyTo: draft?.inReplyTo,
-      references: draft?.references,
-    }
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -239,10 +357,11 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
       }
       await sendMessage(payload)
       setDirty(false)
+      const meta = draftMetaRef.current
       onSent?.({
         to: payload.to,
-        replaceDraftId,
-        replaceDraftFolder,
+        replaceDraftId: meta.id,
+        replaceDraftFolder: meta.folder,
       })
       onClose()
     } catch (err) {
@@ -261,38 +380,20 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
   }
 
   async function handleSaveDraft() {
-    setError(null)
-    setStatus('saving')
-    try {
-      const payload = await buildPayload(false)
-      if (!payload) {
-        setStatus('idle')
-        return
-      }
-      await saveDraft(payload)
-      setDirty(false)
-      onDraftSaved?.({
-        replaceDraftId,
-        replaceDraftFolder,
-      })
-      onClose()
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(
-          t(`errors.codes.${err.code}`, {
-            defaultValue: t('compose.draftFailed'),
-          }),
-        )
-      } else {
-        setError(t('errors.network'))
-      }
-    } finally {
-      setStatus('idle')
-    }
+    await persistDraft({ silent: false, closeAfter: true })
   }
 
+  const autosaveLabel =
+    autosaveHint === 'saving'
+      ? t('compose.autosaving')
+      : autosaveHint === 'saved'
+        ? t('compose.autosaved')
+        : autosaveHint === 'error'
+          ? t('compose.autosaveFailed')
+          : null
+
   return (
-    <div className={styles.backdrop} role="presentation" onClick={requestClose}>
+    <div className={styles.backdrop} role="presentation" onClick={() => void requestClose()}>
       <div
         className={styles.dialog}
         role="dialog"
@@ -307,7 +408,7 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
           <button
             type="button"
             className={styles.iconBtn}
-            onClick={requestClose}
+            onClick={() => void requestClose()}
             aria-label={t('common.close')}
             disabled={busy}
           >
@@ -315,7 +416,7 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
           </button>
         </header>
 
-        <form className={styles.form} onSubmit={handleSubmit}>
+        <form className={styles.form} onSubmit={(e) => void handleSubmit(e)}>
           <div className={styles.row}>
             <label className={styles.label} htmlFor="compose-to">
               {t('compose.to')}
@@ -327,7 +428,7 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
               value={to}
               onChange={(e) => {
                 setTo(e.target.value)
-                setDirty(true)
+                markDirty()
               }}
               placeholder={t('compose.toPlaceholder')}
               autoComplete="email"
@@ -363,7 +464,7 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
                 value={cc}
                 onChange={(e) => {
                   setCc(e.target.value)
-                  setDirty(true)
+                  markDirty()
                 }}
                 placeholder={t('compose.ccPlaceholder')}
                 autoComplete="email"
@@ -382,7 +483,7 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
                 value={bcc}
                 onChange={(e) => {
                   setBcc(e.target.value)
-                  setDirty(true)
+                  markDirty()
                 }}
                 placeholder={t('compose.bccPlaceholder')}
                 autoComplete="email"
@@ -400,17 +501,27 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
               value={subject}
               onChange={(e) => {
                 setSubject(e.target.value)
-                setDirty(true)
+                markDirty()
               }}
               placeholder={t('compose.subjectPlaceholder')}
             />
           </div>
 
           <div className={styles.toolbar} role="toolbar" aria-label={t('compose.formatting')}>
-            <button type="button" className={styles.toolBtn} onClick={() => exec('bold')} title={t('compose.bold')}>
+            <button
+              type="button"
+              className={styles.toolBtn}
+              onClick={() => exec('bold')}
+              title={t('compose.bold')}
+            >
               <strong>B</strong>
             </button>
-            <button type="button" className={styles.toolBtn} onClick={() => exec('italic')} title={t('compose.italic')}>
+            <button
+              type="button"
+              className={styles.toolBtn}
+              onClick={() => exec('italic')}
+              title={t('compose.italic')}
+            >
               <em>I</em>
             </button>
             <button
@@ -419,7 +530,7 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
               onClick={() => exec('underline')}
               title={t('compose.underline')}
             >
-              <span className={styles.underlineMark}>U</span>
+              <span style={{ textDecoration: 'underline' }}>U</span>
             </button>
             <button
               type="button"
@@ -469,7 +580,7 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
             data-placeholder={t('compose.bodyPlaceholder')}
             onInput={() => {
               setError(null)
-              setDirty(true)
+              markDirty()
             }}
           />
 
@@ -485,7 +596,10 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
                     <button
                       type="button"
                       className={styles.fileRemove}
-                      onClick={() => setFiles((prev) => prev.filter((f) => f.id !== item.id))}
+                      onClick={() => {
+                        setFiles((prev) => prev.filter((f) => f.id !== item.id))
+                        markDirty()
+                      }}
                       aria-label={t('compose.removeFile', { name })}
                       disabled={busy}
                     >
@@ -500,13 +614,19 @@ export function ComposeDialog({ open, draft, onClose, onSent, onDraftSaved }: Co
           {error ? <p className={styles.error}>{error}</p> : null}
 
           <footer className={styles.footer}>
+            <span
+              className={`${styles.autosave} ${autosaveHint === 'error' ? styles.autosaveError : ''}`}
+              aria-live="polite"
+            >
+              {autosaveLabel}
+            </span>
             <button
               type="button"
               className={styles.secondary}
-              onClick={requestClose}
+              onClick={() => void requestClose()}
               disabled={busy}
             >
-              {t('common.cancel')}
+              {t('common.close')}
             </button>
             <button
               type="button"

@@ -625,17 +625,56 @@ func FindDraftsFolder(creds session.Credentials) (string, error) {
 }
 
 // AppendDraft stores a raw RFC822 message in Drafts with \Draft.
-func AppendDraft(creds session.Credentials, raw []byte) error {
+// Returns the new UID (best-effort via UIDNEXT before APPEND) and folder name.
+func AppendDraft(creds session.Credentials, raw []byte) (uid uint32, folder string, err error) {
 	name, err := FindDraftsFolder(creds)
 	if err != nil {
-		return err
+		return 0, "", err
+	}
+	c, err := ConnectIMAP(creds)
+	if err != nil {
+		return 0, "", err
+	}
+	defer func() { _ = c.Logout() }()
+
+	status, err := c.Status(name, []imap.StatusItem{imap.StatusUidNext})
+	if err != nil {
+		return 0, "", err
+	}
+	uidNext := status.UidNext
+	if err := c.Append(name, []string{imap.DraftFlag}, time.Now(), bytes.NewReader(raw)); err != nil {
+		return 0, "", err
+	}
+	if uidNext == 0 {
+		return 0, name, nil
+	}
+	return uidNext, name, nil
+}
+
+// DeleteMessage permanently removes a UID from a folder (\\Deleted + EXPUNGE).
+func DeleteMessage(creds session.Credentials, folder, id string) error {
+	if folder == "" {
+		return fmt.Errorf("missing folder")
+	}
+	var uid uint32
+	if _, err := fmt.Sscanf(id, "%d", &uid); err != nil || uid == 0 {
+		return fmt.Errorf("invalid message id")
 	}
 	c, err := ConnectIMAP(creds)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = c.Logout() }()
-	return c.Append(name, []string{imap.DraftFlag}, time.Now(), bytes.NewReader(raw))
+	if _, err := c.Select(folder, false); err != nil {
+		return err
+	}
+	seqset := new(imap.SeqSet)
+	seqset.AddNum(uid)
+	item := imap.FormatFlagsOp(imap.AddFlags, true)
+	if err := c.UidStore(seqset, item, []interface{}{imap.DeletedFlag}, nil); err != nil {
+		return err
+	}
+	return c.Expunge(nil)
 }
 
 // SearchMessages runs IMAP TEXT search and returns matching summaries (newest first, capped).

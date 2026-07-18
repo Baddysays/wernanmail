@@ -263,11 +263,24 @@
 
 .footer {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  flex-wrap: wrap;
   gap: 0.5rem;
   padding: 0.75rem 1rem 0.95rem;
   border-top: 1px solid var(--border-subtle);
   background: var(--bg-elevated);
+}
+
+.autosave {
+  margin-right: auto;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  min-height: 1.2em;
+}
+
+.autosaveError {
+  color: #8a2a24;
 }
 
 .primary,

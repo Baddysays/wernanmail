@@ -138,8 +138,13 @@ export function sendMessage(payload: SendPayload) {
   return apiPost<{ status: string }>('/api/messages/send', payload)
 }
 
-export function saveDraft(payload: SendPayload) {
-  return apiPost<{ status: string }>('/api/messages/drafts', payload)
+export function saveDraft(
+  payload: SendPayload & { replaceId?: string; replaceFolder?: string },
+) {
+  return apiPost<{ status: string; id?: string; folder?: string }>(
+    '/api/messages/drafts',
+    payload,
+  )
 }
 
 export function attachmentUrl(messageId: string, folder: string, partId: string) {

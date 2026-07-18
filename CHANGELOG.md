@@ -7,6 +7,7 @@ All notable changes to Wernanmail will be documented in this file.
 ### Added
 
 - Webmail: resume/edit drafts, Archive/Spam/move actions, list previews, load-more pagination, custom folders, Bcc, mark unread.
+- Webmail compose **autosave** to Drafts after idle typing (and on close); draft API returns id and replaces previous copy.
 
 ### Added
 
