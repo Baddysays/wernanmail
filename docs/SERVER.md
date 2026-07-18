@@ -18,8 +18,8 @@ The Phase 1 web client stays a thin IMAP/SMTP client. Point it at this stack whe
 
 ```
 Internet MX:25 ──► smtpd ──► pipeline (antispam → antivirus) ──► queue ──► worker ──► store
-Users :587 (or optional :465) ► submission ─────────────────────────┘              │
-Users :143 (or optional :993) ► imapd ◄────────────────────────────────────────────┘
+Users :587 / :465 ► submission ─────────────────────────────────────┘              │
+Users :143 / :993 ► imapd ◄────────────────────────────────────────────────────────┘
 Admin UI HTTPS ► admin API ──► store / queue / settings / quarantine
 Web client ────► existing BFF (Phase 1) ──► this IMAP/SMTP
 ```
@@ -28,8 +28,8 @@ Web client ────► existing BFF (Phase 1) ──► this IMAP/SMTP
 
 | Binary | Role |
 |--------|------|
-| `cmd/mta` | SMTP inbound (:25) + authenticated submission (:587) |
-| `cmd/imapd` | IMAP (:143; wrap :993 via TLS terminator or native TLS) |
+| `cmd/mta` | SMTP inbound (:25) + submission STARTTLS (:587) + SMTPS (:465 when `SMTPS_ADDR` set) |
+| `cmd/imapd` | IMAP STARTTLS (:143) + IMAPS (:993 when `IMAPS_ADDR` set) |
 | `cmd/worker` | Queue consumer: local deliver, outbound SMTP, bounce |
 | `cmd/admin` | Admin HTTP API (+ optional static admin UI) |
 | `cmd/api` | Existing client BFF (Phase 1) |
@@ -87,7 +87,7 @@ WERNANMAIL_NONINTERACTIVE=1 \
 6. **DMARC** — start with `v=DMARC1; p=none; rua=mailto:postmaster@…`
 7. **PTR** — reverse DNS for the outbound IP (VPS provider) matching `MAIL_EHLO` / `MAIL_HOSTNAME`
 8. Optional: **MTA-STS** (`_mta-sts` TXT + HTTPS policy at `https://mta-sts.<domain>/.well-known/mta-sts.txt` — point `mta-sts` A/AAAA at the API host or reverse-proxy `/.well-known/mta-sts.txt`), **TLS-RPT** (`_smtp._tls` TXT; aggregates land in admin like DMARC), **BIMI** (`default._bimi` TXT + SVG at `l=` URL; no VMC required for the helper)
-9. Firewall: **25, 587, 143, 80, 443** by default; `install.sh` also reports **465 / 993** and can open them if you expose implicit TLS
+9. Firewall: **25, 587, 465, 143, 993, 80, 443** (Compose publishes all of these when TLS certs exist)
 
 ### TLS
 
@@ -207,8 +207,8 @@ docker compose up --build -d
 | Admin | `https://your-host/admin/` |
 | Webmail | `https://your-host/` |
 | SMTP | port `25` |
-| SMTP submit | port `587` with STARTTLS |
-| IMAP | port `143` with STARTTLS |
+| SMTP submit | port `587` with STARTTLS (or `465` SMTPS) |
+| IMAP | port `143` with STARTTLS (or `993` IMAPS) |
 
 The init service generates persistent secrets and a self-signed bootstrap
 certificate. Replace the certificate in the `mail_tls` Docker volume before

@@ -6,6 +6,7 @@ All notable changes to Wernanmail will be documented in this file.
 
 ### Added
 
+- Native **SMTPS :465** and **IMAPS :993** listeners (`SMTPS_ADDR` / `IMAPS_ADDR`) for Outlook and other implicit-TLS clients; Compose publishes them by default.
 - Webmail: resume/edit drafts, Archive/Spam/move actions, list previews, load-more pagination, custom folders, Bcc, mark unread.
 - Webmail compose **autosave** to Drafts after idle typing (and on close); draft API returns id and replaces previous copy.
 - **First-run install wizard** (`install.sh`): hostname / URL / contact email prompts, optional Let's Encrypt, local port/firewall check with UFW/firewalld open offer, plain-language next steps.

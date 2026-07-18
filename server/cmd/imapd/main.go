@@ -36,13 +36,33 @@ func main() {
 	if cfg.MasterPassword != "" {
 		log.Printf("imapd: master password configured (admin impersonation)")
 	}
-	// AllowInsecureAuth must stay true while stunnel terminates TLS on :993/:465
-	// and forwards plaintext to this process — otherwise LOGIN/AUTH stay disabled
-	// (Outlook IMAPS/SMTPS). STARTTLS on :143/:587 still works when TLSConfig is set.
-	log.Fatal(imapd.Listen(imapd.ListenOpts{
-		Addr:              cfg.IMAPAddr,
-		Backend:           be,
-		TLSConfig:         tlsCfg,
-		AllowInsecureAuth: true,
-	}))
+
+	errCh := make(chan error, 2)
+	go func() {
+		// AllowInsecureAuth must stay true while stunnel terminates TLS on :993
+		// and forwards plaintext here — otherwise LOGIN/AUTH stay disabled.
+		// STARTTLS on :143 still works when TLSConfig is set.
+		errCh <- imapd.Listen(imapd.ListenOpts{
+			Addr:              cfg.IMAPAddr,
+			Backend:           be,
+			TLSConfig:         tlsCfg,
+			AllowInsecureAuth: true,
+		})
+	}()
+	if cfg.IMAPSAddr != "" {
+		if tlsCfg == nil {
+			log.Printf("imapd: IMAPS_ADDR=%s set but MAIL_TLS_CERT/KEY unset — skipping implicit TLS", cfg.IMAPSAddr)
+		} else {
+			go func() {
+				errCh <- imapd.Listen(imapd.ListenOpts{
+					Addr:              cfg.IMAPSAddr,
+					Backend:           be,
+					TLSConfig:         tlsCfg,
+					AllowInsecureAuth: false,
+					ImplicitTLS:       true,
+				})
+			}()
+		}
+	}
+	log.Fatal(<-errCh)
 }

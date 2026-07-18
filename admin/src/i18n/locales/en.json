@@ -169,7 +169,7 @@
     "scoreTitle": "Deliverability score",
     "scoreDetail": "Current score {{score}}/10 (aim for 8+ before inviting others).",
     "scorePending": "Score appears after the first posture check.",
-    "firewallHint": "Firewall: allow 25 (mail in), 587 (send), 143 (IMAP), 80 and 443 (web + Let's Encrypt)."
+    "firewallHint": "Firewall: allow 25 (mail in), 587/465 (send), 143/993 (IMAP), 80 and 443 (web + Let's Encrypt). Use 465/993 for older Outlook."
   },
   "domains": {
     "title": "Domains",

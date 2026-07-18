@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"net/mail"
@@ -775,9 +776,11 @@ type ListenOpts struct {
 	Backend           *Backend
 	TLSConfig         *tls.Config
 	AllowInsecureAuth bool
+	// ImplicitTLS uses ListenAndServeTLS (IMAPS on :993). STARTTLS stays on :143.
+	ImplicitTLS bool
 }
 
-// Listen starts IMAP with optional TLS.
+// Listen starts IMAP with optional STARTTLS or implicit TLS.
 func Listen(opts ListenOpts) error {
 	s := server.New(opts.Backend)
 	s.Addr = opts.Addr
@@ -787,6 +790,16 @@ func Listen(opts ListenOpts) error {
 		log.Printf("imap %s: TLS not configured — forcing AllowInsecureAuth for local/dev", opts.Addr)
 		s.AllowInsecureAuth = true
 	}
-	log.Printf("imap listening on %s (insecure_auth=%v tls=%v)", opts.Addr, s.AllowInsecureAuth, opts.TLSConfig != nil)
+	mode := "starttls/plain"
+	if opts.ImplicitTLS {
+		mode = "implicit-tls"
+		if opts.TLSConfig == nil {
+			return fmt.Errorf("imap %s: ImplicitTLS requires TLSConfig", opts.Addr)
+		}
+	}
+	log.Printf("imap listening on %s (%s insecure_auth=%v tls=%v)", opts.Addr, mode, s.AllowInsecureAuth, opts.TLSConfig != nil)
+	if opts.ImplicitTLS {
+		return s.ListenAndServeTLS()
+	}
 	return s.ListenAndServe()
 }

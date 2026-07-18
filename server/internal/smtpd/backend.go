@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"log"
 	"strings"
@@ -298,6 +299,8 @@ type ListenOpts struct {
 	Domain            string
 	TLSConfig         *tls.Config
 	AllowInsecureAuth bool
+	// ImplicitTLS uses ListenAndServeTLS (SMTPS on :465). STARTTLS stays on :587.
+	ImplicitTLS bool
 }
 
 func ListenAndServe(addr string, be *Backend, domain string) error {
@@ -318,7 +321,17 @@ func Listen(opts ListenOpts) error {
 		log.Printf("smtp %s: TLS not configured — forcing AllowInsecureAuth for local/dev", opts.Addr)
 		s.AllowInsecureAuth = true
 	}
-	log.Printf("smtp listening on %s (auth_required=%v insecure_auth=%v tls=%v)",
-		opts.Addr, opts.Backend.RequireAuth, s.AllowInsecureAuth, opts.TLSConfig != nil)
+	mode := "starttls/plain"
+	if opts.ImplicitTLS {
+		mode = "implicit-tls"
+		if opts.TLSConfig == nil {
+			return fmt.Errorf("smtp %s: ImplicitTLS requires TLSConfig", opts.Addr)
+		}
+	}
+	log.Printf("smtp listening on %s (%s auth_required=%v insecure_auth=%v tls=%v)",
+		opts.Addr, mode, opts.Backend.RequireAuth, s.AllowInsecureAuth, opts.TLSConfig != nil)
+	if opts.ImplicitTLS {
+		return s.ListenAndServeTLS()
+	}
 	return s.ListenAndServe()
 }

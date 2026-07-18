@@ -155,10 +155,10 @@ check_and_offer_ports() {
     "25|SMTP inbound (receiving mail from the internet)"
     "80|HTTP (Let's Encrypt challenge)"
     "443|HTTPS (webmail + admin)"
-    "587|Submission STARTTLS (sending mail from clients)"
-    "143|IMAP STARTTLS (reading mail)"
-    "465|SMTPS implicit TLS (optional — not bound by default Compose)"
-    "993|IMAPS implicit TLS (optional — not bound by default Compose)"
+    "587|Submission STARTTLS (modern clients)"
+    "143|IMAP STARTTLS (modern clients)"
+    "465|SMTPS implicit TLS (Outlook / older clients)"
+    "993|IMAPS implicit TLS (Outlook / older clients)"
   )
   local fw
   fw="$(detect_firewall)"
@@ -167,7 +167,7 @@ check_and_offer_ports() {
   echo "=== Ports (this machine) ==="
   echo "Listening = Docker/stack bound the port here."
   echo "Firewall  = local UFW/firewalld rule (NOT your cloud security group)."
-  echo "465/993 are optional (IMAPS/SMTPS via TLS terminator); 'not listening' is normal on default Compose."
+  echo "Compose exposes 465/993 when TLS certs exist (self-signed on day one, then Let's Encrypt)."
   echo
 
   local need_open=()
@@ -205,8 +205,7 @@ check_and_offer_ports() {
 
   if [ "$fw" = "none" ]; then
     echo
-    echo "No active UFW/firewalld — if you use a cloud firewall, open 25,80,443,587,143 there"
-    echo "(plus 465/993 only if you expose IMAPS/SMTPS)."
+    echo "No active UFW/firewalld — if you use a cloud firewall, open 25,80,443,587,143,465,993 there."
     return
   fi
 
@@ -216,67 +215,40 @@ check_and_offer_ports() {
     return
   fi
 
-  # Prefer opening the default Compose ports; ask separately for optional 465/993.
-  local need_required=() need_optional=()
-  local p
-  for p in "${need_open[@]}"; do
-    case "$p" in
-      465|993) need_optional+=("$p") ;;
-      *) need_required+=("$p") ;;
-    esac
-  done
-
-  open_ports_list() {
-    local list=("$@")
-    local q
-    for q in "${list[@]}"; do
-      if open_firewall_port "$fw" "$q"; then
-        echo "  opened ${q}/tcp in $fw"
-      else
-        echo "  could not open ${q}/tcp (try manually with sudo)"
-      fi
-    done
-  }
-
-  print_port_cmds() {
-    local list=("$@")
-    local q
-    for q in "${list[@]}"; do
-      if [ "$fw" = "ufw" ]; then
-        echo "  sudo ufw allow ${q}/tcp"
-      else
-        echo "  sudo firewall-cmd --permanent --add-port=${q}/tcp && sudo firewall-cmd --reload"
-      fi
-    done
-  }
-
   if ! want_interactive; then
     echo
     echo "Non-interactive: not changing firewall. Suggested $fw commands:"
-    print_port_cmds "${need_open[@]}"
+    local p
+    for p in "${need_open[@]}"; do
+      if [ "$fw" = "ufw" ]; then
+        echo "  sudo ufw allow ${p}/tcp"
+      else
+        echo "  sudo firewall-cmd --permanent --add-port=${p}/tcp && sudo firewall-cmd --reload"
+      fi
+    done
     return
   fi
 
-  if [ "${#need_required[@]}" -gt 0 ]; then
-    echo
-    echo "Local $fw is active, but some required ports look closed: ${need_required[*]}"
-    if prompt_yn "Open these ports in $fw now?" "y"; then
-      open_ports_list "${need_required[@]}"
-    else
-      echo "Skipped. You can open them later, for example:"
-      print_port_cmds "${need_required[@]}"
-    fi
-  fi
-
-  if [ "${#need_optional[@]}" -gt 0 ]; then
-    echo
-    echo "Optional IMAPS/SMTPS ports are not allowed in $fw yet: ${need_optional[*]}"
-    echo "(Default Compose uses 587/143 STARTTLS; open 465/993 only if a TLS terminator will listen there.)"
-    if prompt_yn "Also open optional 465/993 in $fw?" "n"; then
-      open_ports_list "${need_optional[@]}"
-    else
-      echo "Skipped optional ports."
-    fi
+  echo
+  echo "Local $fw is active, but some ports look closed: ${need_open[*]}"
+  if prompt_yn "Open these ports in $fw now?" "y"; then
+    local p
+    for p in "${need_open[@]}"; do
+      if open_firewall_port "$fw" "$p"; then
+        echo "  opened ${p}/tcp in $fw"
+      else
+        echo "  could not open ${p}/tcp (try manually with sudo)"
+      fi
+    done
+  else
+    echo "Skipped. You can open them later, for example:"
+    for p in "${need_open[@]}"; do
+      if [ "$fw" = "ufw" ]; then
+        echo "  sudo ufw allow ${p}/tcp"
+      else
+        echo "  sudo firewall-cmd --permanent --add-port=${p}/tcp && sudo firewall-cmd --reload"
+      fi
+    done
   fi
 }
 

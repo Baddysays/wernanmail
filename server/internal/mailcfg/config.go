@@ -15,7 +15,9 @@ type Config struct {
 	DataDir        string
 	SMTPAddr       string
 	SubmitAddr     string
+	SMTPSAddr      string // empty = disabled; implicit TLS submission (e.g. :465)
 	IMAPAddr       string
+	IMAPSAddr      string // empty = disabled; implicit TLS IMAP (e.g. :993)
 	AdminAddr      string
 	Hostname       string
 	EHLOHost       string // outbound EHLO; should match PTR when possible
@@ -64,7 +66,9 @@ func Load() Config {
 		DataDir:        getenv("DATA_DIR", "./data"),
 		SMTPAddr:       getenv("SMTP_ADDR", ":2525"),
 		SubmitAddr:     getenv("SUBMIT_ADDR", ":2587"),
+		SMTPSAddr:      getenv("SMTPS_ADDR", ""),
 		IMAPAddr:       getenv("IMAP_ADDR", ":2143"),
+		IMAPSAddr:      getenv("IMAPS_ADDR", ""),
 		AdminAddr:      getenv("ADMIN_ADDR", ":8090"),
 		Hostname:       host,
 		EHLOHost:       ehlo,

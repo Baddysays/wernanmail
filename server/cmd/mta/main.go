@@ -118,7 +118,7 @@ func main() {
 	reg := metrics.New("mta")
 	metrics.ListenEnv(reg)
 
-	errCh := make(chan error, 2)
+	errCh := make(chan error, 3)
 	go func() {
 		be := &smtpd.Backend{
 			Store: st, Pipeline: pipe, Queue: qs,
@@ -160,6 +160,34 @@ func main() {
 			AllowInsecureAuth: true,
 		})
 	}()
+	if cfg.SMTPSAddr != "" {
+		if tlsCfg == nil {
+			log.Printf("mta: SMTPS_ADDR=%s set but MAIL_TLS_CERT/KEY unset — skipping implicit TLS", cfg.SMTPSAddr)
+		} else {
+			go func() {
+				be := &smtpd.Backend{
+					Store: st, Pipeline: pipe, Queue: qs,
+					Limiter:          settings.NewLimiter(sm.GetInt(settings.KeyRateSubmitPerMin, 60)),
+					SendLimiter:      sendLim,
+					AuthLimiter:      authLim,
+					RequireAuth:      true,
+					Hostname:         cfg.Hostname,
+					MasterPassword:   cfg.MasterPassword,
+					SuperuserEnabled: superuser,
+					OutboundPolicy:   outboundPolicy,
+					Metrics:          reg,
+				}
+				errCh <- smtpd.Listen(smtpd.ListenOpts{
+					Addr:              cfg.SMTPSAddr,
+					Backend:           be,
+					Domain:            cfg.Hostname,
+					TLSConfig:         tlsCfg,
+					AllowInsecureAuth: false,
+					ImplicitTLS:       true,
+				})
+			}()
+		}
+	}
 	log.Fatal(<-errCh)
 }
 

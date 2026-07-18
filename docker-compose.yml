@@ -41,10 +41,12 @@ services:
       <<: *server-environment
       SMTP_ADDR: ":25"
       SUBMIT_ADDR: ":587"
+      SMTPS_ADDR: ":465"
       RELAY_HOST: "${RELAY_HOST:-}"
     ports:
       - "${SMTP_PORT:-25}:25"
       - "${SUBMISSION_PORT:-587}:587"
+      - "${SMTPS_PORT:-465}:465"
     mem_limit: 96m
     memswap_limit: 96m
     healthcheck:
@@ -60,8 +62,10 @@ services:
     environment:
       <<: *server-environment
       IMAP_ADDR: ":143"
+      IMAPS_ADDR: ":993"
     ports:
       - "${IMAP_PORT:-143}:143"
+      - "${IMAPS_PORT:-993}:993"
     depends_on:
       init:
         condition: service_completed_successfully

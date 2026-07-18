@@ -92,7 +92,7 @@ WERNANMAIL_NONINTERACTIVE=1 MAIL_HOSTNAME=mail.example.com PUBLIC_URL=https://ma
 2. Add your domain → **Generate DKIM**  
 3. Follow **Setup — go live** on Overview (and **DNS helper** for copy-paste records)  
 4. Publish **MX · SPF · DKIM · DMARC · PTR** at your DNS panel  
-5. Open firewall: **25, 587, 143, 80, 443** (add **465 / 993** only if you expose IMAPS/SMTPS)  
+5. Open firewall: **25, 587, 465, 143, 993, 80, 443**  
 6. If the browser still warns about HTTPS:  
    `./scripts/issue-tls-certbot.sh`  
 7. Send a test both ways → watch **Deliverability** (aim for score **8+**)  
@@ -115,8 +115,9 @@ docker compose down --volumes   # wipe mail + secrets
 | Admin | `https://your-host/admin/` |
 | SMTP | `25` |
 | Submission (STARTTLS) | `587` |
+| SMTPS (implicit TLS, Outlook-friendly) | `465` |
 | IMAP (STARTTLS) | `143` |
-| Optional implicit TLS | `465` / `993` via TLS terminator or custom config |
+| IMAPS (implicit TLS, Outlook-friendly) | `993` |
 
 ## What ships in the stack
 
@@ -141,7 +142,7 @@ docker compose down --volumes   # wipe mail + secrets
 ## Roadmap notes
 
 - **Mailport** is still a preview surface, not a finished embeddable product
-- **Implicit TLS** on `465` / `993` is optional; STARTTLS on `587` / `143` is the default Compose path
+- Prefer **587 / 143** for modern clients; **465 / 993** are also exposed for Outlook and other implicit-TLS clients
 - **Host-level ACME** via [`scripts/issue-tls-certbot.sh`](scripts/issue-tls-certbot.sh) (Certbot → `mail_tls` volume)
 
 ## Product shots
