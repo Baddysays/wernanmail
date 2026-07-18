@@ -24,6 +24,7 @@ import type {
   SettingGroup,
   SpamReason,
   SparkSample,
+  TlsRptReport,
 } from './types'
 
 const NAV: NavTab[] = ['overview', 'domains', 'mailboxes', 'queue', 'quarantine', 'settings', 'backup', 'audit']
@@ -468,11 +469,13 @@ function dnsChip(check: DnsCheck | undefined, labels: DnsChipLabels) {
 function DeliverabilityCard({
   dns,
   reports,
+  tlsReports,
   posture,
   onRecheck,
 }: {
   dns: DnsStatus | null
   reports: DmarcReport[] | null
+  tlsReports: TlsRptReport[] | null
   posture: Posture | null
   onRecheck?: () => void | Promise<void>
 }) {
@@ -500,6 +503,24 @@ function DeliverabilityCard({
     { id: 'spf', label: 'SPF', check: dns?.spf || posture?.dns?.spf },
     { id: 'dkim', label: 'DKIM', check: dns?.dkim || posture?.dns?.dkim },
     { id: 'dmarc', label: 'DMARC', check: dns?.dmarc || posture?.dns?.dmarc },
+    {
+      id: 'mtasts',
+      label: 'STS',
+      check: dns?.mtasts || posture?.dns?.mtasts,
+      missingText: t('deliverability.optional'),
+    },
+    {
+      id: 'tlsrpt',
+      label: 'TLS-RPT',
+      check: dns?.tlsrpt || posture?.dns?.tlsrpt,
+      missingText: t('deliverability.optional'),
+    },
+    {
+      id: 'bimi',
+      label: 'BIMI',
+      check: dns?.bimi || posture?.dns?.bimi,
+      missingText: t('deliverability.optional'),
+    },
     {
       id: 'ptr',
       label: 'PTR',
@@ -562,19 +583,25 @@ function DeliverabilityCard({
         </div>
       ) : null}
       <div className="deliverability-checks">
-        {checks.map(({ id, label, check, okText }) => {
+        {checks.map(({ id, label, check, okText, missingText }) => {
           const status = dnsChip(check, {
             ok: okText || t('deliverability.ready'),
-            missing: t('deliverability.missing'),
+            missing: missingText || t('deliverability.missing'),
             checking: t('health.checking'),
             warn: check?.detail,
           })
           const pts = rating?.items?.find((it) => it.id === id)
+          const showDetail =
+            status.state === 'ok'
+              ? status.text
+              : check?.state === 'missing' && missingText
+                ? missingText
+                : check?.detail || status.text
           return (
             <div className="deliverability-check" key={id} title={check?.detail}>
               <span className={`status-dot ${status.state === 'ok' ? 'on' : status.state === 'bad' ? 'off' : ''}`} />
               <strong>{label}</strong>
-              <span>{status.state === 'ok' ? status.text : check?.detail || status.text}</span>
+              <span>{showDetail}</span>
               {pts && typeof pts.max === 'number' ? (
                 <em className="deliverability-pts">
                   {typeof pts.points === 'number' ? pts.points : 0}/{pts.max}
@@ -623,6 +650,31 @@ function DeliverabilityCard({
             <>
               <p className="muted dmarc-empty">{t('deliverability.noReports')}</p>
               <p className="muted dmarc-empty-hint">{t('deliverability.noReportsHint')}</p>
+            </>
+          )}
+        </div>
+      ) : null}
+      {tlsReports ? (
+        <div className="dmarc-summary">
+          <p className="dmarc-summary-title">{t('deliverability.tlsReports')}</p>
+          {tlsReports.length ? (
+            <div className="dmarc-report-list">
+              {tlsReports.slice(0, 5).map((report, index) => (
+                <div
+                  className="dmarc-report-row"
+                  key={report.id ?? `${report.org}-${report.policyDomain}-${index}`}
+                >
+                  <code>{report.org || report.policyDomain || '—'}</code>
+                  <span>✓{report.successCount ?? 0}</span>
+                  <span>✗{report.failureCount ?? 0}</span>
+                  <span>{report.resultType || '—'}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <>
+              <p className="muted dmarc-empty">{t('deliverability.noTlsReports')}</p>
+              <p className="muted dmarc-empty-hint">{t('deliverability.noTlsReportsHint')}</p>
             </>
           )}
         </div>
@@ -809,6 +861,7 @@ export function App() {
   const [navOpen, setNavOpen] = useState(false)
   const [dnsStatus, setDnsStatus] = useState<DnsStatus | null>(null)
   const [dmarcReports, setDmarcReports] = useState<DmarcReport[] | null>(null)
+  const [tlsRptReports, setTlsRptReports] = useState<TlsRptReport[] | null>(null)
   const [hostStats, setHostStats] = useState<HostStats | null>(null)
   const [ops, setOps] = useState<OpsStatus | null>(null)
   const [posture, setPosture] = useState<Posture | null>(null)
@@ -836,12 +889,14 @@ export function App() {
       api<OpsStatus>('/api/admin/ops', creds!),
       api<DmarcReport[]>(`/api/admin/dmarc-reports${q}`, creds!),
       api<Posture>(`/api/admin/posture${q}`, creds!),
+      api<TlsRptReport[]>(`/api/admin/tls-rpt-reports${q}`, creds!),
     ])
     if (settled[0].status === 'fulfilled') setDnsStatus(settled[0].value)
     if (settled[1].status === 'fulfilled') setHostStats(settled[1].value)
     if (settled[2].status === 'fulfilled') setOps(settled[2].value)
     if (settled[3].status === 'fulfilled') setDmarcReports(asList(settled[3].value))
     if (settled[4].status === 'fulfilled') setPosture(settled[4].value)
+    if (settled[5].status === 'fulfilled') setTlsRptReports(asList(settled[5].value))
     return d
   }, [creds, dnsDomain?.name])
 
@@ -1775,6 +1830,7 @@ export function App() {
               <DeliverabilityCard
                 dns={dnsStatus}
                 reports={dmarcReports}
+                tlsReports={tlsRptReports}
                 posture={posture}
                 onRecheck={() => refreshDash().then(() => undefined)}
               />

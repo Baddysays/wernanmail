@@ -886,6 +886,61 @@ FROM dmarc_reports ORDER BY id DESC LIMIT ?`, limit)
 	return out, rows.Err()
 }
 
+func (s *Store) AddTLSRPTReports(ctx context.Context, reports []domain.TLSRPTReport) error {
+	if len(reports) == 0 {
+		return nil
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for i := range reports {
+		r := &reports[i]
+		res, err := tx.ExecContext(ctx, `INSERT OR IGNORE INTO tls_rpt_reports
+(mailbox_id,org_name,report_id,date_begin,date_end,policy_domain,success_count,failure_count,result_type,created_at)
+VALUES(?,?,?,?,?,?,?,?,?,?)`, r.MailboxID, r.OrgName, r.ReportID,
+			r.DateBegin.UTC().Format(time.RFC3339Nano), r.DateEnd.UTC().Format(time.RFC3339Nano),
+			r.PolicyDomain, r.SuccessCount, r.FailureCount, r.ResultType, now())
+		if err != nil {
+			return err
+		}
+		if id, _ := res.LastInsertId(); id > 0 {
+			r.ID = id
+			r.CreatedAt = time.Now().UTC()
+		}
+	}
+	return tx.Commit()
+}
+
+func (s *Store) ListTLSRPTReports(ctx context.Context, limit int) ([]domain.TLSRPTReport, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 1000 {
+		limit = 1000
+	}
+	rows, err := s.db.QueryContext(ctx, `SELECT id,mailbox_id,org_name,report_id,date_begin,date_end,
+policy_domain,success_count,failure_count,result_type,created_at
+FROM tls_rpt_reports ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []domain.TLSRPTReport
+	for rows.Next() {
+		var r domain.TLSRPTReport
+		var begin, end, created string
+		if err := rows.Scan(&r.ID, &r.MailboxID, &r.OrgName, &r.ReportID, &begin, &end,
+			&r.PolicyDomain, &r.SuccessCount, &r.FailureCount, &r.ResultType, &created); err != nil {
+			return nil, err
+		}
+		r.DateBegin, r.DateEnd, r.CreatedAt = parseTime(begin), parseTime(end), parseTime(created)
+		out = append(out, r)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) ListMailFilters(ctx context.Context, mailboxID int64) ([]domain.MailFilter, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id,mailbox_id,enabled,priority,match_field,match_op,match_value,action,action_arg
 FROM mail_filters WHERE mailbox_id=? ORDER BY priority ASC,id ASC`, mailboxID)

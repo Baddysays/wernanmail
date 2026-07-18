@@ -104,7 +104,11 @@
     "recipientHint": "Попросите первых получателей отметить письма «Не спам» и добавить отправителя в контакты.",
     "reports": "Последние отчёты DMARC",
     "noReports": "Агрегированных отчётов пока нет",
-    "noReportsHint": "Опубликуйте DMARC с rua=mailto:… — провайдеры пришлют XML на postmaster@ваш-домен (обычно через 1–3 дня)."
+    "noReportsHint": "Опубликуйте DMARC с rua=mailto:… — провайдеры пришлют XML на postmaster@ваш-домен (обычно через 1–3 дня).",
+    "optional": "не опубликовано (опционально)",
+    "tlsReports": "Последние отчёты TLS-RPT",
+    "noTlsReports": "TLS-отчётов пока нет",
+    "noTlsReportsHint": "Опубликуйте TXT _smtp._tls с rua=mailto:… — провайдеры пришлют JSON-агрегаты на этот ящик."
   },
   "overview": {
     "healthyTitle": "Почта в порядке",

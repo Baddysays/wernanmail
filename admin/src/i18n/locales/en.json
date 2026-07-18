@@ -104,7 +104,11 @@
     "recipientHint": "Ask early recipients to mark messages Not spam and add the sender to contacts.",
     "reports": "Recent DMARC reports",
     "noReports": "No aggregate reports yet",
-    "noReportsHint": "Publish DMARC with rua=mailto:… and wait for providers to send XML to postmaster@your-domain."
+    "noReportsHint": "Publish DMARC with rua=mailto:… and wait for providers to send XML to postmaster@your-domain.",
+    "optional": "not published (optional)",
+    "tlsReports": "Recent TLS-RPT reports",
+    "noTlsReports": "No TLS reports yet",
+    "noTlsReportsHint": "Publish _smtp._tls TXT with rua=mailto:… — providers send JSON aggregates to that mailbox."
   },
   "overview": {
     "healthyTitle": "Mail is healthy",

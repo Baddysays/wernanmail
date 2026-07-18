@@ -112,7 +112,7 @@ export function dnsRecordsFor(domain: Domain | null | undefined, publicIP?: stri
       label: 'MTA-STS',
       host: '_mta-sts',
       type: 'TXT',
-      value: 'v=STSv1; id=1',
+      value: `v=STSv1; id=${new Date().toISOString().slice(0, 10).replace(/-/g, '')}`,
     },
     {
       id: 'tls-rpt',
@@ -120,6 +120,13 @@ export function dnsRecordsFor(domain: Domain | null | undefined, publicIP?: stri
       host: '_smtp._tls',
       type: 'TXT',
       value: `v=TLSRPTv1; rua=mailto:postmaster@${name}`,
+    },
+    {
+      id: 'bimi',
+      label: 'BIMI',
+      host: 'default._bimi',
+      type: 'TXT',
+      value: `v=BIMI1; l=https://${name}/bimi.svg`,
     },
     {
       id: 'ptr',

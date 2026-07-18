@@ -19,6 +19,7 @@ import (
 	"github.com/Baddysays/wernanmail/server/internal/queue"
 	"github.com/Baddysays/wernanmail/server/internal/received"
 	"github.com/Baddysays/wernanmail/server/internal/store"
+	"github.com/Baddysays/wernanmail/server/internal/tlsrpt"
 )
 
 // Inbound processes accepted SMTP DATA.
@@ -170,6 +171,15 @@ func (p *Inbound) Process(ctx context.Context, in ProcessInput) Result {
 			}
 			// Report indexing is supplemental and must never delay mail delivery.
 			_ = p.Store.AddDMARCReports(ctx, copyReports)
+		}
+	}
+	if reports, err := tlsrpt.ParseMessage(raw); err == nil {
+		for _, d := range deliveries {
+			copyReports := append([]domain.TLSRPTReport(nil), reports...)
+			for i := range copyReports {
+				copyReports[i].MailboxID = d.mailboxID
+			}
+			_ = p.Store.AddTLSRPTReports(ctx, copyReports)
 		}
 	}
 

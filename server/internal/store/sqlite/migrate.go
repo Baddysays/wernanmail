@@ -7,7 +7,7 @@ import (
 )
 
 // CurrentSchemaVersion is the latest applied migration ID.
-const CurrentSchemaVersion = 2
+const CurrentSchemaVersion = 3
 
 type migration struct {
 	version int
@@ -59,6 +59,7 @@ func schemaMigrations() []migration {
 	return []migration{
 		{1, "baseline_core", migrateV1Baseline},
 		{2, "mailbox_content_rev_and_quotas", migrateV2Columns},
+		{3, "tls_rpt_reports", migrateV3TLSRPT},
 	}
 }
 
@@ -197,6 +198,27 @@ func migrateV2Columns(tx *sql.Tx) error {
 	_, _ = tx.Exec(`ALTER TABLE domains ADD COLUMN default_quota_bytes INTEGER NOT NULL DEFAULT 0`)
 	_, _ = tx.Exec(`ALTER TABLE mailboxes ADD COLUMN content_rev INTEGER NOT NULL DEFAULT 0`)
 	return nil
+}
+
+func migrateV3TLSRPT(tx *sql.Tx) error {
+	_, err := tx.Exec(`
+CREATE TABLE IF NOT EXISTS tls_rpt_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  mailbox_id INTEGER NOT NULL REFERENCES mailboxes(id) ON DELETE CASCADE,
+  org_name TEXT NOT NULL DEFAULT '',
+  report_id TEXT NOT NULL DEFAULT '',
+  date_begin TEXT NOT NULL DEFAULT '',
+  date_end TEXT NOT NULL DEFAULT '',
+  policy_domain TEXT NOT NULL DEFAULT '',
+  success_count INTEGER NOT NULL DEFAULT 0,
+  failure_count INTEGER NOT NULL DEFAULT 0,
+  result_type TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  UNIQUE(mailbox_id, report_id, date_begin, date_end, policy_domain, result_type)
+);
+CREATE INDEX IF NOT EXISTS idx_tls_rpt_reports_created ON tls_rpt_reports(id DESC);
+`)
+	return err
 }
 
 func (s *Store) applyMigration(m migration) error {

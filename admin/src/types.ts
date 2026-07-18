@@ -136,6 +136,9 @@ export type DnsStatus = {
   spf?: DnsCheck
   dkim?: DnsCheck
   dmarc?: DnsCheck
+  mtasts?: DnsCheck
+  tlsrpt?: DnsCheck
+  bimi?: DnsCheck
 }
 
 export type DmarcReport = {
@@ -146,6 +149,15 @@ export type DmarcReport = {
   messageCount?: number
   dkim?: string
   spf?: string
+}
+
+export type TlsRptReport = {
+  id?: string | number
+  org?: string
+  policyDomain?: string
+  successCount?: number
+  failureCount?: number
+  resultType?: string
 }
 
 export type HostProcess = {
@@ -231,6 +243,9 @@ export type Posture = {
     spf?: PostureCheck
     dkim?: PostureCheck
     dmarc?: PostureCheck
+    mtasts?: PostureCheck
+    tlsrpt?: PostureCheck
+    bimi?: PostureCheck
   }
   rating?: DeliverabilityRating
   stack?: {

@@ -97,6 +97,7 @@ func NewRouter(h *Handler) http.Handler {
 		r.Post("/api/admin/quarantine/{id}/release", h.releaseQuarantine)
 		r.Post("/api/admin/quarantine/{id}/delete", h.deleteQuarantine)
 		r.Get("/api/admin/dmarc-reports", h.listDMARCReports)
+		r.Get("/api/admin/tls-rpt-reports", h.listTLSRPTReports)
 		r.Get("/api/admin/mailboxes/{id}/filters", h.listMailboxFilters)
 		r.Put("/api/admin/mailboxes/{id}/filters", h.putMailboxFilters)
 		r.Get("/api/admin/settings", h.getSettings)
@@ -922,6 +923,9 @@ func (h *Handler) dnsStatus(w http.ResponseWriter, r *http.Request) {
 		"spf":       snap.SPF,
 		"dkim":      snap.DKIM,
 		"dmarc":     snap.DMARC,
+		"mtasts":    snap.MTASTS,
+		"tlsrpt":    snap.TLSRPT,
+		"bimi":      snap.BIMI,
 		"checkedAt": time.Now().UTC(),
 	})
 }
@@ -1119,6 +1123,19 @@ func (h *Handler) listDMARCReports(w http.ResponseWriter, r *http.Request) {
 	}
 	if list == nil {
 		list = []domain.DMARCReport{}
+	}
+	writeJSON(w, http.StatusOK, list)
+}
+
+func (h *Handler) listTLSRPTReports(w http.ResponseWriter, r *http.Request) {
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	list, err := h.Store.ListTLSRPTReports(r.Context(), limit)
+	if err != nil {
+		writeErr(w, http.StatusInternalServerError, "admin.store", err.Error())
+		return
+	}
+	if list == nil {
+		list = []domain.TLSRPTReport{}
 	}
 	writeJSON(w, http.StatusOK, list)
 }

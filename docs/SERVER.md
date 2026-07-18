@@ -68,7 +68,7 @@ Do **not** commit real hostnames/IPs into the public repo.
 5. **DKIM** — publish public key from admin → Domains → DKIM
 6. **DMARC** — start with `v=DMARC1; p=none; rua=mailto:postmaster@…`
 7. **PTR** — reverse DNS for the outbound IP (VPS provider) matching `MAIL_HOSTNAME`
-8. Optional: **MTA-STS** (`_mta-sts` TXT + `mta-sts.` HTTPS policy) and **TLS-RPT**
+8. Optional: **MTA-STS** (`_mta-sts` TXT + HTTPS policy at `https://mta-sts.<domain>/.well-known/mta-sts.txt` — point `mta-sts` A/AAAA at the API host or reverse-proxy `/.well-known/mta-sts.txt`), **TLS-RPT** (`_smtp._tls` TXT; aggregates land in admin like DMARC), **BIMI** (`default._bimi` TXT + SVG at `l=` URL; no VMC required for the helper)
 9. Firewall: **25, 587, 143** + HTTPS **443** by default; add **465 / 993** only if you expose implicit TLS
 
 ### TLS

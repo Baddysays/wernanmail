@@ -2,8 +2,11 @@ package adminapi
 
 import (
 	"context"
+	"io"
 	"math"
+	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Baddysays/wernanmail/server/internal/domain"
 )
@@ -15,6 +18,9 @@ type dnsSnapshot struct {
 	SPF      map[string]string
 	DKIM     map[string]string
 	DMARC    map[string]string
+	MTASTS   map[string]string
+	TLSRPT   map[string]string
+	BIMI     map[string]string
 }
 
 type scoreItem struct {
@@ -35,10 +41,13 @@ type deliverabilityRating struct {
 
 func (h *Handler) collectDNSStatus(ctx context.Context, wantName string) dnsSnapshot {
 	out := dnsSnapshot{
-		MX:    checkResult("missing", "no domain"),
-		SPF:   checkResult("missing", "no domain"),
-		DKIM:  checkResult("missing", "no domain"),
-		DMARC: checkResult("missing", "no domain"),
+		MX:     checkResult("missing", "no domain"),
+		SPF:    checkResult("missing", "no domain"),
+		DKIM:   checkResult("missing", "no domain"),
+		DMARC:  checkResult("missing", "no domain"),
+		MTASTS: checkResult("missing", "no domain"),
+		TLSRPT: checkResult("missing", "no domain"),
+		BIMI:   checkResult("missing", "no domain"),
 	}
 	if h.Store == nil {
 		return out
@@ -133,7 +142,158 @@ func (h *Handler) collectDNSStatus(ctx context.Context, wantName string) dnsSnap
 		}
 	}
 	out.DMARC = checkResult(dmarcState, dmarcDetail)
+
+	out.MTASTS = checkMTASTS(ctx, res, name)
+	out.TLSRPT = checkTLSRPT(ctx, res, name)
+	out.BIMI = checkBIMI(ctx, res, name)
 	return out
+}
+
+func checkMTASTS(ctx context.Context, res interface {
+	LookupTXT(context.Context, string) ([]string, error)
+}, name string) map[string]string {
+	txtOK := false
+	txtDetail := "no _mta-sts TXT"
+	if txts, err := res.LookupTXT(ctx, "_mta-sts."+name); err == nil {
+		for _, t := range txts {
+			tt := strings.ToLower(strings.TrimSpace(t))
+			if strings.Contains(tt, "v=stsv1") {
+				txtOK = true
+				txtDetail = strings.TrimSpace(t)
+				break
+			}
+		}
+	}
+	policyURL := "https://mta-sts." + name + "/.well-known/mta-sts.txt"
+	policyOK, policyDetail := fetchMTASTSPolicy(ctx, policyURL)
+	switch {
+	case txtOK && policyOK:
+		return checkResult("ok", "TXT + policy ("+policyDetail+")")
+	case txtOK && !policyOK:
+		return checkResult("warn", "TXT ok; policy: "+policyDetail)
+	case !txtOK && policyOK:
+		return checkResult("warn", "policy ok; missing _mta-sts TXT")
+	default:
+		return checkResult("missing", txtDetail+"; "+policyDetail)
+	}
+}
+
+func fetchMTASTSPolicy(ctx context.Context, url string) (ok bool, detail string) {
+	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, "bad url"
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, "HTTPS unreachable"
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	if resp.StatusCode >= 300 {
+		return false, "HTTP " + http.StatusText(resp.StatusCode)
+	}
+	text := strings.ToLower(string(body))
+	if !strings.Contains(text, "version: stsv1") {
+		return false, "invalid policy body"
+	}
+	mode := "unknown"
+	for _, line := range strings.Split(string(body), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(strings.ToLower(line), "mode:") {
+			mode = strings.TrimSpace(line[5:])
+			break
+		}
+	}
+	return true, "mode=" + mode
+}
+
+func checkTLSRPT(ctx context.Context, res interface {
+	LookupTXT(context.Context, string) ([]string, error)
+}, name string) map[string]string {
+	if txts, err := res.LookupTXT(ctx, "_smtp._tls."+name); err == nil {
+		for _, t := range txts {
+			tt := strings.ToLower(strings.TrimSpace(t))
+			if strings.Contains(tt, "v=tlsrptv1") {
+				return checkResult("ok", strings.TrimSpace(t))
+			}
+		}
+	}
+	return checkResult("missing", "no _smtp._tls TXT")
+}
+
+func checkBIMI(ctx context.Context, res interface {
+	LookupTXT(context.Context, string) ([]string, error)
+}, name string) map[string]string {
+	var record string
+	if txts, err := res.LookupTXT(ctx, "default._bimi."+name); err == nil {
+		for _, t := range txts {
+			tt := strings.ToLower(strings.TrimSpace(t))
+			if strings.Contains(tt, "v=bimi1") {
+				record = strings.TrimSpace(t)
+				break
+			}
+		}
+	}
+	if record == "" {
+		return checkResult("missing", "no default._bimi TXT")
+	}
+	logoURL := extractBIMILogo(record)
+	if logoURL == "" {
+		return checkResult("warn", "TXT without l= logo URL")
+	}
+	if ok, detail := probeBIMILogo(ctx, logoURL); ok {
+		return checkResult("ok", "logo "+detail)
+	} else {
+		return checkResult("warn", "TXT ok; logo: "+detail)
+	}
+}
+
+func extractBIMILogo(record string) string {
+	lower := strings.ToLower(record)
+	idx := strings.Index(lower, "l=")
+	if idx < 0 {
+		return ""
+	}
+	rest := record[idx+2:]
+	end := len(rest)
+	for i, r := range rest {
+		if r == ';' || r == ' ' {
+			end = i
+			break
+		}
+	}
+	return strings.TrimSpace(rest[:end])
+}
+
+func probeBIMILogo(ctx context.Context, url string) (ok bool, detail string) {
+	if !strings.HasPrefix(strings.ToLower(url), "https://") {
+		return false, "l= must be https"
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+	if err != nil {
+		return false, "bad url"
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return false, "unreachable"
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	if resp.StatusCode >= 300 {
+		return false, "HTTP status"
+	}
+	ct := strings.ToLower(resp.Header.Get("Content-Type"))
+	text := strings.ToLower(string(body))
+	if strings.Contains(ct, "svg") || strings.Contains(text, "<svg") {
+		return true, "svg ok"
+	}
+	return false, "not SVG"
 }
 
 func scorePoints(state string, max float64) float64 {
@@ -147,6 +307,21 @@ func scorePoints(state string, max float64) float64 {
 	}
 }
 
+// optionalScorePoints: missing does not punish (record not published yet).
+func optionalScorePoints(state string, max float64) float64 {
+	if state == "" {
+		state = "missing"
+	}
+	switch state {
+	case "ok", "missing":
+		return max
+	case "warn":
+		return math.Round(max*5) / 10
+	default:
+		return 0
+	}
+}
+
 func buildDeliverabilityRating(dns dnsSnapshot, ptr, rbl map[string]string, spam map[string]any) deliverabilityRating {
 	spamState, _ := spam["state"].(string)
 	spamDetail, _ := spam["detail"].(string)
@@ -155,6 +330,9 @@ func buildDeliverabilityRating(dns dnsSnapshot, ptr, rbl map[string]string, spam
 		{ID: "spf", Label: "SPF", State: dns.SPF["state"], Max: 2, Points: scorePoints(dns.SPF["state"], 2), Detail: dns.SPF["detail"]},
 		{ID: "dkim", Label: "DKIM", State: dns.DKIM["state"], Max: 2, Points: scorePoints(dns.DKIM["state"], 2), Detail: dns.DKIM["detail"]},
 		{ID: "dmarc", Label: "DMARC", State: dns.DMARC["state"], Max: 1, Points: scorePoints(dns.DMARC["state"], 1), Detail: dns.DMARC["detail"]},
+		{ID: "mtasts", Label: "STS", State: dns.MTASTS["state"], Max: 0.5, Points: optionalScorePoints(dns.MTASTS["state"], 0.5), Detail: dns.MTASTS["detail"]},
+		{ID: "tlsrpt", Label: "TLS-RPT", State: dns.TLSRPT["state"], Max: 0.5, Points: optionalScorePoints(dns.TLSRPT["state"], 0.5), Detail: dns.TLSRPT["detail"]},
+		{ID: "bimi", Label: "BIMI", State: dns.BIMI["state"], Max: 0.5, Points: optionalScorePoints(dns.BIMI["state"], 0.5), Detail: dns.BIMI["detail"]},
 		{ID: "ptr", Label: "PTR", State: ptr["state"], Max: 1, Points: scorePoints(ptr["state"], 1), Detail: ptr["detail"]},
 		{ID: "rbl", Label: "IP", State: rbl["state"], Max: 2, Points: scorePoints(rbl["state"], 2), Detail: rbl["detail"]},
 		{ID: "spam", Label: "Spam", State: spamState, Max: 1, Points: scorePoints(spamState, 1), Detail: spamDetail},

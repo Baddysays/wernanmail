@@ -165,6 +165,21 @@ type DMARCReport struct {
 	CreatedAt   time.Time `json:"createdAt"`
 }
 
+// TLSRPTReport is a flattened TLS reporting summary (RFC 8460).
+type TLSRPTReport struct {
+	ID           int64     `json:"id"`
+	MailboxID    int64     `json:"mailboxId"`
+	OrgName      string    `json:"org"`
+	ReportID     string    `json:"reportId"`
+	DateBegin    time.Time `json:"dateBegin"`
+	DateEnd      time.Time `json:"dateEnd"`
+	PolicyDomain string    `json:"policyDomain"`
+	SuccessCount int       `json:"successCount"`
+	FailureCount int       `json:"failureCount"`
+	ResultType   string    `json:"resultType"`
+	CreatedAt    time.Time `json:"createdAt"`
+}
+
 // MailFilter is a small server-side delivery rule.
 type MailFilter struct {
 	ID         int64  `json:"id"`

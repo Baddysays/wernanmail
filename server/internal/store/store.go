@@ -65,6 +65,10 @@ type MessageStore interface {
 	AddDMARCReports(ctx context.Context, reports []domain.DMARCReport) error
 	ListDMARCReports(ctx context.Context, limit int) ([]domain.DMARCReport, error)
 
+	// TLS-RPT aggregate reports
+	AddTLSRPTReports(ctx context.Context, reports []domain.TLSRPTReport) error
+	ListTLSRPTReports(ctx context.Context, limit int) ([]domain.TLSRPTReport, error)
+
 	// Mailbox filters
 	ListMailFilters(ctx context.Context, mailboxID int64) ([]domain.MailFilter, error)
 	ReplaceMailFilters(ctx context.Context, mailboxID int64, filters []domain.MailFilter) error

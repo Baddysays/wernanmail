@@ -32,7 +32,8 @@ func TestBuildDeliverabilityRatingMissingDKIM(t *testing.T) {
 	if r.Score >= 10 || r.Verdict == "perfect" {
 		t.Fatalf("expected less than perfect, got %v %s", r.Score, r.Verdict)
 	}
-	if r.Score != 8 { // lost 2 DKIM points → 8/10
-		t.Fatalf("score=%v want 8", r.Score)
+	// Lost 2 DKIM of 11.5 max → 9.5/11.5 ≈ 8.3 on the /10 scale.
+	if r.Score != 8.3 {
+		t.Fatalf("score=%v want 8.3", r.Score)
 	}
 }

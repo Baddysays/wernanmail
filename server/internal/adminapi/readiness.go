@@ -50,7 +50,7 @@ func (h *Handler) readyz(w http.ResponseWriter, r *http.Request) {
 
 // posture returns outbound IP cleanliness, antispam self-test, and stack/queue health.
 func (h *Handler) posture(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 12*time.Second)
 	defer cancel()
 	_ = h.Settings.Reload(ctx)
 
@@ -118,6 +118,9 @@ func (h *Handler) posture(w http.ResponseWriter, r *http.Request) {
 			"spf":      dns.SPF,
 			"dkim":     dns.DKIM,
 			"dmarc":    dns.DMARC,
+			"mtasts":   dns.MTASTS,
+			"tlsrpt":   dns.TLSRPT,
+			"bimi":     dns.BIMI,
 		},
 		"rating": rating,
 		"stack": map[string]any{
