@@ -72,6 +72,7 @@ The script will ask (in plain language):
 2. **Public URL** — usually `https://mail.example.com`
 3. **Contact email** — for Let's Encrypt notices
 4. **Issue TLS now?** — if yes, runs Certbot (port **80** must be open)
+5. **Firewall ports?** — shows what is listening / allowed locally and can open UFW or firewalld (cloud security groups and provider blocks on port **25** still need the panel/support)
 
 When it finishes you get:
 

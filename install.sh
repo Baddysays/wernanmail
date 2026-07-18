@@ -7,6 +7,7 @@
 #   3. Builds and starts the stack
 #   4. Shows the admin password and what to do next
 #   5. Optionally requests a Let's Encrypt certificate
+#   6. Checks local listen/firewall ports and can open UFW/firewalld rules
 #
 # Non-interactive (CI / scripts):
 #   WERNANMAIL_NONINTERACTIVE=1 MAIL_HOSTNAME=mail.example.com ./install.sh
@@ -65,7 +66,6 @@ set_env_var() {
   local tmp
   tmp="$(mktemp)"
   if [ -f "$file" ] && grep -qE "^${key}=" "$file"; then
-    # Escape | in value for sed
     local esc
     esc="$(printf '%s' "$val" | sed 's/[\\/&|]/\\&/g')"
     sed "s|^${key}=.*|${key}=${esc}|" "$file" >"$tmp"
@@ -73,6 +73,180 @@ set_env_var() {
   else
     printf '%s=%s\n' "$key" "$val" >>"$file"
     rm -f "$tmp"
+  fi
+}
+
+# Returns 0 if something is listening on TCP port locally.
+port_listening() {
+  local port="$1"
+  if command -v ss >/dev/null 2>&1; then
+    ss -tlnH 2>/dev/null | grep -qE "[:.]${port}[[:space:]]" && return 0
+    ss -tln 2>/dev/null | grep -qE "[:.]${port}[[:space:]]"
+    return $?
+  fi
+  if command -v netstat >/dev/null 2>&1; then
+    netstat -tln 2>/dev/null | grep -qE "[:.]${port}[[:space:]]"
+    return $?
+  fi
+  return 2
+}
+
+detect_firewall() {
+  if command -v ufw >/dev/null 2>&1; then
+    if ufw status 2>/dev/null | grep -qi 'Status: active'; then
+      echo ufw
+      return
+    fi
+  fi
+  if command -v firewall-cmd >/dev/null 2>&1; then
+    if firewall-cmd --state 2>/dev/null | grep -qi running; then
+      echo firewalld
+      return
+    fi
+  fi
+  echo none
+}
+
+firewall_allows_port() {
+  local fw="$1"
+  local port="$2"
+  case "$fw" in
+    ufw)
+      ufw status 2>/dev/null | grep -E "^${port}(/tcp)?[[:space:]]+ALLOW" >/dev/null
+      ;;
+    firewalld)
+      firewall-cmd --list-ports 2>/dev/null | tr ' ' '\n' | grep -qx "${port}/tcp"
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+open_firewall_port() {
+  local fw="$1"
+  local port="$2"
+  case "$fw" in
+    ufw)
+      if [ "$(id -u)" -eq 0 ]; then
+        ufw allow "${port}/tcp" comment 'wernanmail' >/dev/null
+      else
+        sudo ufw allow "${port}/tcp" comment 'wernanmail' >/dev/null
+      fi
+      ;;
+    firewalld)
+      if [ "$(id -u)" -eq 0 ]; then
+        firewall-cmd --permanent --add-port="${port}/tcp" >/dev/null
+        firewall-cmd --reload >/dev/null
+      else
+        sudo firewall-cmd --permanent --add-port="${port}/tcp" >/dev/null
+        sudo firewall-cmd --reload >/dev/null
+      fi
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+# After compose is up: show listen/firewall status and offer to open local firewall rules.
+check_and_offer_ports() {
+  local ports=(25 80 443 587 143)
+  local labels=(
+    "25|SMTP inbound (receiving mail from the internet)"
+    "80|HTTP (Let's Encrypt challenge)"
+    "443|HTTPS (webmail + admin)"
+    "587|Submission (sending mail from clients)"
+    "143|IMAP (reading mail)"
+  )
+  local fw
+  fw="$(detect_firewall)"
+
+  echo
+  echo "=== Ports (this machine) ==="
+  echo "Listening = Docker/stack bound the port here."
+  echo "Firewall  = local UFW/firewalld rule (NOT your cloud security group)."
+  echo
+
+  local need_open=()
+  local line port label listen_state fw_state
+  for line in "${labels[@]}"; do
+    port="${line%%|*}"
+    label="${line#*|}"
+    if port_listening "$port"; then
+      listen_state="listening"
+    else
+      listen_state="not listening"
+    fi
+    case "$fw" in
+      ufw|firewalld)
+        if firewall_allows_port "$fw" "$port"; then
+          fw_state="allowed in $fw"
+        else
+          fw_state="blocked/unknown in $fw"
+          need_open+=("$port")
+        fi
+        ;;
+      *)
+        fw_state="no active ufw/firewalld detected"
+        ;;
+    esac
+    printf "  %-4s  %-14s  %s\n" "$port" "$listen_state" "$fw_state"
+    printf "         %s\n" "$label"
+  done
+
+  echo
+  echo "Important limits:"
+  echo "  • Cloud panels (Hetzner/AWS/… security groups) are separate — open ports there too."
+  echo "  • Many VPS providers block port 25 until you ask support to unblock it."
+  echo "    Local 'allow 25' does nothing if the provider filters it upstream."
+
+  if [ "$fw" = "none" ]; then
+    echo
+    echo "No active UFW/firewalld — if you use a cloud firewall, open 25,80,443,587,143 there."
+    return
+  fi
+
+  if [ "${#need_open[@]}" -eq 0 ]; then
+    echo
+    echo "Local $fw already allows the mail/web ports we checked."
+    return
+  fi
+
+  if ! want_interactive; then
+    echo
+    echo "Non-interactive: not changing firewall. Suggested $fw commands:"
+    local p
+    for p in "${need_open[@]}"; do
+      if [ "$fw" = "ufw" ]; then
+        echo "  sudo ufw allow ${p}/tcp"
+      else
+        echo "  sudo firewall-cmd --permanent --add-port=${p}/tcp && sudo firewall-cmd --reload"
+      fi
+    done
+    return
+  fi
+
+  echo
+  echo "Local $fw is active, but some ports look closed: ${need_open[*]}"
+  if prompt_yn "Open these ports in $fw now?" "y"; then
+    local p
+    for p in "${need_open[@]}"; do
+      if open_firewall_port "$fw" "$p"; then
+        echo "  opened ${p}/tcp in $fw"
+      else
+        echo "  could not open ${p}/tcp (try manually with sudo)"
+      fi
+    done
+  else
+    echo "Skipped. You can open them later, for example:"
+    for p in "${need_open[@]}"; do
+      if [ "$fw" = "ufw" ]; then
+        echo "  sudo ufw allow ${p}/tcp"
+      else
+        echo "  sudo firewall-cmd --permanent --add-port=${p}/tcp && sudo firewall-cmd --reload"
+      fi
+    done
   fi
 }
 
@@ -212,13 +386,15 @@ if [ "$ISSUE_TLS" = "1" ]; then
   fi
 fi
 
+check_and_offer_ports
+
 echo
 echo "=== What to do next (about 15 minutes) ==="
 echo "1. Open Admin:  $PUBLIC_URL/admin/"
 echo "2. Sign in, add your domain, generate DKIM."
 echo "3. Open Overview → Setup checklist and DNS helper."
 echo "   Publish MX, SPF, DKIM, DMARC, and PTR at your DNS panel."
-echo "4. Open firewall ports: 25, 587, 143, 80, 443."
+echo "4. Confirm ports (above) + cloud firewall / provider port 25."
 echo "5. Send a test message and watch Deliverability score."
 echo
 echo "If the browser warns about the certificate, either finish Let's Encrypt"
