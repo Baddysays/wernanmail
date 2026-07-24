@@ -1040,13 +1040,15 @@ export function App() {
 
   const loadDomainExtras = useCallback(
     async (domain: Domain) => {
-      if (!domain?.id) return
+      if (!domain?.id) return [] as Mailbox[]
       const [mbs, als] = await Promise.all([
         api<Mailbox[]>(`/api/admin/domains/${domain.id}/mailboxes`, creds!),
         api<Alias[]>(`/api/admin/domains/${domain.id}/aliases`, creds!),
       ])
-      setMailboxes(asList(mbs))
+      const list = asList(mbs)
+      setMailboxes(list)
       setAliases(asList(als))
+      return list
     },
     [creds],
   )
@@ -1255,13 +1257,14 @@ export function App() {
           return
         }
       }
+      const createdLocal = form.localPart.trim().toLowerCase()
       await api(`/api/admin/domains/${selectedDomain.id}/mailboxes`, {
         ...creds,
         method: 'POST',
         body,
       })
       setForm((f) => ({ ...f, localPart: '', password: '', displayName: '', quotaMb: '' }))
-      await loadDomainExtras(selectedDomain)
+      const mbs = await loadDomainExtras(selectedDomain)
       const list = asList(await api<Domain[]>('/api/admin/domains', creds!))
       setDomains(list)
       const refreshed = list.find((d) => domainId(d) === String(selectedDomain.id))
@@ -1272,6 +1275,8 @@ export function App() {
           name: domainName(refreshed),
         })
       }
+      const created = mbs.find((m) => m.localPart.toLowerCase() === createdLocal)
+      if (created) selectMailbox(created)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -2308,6 +2313,17 @@ export function App() {
                   ? t('mailboxes.count', { n: filteredMailboxes.length, total: mailboxes.length })
                   : null}
               </span>
+              <button
+                type="button"
+                className="primary"
+                disabled={!selectedDomain}
+                onClick={() => {
+                  setSelectedMailbox(null)
+                  setMbDetailTab('general')
+                }}
+              >
+                {t('mailboxes.add')}
+              </button>
               <button type="button" className="ghost" onClick={() => void load()} disabled={!selectedDomain}>
                 {t('actions.refresh')}
               </button>
@@ -2470,56 +2486,6 @@ export function App() {
                               </div>
                             </form>
                           </section>
-                          <section className="detail-card">
-                            <h4>{t('mailboxes.addAnother')}</h4>
-                            <form className="form-stack" onSubmit={createMailbox}>
-                              <div className="field-grid">
-                                <div className="field">
-                                  <label htmlFor="mb-quick-local">{t('domains.localPart')}</label>
-                                  <input
-                                    id="mb-quick-local"
-                                    value={form.localPart}
-                                    onChange={(e) => setForm({ ...form, localPart: e.target.value })}
-                                    required
-                                  />
-                                </div>
-                                <div className="field">
-                                  <label htmlFor="mb-quick-name">{t('domains.displayName')}</label>
-                                  <input
-                                    id="mb-quick-name"
-                                    value={form.displayName}
-                                    onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-                                  />
-                                </div>
-                                <div className="field">
-                                  <label htmlFor="mb-quick-pass">{t('domains.password')}</label>
-                                  <input
-                                    id="mb-quick-pass"
-                                    type="password"
-                                    value={form.password}
-                                    onChange={(e) => setForm({ ...form, password: e.target.value })}
-                                    required
-                                  />
-                                </div>
-                                <div className="field">
-                                  <label htmlFor="mb-quick-quota">{t('mailboxes.quotaMb')}</label>
-                                  <input
-                                    id="mb-quick-quota"
-                                    type="number"
-                                    min="0"
-                                    value={form.quotaMb}
-                                    onChange={(e) => setForm({ ...form, quotaMb: e.target.value })}
-                                    placeholder={t('mailboxes.quotaDefault')}
-                                  />
-                                </div>
-                              </div>
-                              <div className="detail-actions">
-                                <button className="primary" type="submit" disabled={busy}>
-                                  {t('actions.add')}
-                                </button>
-                              </div>
-                            </form>
-                          </section>
                         </>
                       ) : mbDetailTab === 'aliases' ? (
                         <section className="detail-card">
@@ -2577,10 +2543,66 @@ export function App() {
                       )}
                     </>
                   ) : (
-                    <div className="empty-state">
-                      <p className="empty-title">{t('mailboxes.select')}</p>
-                      <p className="muted">{t('mailboxes.selectHint')}</p>
-                    </div>
+                    <section className="detail-card">
+                      <h4>{t('mailboxes.add')}</h4>
+                      <p className="muted foot-note">{t('mailboxes.addHint')}</p>
+                      <form className="form-stack" onSubmit={createMailbox}>
+                        <div className="field-grid">
+                          <div className="field">
+                            <label htmlFor="mb-new-local">{t('domains.localPart')}</label>
+                            <input
+                              id="mb-new-local"
+                              value={form.localPart}
+                              onChange={(e) => setForm({ ...form, localPart: e.target.value })}
+                              autoComplete="off"
+                              required
+                              autoFocus
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="mb-new-name">{t('domains.displayName')}</label>
+                            <input
+                              id="mb-new-name"
+                              value={form.displayName}
+                              onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+                              autoComplete="off"
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="mb-new-pass">{t('domains.password')}</label>
+                            <input
+                              id="mb-new-pass"
+                              type="password"
+                              value={form.password}
+                              onChange={(e) => setForm({ ...form, password: e.target.value })}
+                              autoComplete="new-password"
+                              required
+                            />
+                          </div>
+                          <div className="field">
+                            <label htmlFor="mb-new-quota">{t('mailboxes.quotaMb')}</label>
+                            <input
+                              id="mb-new-quota"
+                              type="number"
+                              min="0"
+                              value={form.quotaMb}
+                              onChange={(e) => setForm({ ...form, quotaMb: e.target.value })}
+                              placeholder={t('mailboxes.quotaDefault')}
+                            />
+                          </div>
+                        </div>
+                        <div className="detail-actions">
+                          <button className="primary" type="submit" disabled={busy}>
+                            {t('domains.addMailbox')}
+                          </button>
+                        </div>
+                      </form>
+                      {mailboxes.length ? (
+                        <p className="muted foot-note" style={{ marginTop: '0.75rem' }}>
+                          {t('mailboxes.selectHint')}
+                        </p>
+                      ) : null}
+                    </section>
                   )}
                 </div>
               </div>
